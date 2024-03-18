@@ -1,0 +1,605 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+
+  <!--
+        This POM exists as a convenience to build all modules in the LvvFrontend project.
+        https://maven.apache.org/guides/mini/guide-multiple-modules.html
+    -->
+  <parent>
+    <groupId>com.oracle.pic.commons</groupId>
+    <artifactId>service-pom</artifactId>
+    <version>2.0.16</version>
+  </parent>
+
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>com.oracle.pic.networking.lvv.frontend</groupId>
+  <artifactId>lvv-frontend-reactor-pom</artifactId>
+  <name>LvvFrontend Reactor Pom</name>
+  <version>0.1-SNAPSHOT</version>
+  <packaging>pom</packaging>
+
+  <modules>
+    <module>lvv-frontend-spec</module>
+    <module>lvv-frontend-java-client</module>
+    <module>lvv-frontend-python-client</module>
+    <module>lvv-frontend-api</module>
+    <module>lvv-frontend-canary</module>
+  </modules>
+
+  <properties>
+    <!-- Treat any resources/sources as UTF-8 -->
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+    <!--
+        Versions for libraries used in build.
+
+        Also go to java client pom file and keep the bmc-sdk-java-client-parent version in sync with the
+        oci-java-sdk-version defined in oci-internal-bom
+    -->
+    <oci-internal-bom-version>2.0.186</oci-internal-bom-version>
+    <!-- also update dw-service-bom-version in java & python client -->
+    <dropwizard-service-bom-version>2.1.46</dropwizard-service-bom-version>
+
+    <formatter-goal>apply</formatter-goal>
+    <maven-toolchains-plugin-version>3.0.0</maven-toolchains-plugin-version>
+  </properties>
+
+  <dependencyManagement>
+    <dependencies>
+      <!-- Dropwizard BOM -->
+      <!-- This BOM file tracks all of the common third party dropwizard related dependencies' versions
+           For more information see: https://confluence.oci.oraclecorp.com/x/8IF2Gg -->
+
+      <dependency>
+        <groupId>com.oracle.pic.commons</groupId>
+        <artifactId>dropwizard-service-bom</artifactId>
+        <version>${dropwizard-service-bom-version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+
+      <!-- OCI Internal Dependencies BOM -->
+      <!-- This BOM file tracks all of the common OCI internal dependencies' versions, such as
+           Commons, Identity, Kiev, Service Frameworks, etc.
+           For more information see: https://confluence.oci.oraclecorp.com/x/BeAPGQ -->
+      <dependency>
+        <groupId>com.oracle.pic.sfw</groupId>
+        <artifactId>oci-internal-bom</artifactId>
+        <version>${oci-internal-bom-version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+
+      <!-- Publications from the current project's sub-modules -->
+      <dependency>
+        <groupId>com.oracle.pic.networking.lvv.frontend</groupId>
+        <artifactId>lvv-frontend-spec</artifactId>
+        <version>0.1-SNAPSHOT</version>
+      </dependency>
+      <dependency>
+        <groupId>com.oracle.pic.networking.lvv.frontend</groupId>
+        <artifactId>lvv-frontend-java-client</artifactId>
+        <version>0.1-SNAPSHOT</version>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>exec-maven-plugin</artifactId>
+        <version>3.0.0</version>
+        <inherited>false</inherited>
+        <executions>
+          <execution>
+            <id>Remove old BOM update</id>
+            <phase>validate</phase>
+            <goals>
+              <goal>exec</goal>
+            </goals>
+            <configuration>
+              <executable>rm</executable>
+              <arguments>
+                <argument>${project.basedir}/bom-dependency-versions.txt</argument>
+              </arguments>
+              <successCodes>
+                <!-- Don't fail if the file isn't there -->
+                <successCode>0</successCode>
+                <successCode>1</successCode>
+              </successCodes>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <!-- This plugin will log the latest version available of the specified dependencies, and if they are being used
+           or not. -->
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>versions-maven-plugin</artifactId>
+        <version>2.8.1</version>
+        <executions>
+          <execution>
+            <phase>install</phase>
+            <goals>
+              <goal>display-property-updates</goal>
+            </goals>
+            <configuration>
+              <includes>
+                <include>com.oracle.pic.commons:dropwizard-service-bom</include>
+                <include>com.oracle.pic.sfw:oci-internal-bom</include>
+              </includes>
+              <rulesUri>file://///${project.basedir}/maven-version-rules.xml</rulesUri>
+              <includeProperties>oci-internal-bom-version,dropwizard-service-bom-version</includeProperties>
+              <allowIncrementalUpdates>true</allowIncrementalUpdates>
+              <allowMinorUpdates>true</allowMinorUpdates>
+              <allowMajorUpdates>true</allowMajorUpdates>
+
+              <!-- This files tracks dependency updates that are due. -->
+              <!-- Remove the following line if you wish to disable this tracking file feature. -->
+              <outputFile>bom-dependency-versions.txt</outputFile>
+
+              <!-- SNAPSHOT versions of the bom should NOT be used in production. -->
+              <allowSnapshots>false</allowSnapshots>
+
+              <!-- Version control already keeps history of the pom file changes -->
+              <generateBackupPoms>false</generateBackupPoms>
+
+              <!-- We don't want to scan the dependencies within the bom. -->
+              <processDependencyManagementTransitive>false</processDependencyManagementTransitive>
+            </configuration>
+          </execution>
+        </executions>
+
+        <!-- We only want to run this plugin in this pom, and not every module. -->
+        <inherited>false</inherited>
+      </plugin>
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+        <version>0.8.5</version>
+        <executions>
+          <execution>
+            <id>default-prepare-agent</id>
+            <goals>
+              <goal>prepare-agent</goal>
+            </goals>
+          </execution>
+          <execution>
+            <id>default-report</id>
+            <phase>prepare-package</phase>
+            <goals>
+              <goal>report</goal>
+            </goals>
+            <configuration>
+              <!-- This is the directory where you want to store the generated code coverage files-->
+              <outputDirectory>${project.build.directory}/jacoco-reports</outputDirectory>
+            </configuration>
+          </execution>
+          <execution>
+            <id>default-check</id>
+            <goals>
+              <goal>check</goal>
+            </goals>
+            <configuration>
+              <rules>
+                <rule implementation="org.jacoco.maven.RuleConfiguration">
+                  <element>BUNDLE</element>
+                  <limits>
+                    <limit implementation="org.jacoco.report.check.Limit">
+                      <counter>COMPLEXITY</counter>
+                      <value>COVEREDRATIO</value>
+                      <!-- Tweak this as you gain coverage -->
+                      <minimum>0.0</minimum>
+                    </limit>
+                  </limits>
+                </rule>
+              </rules>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!-- We use toolchains plugin to support multiple versions of java sdk with maven
+      you need to add toolchains.xml in ~/.m2 directory
+      See: https://dzone.com/articles/guide-for-supporting-multiple-versions-of-java-8-1-->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-toolchains-plugin</artifactId>
+        <version>${maven-toolchains-plugin-version}</version>
+        <executions>
+          <execution>
+            <goals>
+              <goal>toolchain</goal>
+            </goals>
+          </execution>
+        </executions>
+        <configuration>
+          <toolchains>
+            <jdk>
+              <version>17</version>
+            </jdk>
+          </toolchains>
+        </configuration>
+      </plugin>
+
+    </plugins>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-compiler-plugin</artifactId>
+          <version>3.10.1</version>
+          <configuration>
+            <source>17</source>
+            <target>17</target>
+          </configuration>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+  </build>
+
+  <profiles>
+    <profile>
+      <id>enforce-project-version</id>
+      <activation>
+        <activeByDefault>false</activeByDefault>
+      </activation>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-enforcer-plugin</artifactId>
+            <version>1.4.1</version>
+            <dependencies>
+              <dependency>
+                <groupId>com.oracle.pic.kiev.maven</groupId>
+                <artifactId>maven-enforcer-rules</artifactId>
+                <version>1.0.5</version>
+              </dependency>
+            </dependencies>
+            <executions>
+              <execution>
+                <id>requireProjectVersion</id>
+                <goals>
+                  <goal>enforce</goal>
+                </goals>
+                <configuration>
+                  <rules>
+                    <requireProjectVersion implementation="com.oracle.pic.kiev.maven.enforcer.RequireProjectVersion">
+                      <requiredVersion>${env.REQUIRED_PROJECT_VERSION}</requiredVersion>
+                    </requireProjectVersion>
+                  </rules>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+    <!-- If there are Java sources, apply checkstyle, pmd, findbugs, code-coverage, etc. -->
+    <profile>
+      <id>profile-java-has-main-sources</id>
+      <activation>
+        <activeByDefault>false</activeByDefault>
+        <file>
+          <exists>${basedir}/src/main/java</exists>
+        </file>
+      </activation>
+      <build>
+        <pluginManagement>
+          <plugins>
+            <!--This plugin's configuration is used to store Eclipse m2e settings
+              only. It has no influence on the Maven build itself. -->
+            <plugin>
+              <groupId>org.eclipse.m2e</groupId>
+              <artifactId>lifecycle-mapping</artifactId>
+              <version>1.0.0</version>
+              <configuration>
+                <lifecycleMappingMetadata>
+                  <pluginExecutions>
+                    <pluginExecution>
+                      <pluginExecutionFilter>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>build-helper-maven-plugin</artifactId>
+                        <versionRange>[1.9.1,)</versionRange>
+                        <goals>
+                          <goal>parse-version</goal>
+                        </goals>
+                      </pluginExecutionFilter>
+                      <action>
+                        <ignore/>
+                      </action>
+                    </pluginExecution>
+                  </pluginExecutions>
+                </lifecycleMappingMetadata>
+              </configuration>
+            </plugin>
+          </plugins>
+        </pluginManagement>
+
+        <plugins>
+          <!-- Run dependency analyzer during build to keep your dependency graph under control. -->
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-dependency-plugin</artifactId>
+            <version>3.4.0</version>
+            <executions>
+              <execution>
+                <id>analyze-dependencies</id>
+                <goals>
+                  <goal>analyze-only</goal>
+                </goals>
+                <configuration>
+                  <ignoredUnusedDeclaredDependencies>
+                    <ignoredUnusedDeclaredDependency>javax.validation</ignoredUnusedDeclaredDependency>
+                    <ignoredUnusedDeclaredDependency>javax.servlet</ignoredUnusedDeclaredDependency>
+                    <ignoredUnusedDeclaredDependency>javax.ws.rs</ignoredUnusedDeclaredDependency>
+                  </ignoredUnusedDeclaredDependencies>
+
+                  <ignoredUsedUndeclaredDependencies>
+                    <ignoredUsedUndeclaredDependency>jakarta.ws.rs</ignoredUsedUndeclaredDependency>
+                    <ignoredUsedUndeclaredDependency>jakarta.servlet</ignoredUsedUndeclaredDependency>
+                    <ignoredUsedUndeclaredDependency>jakarta.validation</ignoredUsedUndeclaredDependency>
+                    <ignoredUsedUndeclaredDependency>org.glassfish.hk2.external</ignoredUsedUndeclaredDependency>
+                    <ignoredUsedUndeclaredDependency>com.oracle.pic.authproxy</ignoredUsedUndeclaredDependency>
+                    <ignoredUsedUndeclaredDependency>com.oracle.oci.sdk</ignoredUsedUndeclaredDependency>
+                    <ignoredUsedUndeclaredDependency>junit</ignoredUsedUndeclaredDependency>
+                  </ignoredUsedUndeclaredDependencies>
+
+                  <failOnWarning>true</failOnWarning>
+                </configuration>
+              </execution>
+            </executions>
+          </plugin>
+
+          <!-- Enforce various best-practices during build. -->
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-enforcer-plugin</artifactId>
+            <version>3.1.0</version>
+            <executions>
+              <execution>
+                <id>enforce</id>
+                <configuration>
+                  <rules>
+                    <!-- https://maven.apache.org/enforcer/enforcer-rules/dependencyConvergence.html -->
+                    <DependencyConvergence/>
+                    <!-- https://maven.apache.org/enforcer/enforcer-rules/requireJavaVersion.html -->
+                    <requireJavaVersion>
+                      <version>17</version>
+                    </requireJavaVersion>
+                    <!-- https://www.mojohaus.org/extra-enforcer-rules/banDuplicateClasses.html -->
+                    <banDuplicateClasses/>
+                    <!-- Ban all non FIPS bouncy castle use -->
+                    <bannedDependencies>
+                      <searchTransitive>true</searchTransitive>
+                      <excludes>
+                        <exclude>org.bouncycastle:*</exclude>
+                      </excludes>
+                    </bannedDependencies>
+                  </rules>
+                </configuration>
+                <goals>
+                  <goal>enforce</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-checkstyle-plugin</artifactId>
+            <version>3.1.1</version>
+            <configuration>
+              <configLocation>../checkstyle.xml</configLocation>
+              <encoding>UTF-8</encoding>
+              <consoleOutput>true</consoleOutput>
+              <failsOnError>true</failsOnError>
+              <linkXRef>false</linkXRef>
+              <violationSeverity>warning</violationSeverity>
+              <suppressionsLocation>build_config/checkstyle-suppressions.xml</suppressionsLocation>
+            </configuration>
+            <executions>
+              <execution>
+                <id>verify-style</id>
+                <goals>
+                  <goal>check</goal>
+                </goals>
+                <phase>verify</phase>
+              </execution>
+            </executions>
+          </plugin>
+
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-pmd-plugin</artifactId>
+            <version>3.12.0</version>
+            <configuration>
+              <linkXRef>false</linkXRef>
+              <sourceEncoding>UTF-8</sourceEncoding>
+              <excludeRoots>
+                <excludeRoot>target/generated-sources</excludeRoot>
+              </excludeRoots>
+              <!-- duplicate code minimumTokens default: 100 -->
+              <minimumTokens>100</minimumTokens>
+              <excludeFromFailureFile>${project.basedir}/build_config/exclude-pmd.properties</excludeFromFailureFile>
+              <printFailingErrors>true</printFailingErrors>
+            </configuration>
+            <executions>
+              <execution>
+                <goals>
+                  <goal>check</goal>
+                  <goal>cpd-check</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+
+          <plugin>
+            <groupId>com.github.spotbugs</groupId>
+            <artifactId>spotbugs-maven-plugin</artifactId>
+            <version>4.7.3.0</version>
+            <configuration>
+              <effort>Max</effort>
+              <xmlOutput>true</xmlOutput>
+              <excludeFilterFile>build_config/findbugs-exclude.xml</excludeFilterFile>
+              <plugins>
+                <plugin>
+                  <groupId>jp.skypencil.findbugs.slf4j</groupId>
+                  <artifactId>bug-pattern</artifactId>
+                  <version>1.4.2</version>
+                </plugin>
+              </plugins>
+            </configuration>
+            <executions>
+              <execution>
+                <goals>
+                  <goal>check</goal>
+                </goals>
+                <phase>verify</phase>
+              </execution>
+            </executions>
+          </plugin>
+
+          <!-- Spotless is a general-purpose formatting plugin. It is completely Ã la carte,
+          but also includes powerful "batteries-included" if you opt-in
+          https://github.com/diffplug/spotless/tree/master/plugin-maven -->
+          <plugin>
+            <groupId>com.diffplug.spotless</groupId>
+            <artifactId>spotless-maven-plugin</artifactId>
+            <version>2.39.0</version>
+            <configuration>
+              <java>
+                <removeUnusedImports/>
+                <googleJavaFormat>
+                  <version>1.17.0</version>
+                  <!-- Optional, available versions: GOOGLE, AOSP
+                  https://github.com/google/google-java-format/blob/master/core/src/main/java/com/google/googlejavaformat/java/JavaFormatterOptions.java -->
+                  <style>AOSP</style>
+                </googleJavaFormat>
+              </java>
+            </configuration>
+            <executions>
+              <execution>
+                <id>format-sources</id>
+                <goals>
+                  <goal>${formatter-goal}</goal>
+                </goals>
+                <phase>process-sources</phase>
+              </execution>
+            </executions>
+          </plugin>
+
+          <!-- This plugin makes sure all dependencies converge to a specific version and we avoid diamond dependency problem -->
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-enforcer-plugin</artifactId>
+            <version>3.1.0</version>
+            <executions>
+              <execution>
+                <id>enforce</id>
+                <configuration>
+                  <rules>
+                    <!-- https://maven.apache.org/enforcer/enforcer-rules/dependencyConvergence.html -->
+                    <DependencyConvergence/>
+                    <!-- https://maven.apache.org/enforcer/enforcer-rules/requireJavaVersion.html -->
+                    <requireJavaVersion>
+                      <version>17</version>
+                    </requireJavaVersion>
+                    <!-- https://www.mojohaus.org/extra-enforcer-rules/banDuplicateClasses.html -->
+                    <banDuplicateClasses/>
+                    <!-- Ban all non FIPS bouncy castle use -->
+                    <bannedDependencies>
+                      <searchTransitive>true</searchTransitive>
+                      <excludes>
+                        <exclude>org.bouncycastle:*</exclude>
+                      </excludes>
+                    </bannedDependencies>
+                    <requireReleaseDeps>
+                      <message>You tried to use a SNAPSHOT dependency, which is forbidden because it prevents reproducible
+                        builds! Use a release dependency instead.
+                      </message>
+                      <failWhenParentIsSnapshot>false</failWhenParentIsSnapshot>
+                      <!-- ONLY packages that are contained within this Git repository should be added here. DO NOT add
+                       packages from any external repository. -->
+                      <excludes>
+                        <exclude>com.oracle.pic.networking.lvv.frontend:lvv-frontend-spec</exclude>
+                        <exclude>com.oracle.pic.networking.lvv.frontend:lvv-frontend-java-client</exclude>
+                      </excludes>
+                    </requireReleaseDeps>
+                  </rules>
+                </configuration>
+                <goals>
+                  <goal>enforce</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+
+    <!-- Use the 'dev' profile to see stdout from unit tests in the console -->
+    <profile>
+      <id>dev</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-surefire-plugin</artifactId>
+            <configuration>
+              <disableXmlReport>true</disableXmlReport>
+              <redirectTestOutputToFile>false</redirectTestOutputToFile>
+              <useFile>false</useFile>
+              <trimStackTrace>false</trimStackTrace>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+
+    <!--
+        The following are profiles to add the exceptions for the respective tools, if the exception file exists.
+        These rely on activation based on file presence, due to which, the paths cannot be referenced using arbitrary
+        properties (only basedir and a few others may be used). Hence, the paths to the files are duplicated.
+    -->
+    <profile>
+      <id>profile-checkstyle-exception-exists</id>
+      <activation>
+        <activeByDefault>false</activeByDefault>
+        <file>
+          <exists>build_config/checkstyle-suppressions.xml</exists>
+        </file>
+      </activation>
+      <build>
+        <pluginManagement>
+          <plugins>
+            <plugin>
+              <groupId>org.apache.maven.plugins</groupId>
+              <artifactId>maven-checkstyle-plugin</artifactId>
+              <configuration>
+                <suppressionsLocation>${basedir}/build_config/checkstyle-suppressions.xml</suppressionsLocation>
+              </configuration>
+            </plugin>
+          </plugins>
+        </pluginManagement>
+      </build>
+    </profile>
+
+    <!-- In Build Service we want to fail if the code isn't formatted -->
+    <profile>
+      <id>in-build-service</id>
+      <activation>
+        <activeByDefault>false</activeByDefault>
+        <property>
+          <name>env.BLD_GUID</name>
+        </property>
+      </activation>
+      <properties>
+        <formatter-goal>check</formatter-goal>
+      </properties>
+    </profile>
+  </profiles>
+</project>

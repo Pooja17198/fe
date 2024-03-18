@@ -1,0 +1,93 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+
+<modelVersion>4.0.0</modelVersion>
+
+  <!--
+    Versions for `bmc-sdk-java-client-parent` and `oci-java-sdk` should be the same.
+    Please go to https://bitbucket.oci.oraclecorp.com/projects/lvv-frontend/repos/oci-internal-dependency-management/browse/oci-internal-bom/pom.xml
+    and find the oci-java-sdk-version.
+  -->
+  <parent>
+    <groupId>com.oracle.bmc.sdk.clients</groupId>
+    <artifactId>bmc-sdk-java-client-parent</artifactId>
+    <version>2.66.1</version>
+    <relativePath/>
+  </parent>
+
+  <groupId>com.oracle.pic.networking.lvv.frontend</groupId>
+  <artifactId>lvv-frontend-java-client</artifactId>
+  <version>0.1-SNAPSHOT</version>
+  <packaging>jar</packaging>
+  <name>lvv-frontend-java-client</name>
+
+  <properties>
+    <codegen.artifactory.groupId>com.oracle.pic.networking.lvv.frontend</codegen.artifactory.groupId>
+    <codegen.artifactory.artifactId>lvv-frontend-spec</codegen.artifactory.artifactId>
+    <!-- By default build the release version of the spec file -->
+    <spec-target-group>release</spec-target-group>
+    <codegen.spec.name>${spec-target-group}/api.yaml</codegen.spec.name>
+    <codegen.base.package.name>com.oracle.pic.networking.lvv.frontend</codegen.base.package.name>
+    <codegen.endpoint>lvv-frontend</codegen.endpoint>
+    <codegen.generate.waiters>true</codegen.generate.waiters>
+    <codegen.specGenerationType>INTERNAL</codegen.specGenerationType>
+    <dropwizard-service-bom-version>2.1.46</dropwizard-service-bom-version>
+  </properties>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>com.oracle.pic.commons</groupId>
+        <artifactId>dropwizard-service-bom</artifactId>
+        <version>${dropwizard-service-bom-version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <groupId>com.oracle.bmc.sdk</groupId>
+        <artifactId>bmc-sdk-swagger-maven-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>build-helper-maven-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+      </plugin>
+    </plugins>
+  </build>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.projectlombok</groupId>
+      <artifactId>lombok</artifactId>
+      <!--Versions earlier than 1.16.22 fail with JDK10: https://github.com/rzwitserloot/lombok/issues/1572-->
+      <!-- Version has to be specified here even though it is declared on the dropwizard-bom because
+           bmc-sdk-java-client-parent overrides it to 1.18.12 -->
+      <version>1.18.26</version>
+    </dependency>
+    <dependency>
+      <groupId>com.oracle.pic.networking.lvv.frontend</groupId>
+      <artifactId>lvv-frontend-spec</artifactId>
+      <version>0.1-SNAPSHOT</version>
+    </dependency>
+
+    <dependency>
+      <groupId>com.oracle.oci.sdk</groupId>
+      <artifactId>oci-java-sdk-common</artifactId>
+      <optional>false</optional>
+    </dependency>
+  </dependencies>
+
+</project>

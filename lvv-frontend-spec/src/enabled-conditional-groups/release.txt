@@ -1,0 +1,23 @@
+# Use this file to determine which conditional groups are present in the release spec.
+#
+# This configuration file determines which conditional groups are enabled.
+# Use --group_file enabled.txt or -f enabled.txt
+#
+# The hash '#' character starts a comment
+#
+# Group names can contain the characters A-Z, a-z, 0-9 and the underscore '_' and the hyphen '-'.
+# Whitespace before or after the group name is ignored.
+# The group name is not case-sensitive ("foo" and "FOO" are identical)
+#
+# Note: Just enabling a group here in 'release.txt' will not cause it to appear in the public OCI SDKs.
+# For that, see https://confluence.oci.oraclecorp.com/display/DEX/Self-Service+Testing+and+Development
+#
+# Please check following links for details about conditional swagger specs -
+# https://confluence.oci.oraclecorp.com/display/DEX/Swagger+Spec+Preprocessor
+# https://confluence.oci.oraclecorp.com/display/DEX/Swagger+Spec+Branching+Strategy
+#
+# It is recommended to use the UDX ticket number as group name to enable/disable the feature.
+# For details, please refer to https://confluence.oci.oraclecorp.com/pages/viewpage.action?pageId=10466490#UDXReleaseManagement/RequestingCustomerEnhancements-FeatureDevelopmentandSelf-service
+#
+
+# UDX-123 # not enabled

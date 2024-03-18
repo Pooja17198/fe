@@ -1,0 +1,36 @@
+<FindBugsFilter>
+    <!-- For documentation on this file's format,
+              see http://git.eclipse.org/c/tcf/org.eclipse.tcf.git/plain/admin/findbugs-exclude.xml
+
+    For a description of the error codes,
+    see http://findbugs.sourceforge.net/bugDescriptions.html
+    -->
+
+    <!-- placeholder for any exclusions -->
+
+    <!-- Exclude errors from code-gen for generated fields of type "Date"  -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2,EI_EXPOSE_REP"/>
+        <Package name="com.oracle.pic.networking.lvv.frontend.model" />
+    </Match>
+
+    <!--  AuthHelper constructor takes in a mutable AuthorizationClient as a parameter.
+    There is no .clone() or .toBuilder() methods offered by Identity at the moment, which
+    complicates instantiating a new AuthorizationClient.
+    -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2" />
+        <Class name="com.oracle.pic.networking.lvv.frontend.auth.AuthHelper" />
+        <Method name="&lt;init&gt;"/>
+    </Match>
+
+    <!--  LvvFrontendApiModule constructor takes in a mutable LvvFrontendApiConfiguration as a parameter.
+    Some LvvFrontendApiConfiguration properties such as MetricsConfiguration do not have a .toBuilder()
+    or .clone() method, which complicates instantiating a new LvvFrontendApiConfiguration.
+    -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2" />
+        <Class name="com.oracle.pic.networking.lvv.frontend.config.LvvFrontendApiModule" />
+        <Method name="&lt;init&gt;"/>
+    </Match>
+</FindBugsFilter>

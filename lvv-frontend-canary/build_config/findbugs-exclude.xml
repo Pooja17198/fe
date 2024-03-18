@@ -1,0 +1,42 @@
+<FindBugsFilter>
+    <!-- For documentation on this file's format,
+              see http://git.eclipse.org/c/tcf/org.eclipse.tcf.git/plain/admin/findbugs-exclude.xml
+
+    For a description of the error codes,
+    see http://findbugs.sourceforge.net/bugDescriptions.html
+    -->
+
+    <!-- placeholder for any exclusions -->
+
+    <!-- Exclude errors from code-gen for generated fields of type "Date"  -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2,EI_EXPOSE_REP"/>
+        <Package name="com.oracle.pic.sample.cp.canary.model" />
+    </Match>
+
+    <!--  AuthHelper constructor takes in a mutable BasicAuthenticationDetailsProvider as a parameter.
+    There is no .clone() or .toBuilder() methods for BasicAuthenticationDetailsProvider at the moment,
+    which complicates instantiating a new BasicAuthenticationDetailsProvider.
+    -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2" />
+        <Class name="com.oracle.pic.networking.lvv.frontend.canary.client.ExampleClientProvider" />
+        <Method name="&lt;init&gt;"/>
+    </Match>
+
+    <!--  LvvFrontendCanaryModule and ExampleClientProvider constructors take in a mutable
+    LvvFrontendCanaryConfiguration as a parameter. Some LvvFrontendCanaryConfiguration properties such as
+    MetricsConfiguration do not have a .toBuilder() or .clone() method, which complicates instantiating a new
+    LvvFrontendCanaryConfiguration.
+    -->
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2" />
+        <Class name="com.oracle.pic.networking.lvv.frontend.canary.config.LvvFrontendCanaryModule" />
+        <Method name="&lt;init&gt;"/>
+    </Match>
+    <Match>
+        <Bug pattern="EI_EXPOSE_REP2" />
+        <Class name="com.oracle.pic.networking.lvv.frontend.canary.ExampleClientProvider" />
+        <Method name="&lt;init&gt;"/>
+    </Match>
+</FindBugsFilter>

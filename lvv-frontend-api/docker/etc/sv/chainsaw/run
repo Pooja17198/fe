@@ -1,0 +1,13 @@
+#!/bin/bash
+exec 2>&1
+
+# =============================================================================
+# Launch Chainsaw2
+# =============================================================================
+
+# Todo-Replace: Replace with your compartmentId and lumberjack namespace here.
+chainsaw2 \
+    --compartment="ocid1.compartment.oc1..aaaaaaaa26mceal7cypzsefhbm2l73xtb3yreplacemereplacemereplaceme" \
+    --namespace="lvv-frontend-api" \
+    --s2sbyinstanceprincipal \
+    --metrics="{\"projectName\"=\"lvv-frontend\",\"fleetName\"=\"lvv-frontend-api\"}"

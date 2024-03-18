@@ -1,0 +1,173 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.oracle.bmc.sdk.clients</groupId>
+    <artifactId>bmc-sdk-python-client-parent</artifactId>
+    <version>1.147</version>
+    <relativePath/>
+  </parent>
+
+  <groupId>com.oracle.pic.networking.lvv.frontend</groupId>
+  <artifactId>lvv-frontend-python-client</artifactId>
+  <version>0.1-SNAPSHOT</version>
+  <name>lvv-frontend-python-client</name>
+
+  <properties>
+    <codegen.artifactory.groupId>com.oracle.pic.networking.lvv.frontend</codegen.artifactory.groupId>
+    <codegen.artifactory.artifactId>lvv-frontend-spec</codegen.artifactory.artifactId>
+    <!--
+          This is the file name of the preprocessed spec in the artifact.
+          It depends on which 'enabled group files' you have had when the spec artifact was built,
+          but the 'release' directory should always exist, and the file inside it should have
+          the same name as the spec file in your 'src/spec' directory.
+
+          The 'bmc-sdk-swagger-maven-plugin-example-api-spec' artifact built by the ../example-api-spec
+          project contains the 'src/enabled-conditional-groups/release.txt' and
+          'src/enabled-conditional-groups/internal.txt' files. The Swagger spec is called
+          'bmc-sdk-swagger-maven-plugin-example-api-spec.yaml'. Therefore, the two options for
+          this setting are 'release/bmc-sdk-swagger-maven-plugin-example-api-spec.yaml' and
+          'internal/bmc-sdk-swagger-maven-plugin-example-api-spec.yaml'.
+    -->
+    <spec-target-group>release</spec-target-group>
+    <codegen.spec.name>${spec-target-group}/api.yaml</codegen.spec.name>
+    <!--
+        Probably doesn't have to be changed. Set to 'false' if you don't want to generate an __init__.py
+        file for code generated modules
+    -->
+    <codegen.generate.init>true</codegen.generate.init>
+
+    <!--
+        The directory where code generated modules will be placed. This should be of the form
+        src/<your package name>
+    -->
+    <codegen.module.outputdir>${project.basedir}/src/lvv_frontend_python_client</codegen.module.outputdir>
+
+    <!--
+        This will be used as the name of the code generated module. On disk, the generated code
+        will be placed in ${codegen.module.outputdir}/${codegen.base.package.name}
+    -->
+    <codegen.base.package.name>lvv_frontend</codegen.base.package.name>
+    <!--
+          'INTERNAL' means 'generate everything'. Probably don't have to change this.
+          This is related to the 'x-obmcs-internal-only' and 'x-obmcs-preview-only' flags,
+          which we are trying to get away from.
+          See https://confluence.oci.oraclecorp.com/pages/viewpage.action?pageId=12205175
+    -->
+    <codegen.specGenerationType>INTERNAL</codegen.specGenerationType>
+
+    <!--
+          This is the service endpoint in the REST URI.
+          If your service can be found at 'example.us-phoenix-1.oraclecloud.com' in PHX,
+          then this value should be 'example'.
+
+          Note that this setting can only be used for endpoints following the
+          '<service>.<region>.oraclecloud.com' pattern. To use other endpoint formats,
+          specify the endpoint template in your spec.
+
+          See https://confluence.oci.oraclecorp.com/display/DEX/Service+Endpoint+Update
+    -->
+    <codegen.endpoint>lvv-frontend</codegen.endpoint>
+
+    <dropwizard-service-bom-version>2.1.46</dropwizard-service-bom-version>
+  </properties>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <groupId>com.oracle.bmc.sdk</groupId>
+        <artifactId>bmc-sdk-swagger-maven-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <artifactId>maven-clean-plugin</artifactId>
+        <version>3.0.0</version>
+        <configuration>
+          <filesets>
+            <fileset>
+              <directory>${codegen.module.outputdir}</directory>
+              <includes>
+                <include>*/**/*</include>
+              </includes>
+              <excludes>
+              </excludes>
+            </fileset>
+          </filesets>
+        </configuration>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-antrun-plugin</artifactId>
+        <version>1.8</version>
+        <executions>
+          <execution>
+            <id>replace_links</id>
+            <phase>compile</phase>
+            <configuration>
+              <target>
+                <replace dir="src" token="{{DOC_SERVER_URL}}" value="https://docs.cloud.oracle.com"/>
+              </target>
+              <failOnError>false</failOnError>
+            </configuration>
+            <goals>
+                <goal>run</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>com.oracle.pic.commons</groupId>
+        <artifactId>dropwizard-service-bom</artifactId>
+        <version>${dropwizard-service-bom-version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <dependencies>
+    <dependency>
+      <groupId>io.swagger</groupId>
+      <artifactId>swagger-parser</artifactId>
+      <version>1.0.44</version>
+    </dependency>
+    <dependency>
+      <groupId>com.github.jknack</groupId>
+      <artifactId>handlebars</artifactId>
+      <version>4.2.1</version>
+    </dependency>
+    <dependency>
+      <groupId>io.swagger.codegen.v3</groupId>
+      <artifactId>swagger-codegen</artifactId>
+      <version>3.0.24</version>
+    </dependency>
+    <dependency>
+      <groupId>org.codehaus.plexus</groupId>
+      <artifactId>plexus-utils</artifactId>
+      <version>3.3.0</version>
+    </dependency>
+    <dependency>
+      <groupId>org.codehaus.plexus</groupId>
+      <artifactId>plexus-archiver</artifactId>
+      <version>4.2.1</version>
+    </dependency>
+    <dependency>
+      <groupId>org.mozilla</groupId>
+      <artifactId>rhino</artifactId>
+      <version>1.7.13</version>
+    </dependency>
+    <dependency>
+      <groupId>com.oracle.pic.networking.lvv.frontend</groupId>
+      <artifactId>lvv-frontend-spec</artifactId>
+      <version>0.1-SNAPSHOT</version>
+    </dependency>
+  </dependencies>
+</project>
