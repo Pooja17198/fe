@@ -1,6 +1,0 @@
-
-The following version properties are referencing the newest available version:
-  ${dropwizard-service-bom-version} ............................ 2.1.46
-  ${oci-internal-bom-version} ................................. 2.0.186
-All version properties are referencing the newest version available.
-
