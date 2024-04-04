@@ -1,7 +1,14 @@
 {
-  "name": "lvv-test",
+  "name": "lvv",
   "version": "1.0.0",
   "description": "An Oracle JavaScript Extension Toolkit(JET) web app",
+  "author": "Network Automation opc_nw_automation_dev_us_grp@oracle.com ",
+  "script": {
+    "build": "ojet build"
+  },
+  "config": {
+    "registry": "https://artifactory.oci.oraclecorp.com/api/npm/global-release-npm"
+  },
   "dependencies": {
     "@oracle/oraclejet": "~16.0.0",
     "@oracle/oraclejet-core-pack": "~16.0.0"
