@@ -6,10 +6,12 @@
  * @ignore
  */
 import { h } from "preact";
+import { HomeContainer } from "../HomeContainer/HomeContainer";
 
 export function Content() {
   return (
     <div class="oj-web-applayout-max-width oj-web-applayout-content">
+      <HomeContainer />
     </div>
   );
 };
