@@ -1,0 +1,58 @@
+[
+    {
+        "projectId":"12345",
+        "rack_number": "2018",
+        "serial_number": "2X385HDJVK2847",
+        "type": "cabling",
+        "item_count": "5"
+    },
+    {
+        "projectId":"12345",
+        "rack_number": "2019",
+        "serial_number": "2X385HDJVK2847",
+        "type": "cabling",
+        "item_count": "5"
+    },
+    {
+        "projectId":"12345",
+        "rack_number": "2020",
+        "serial_number": "2X385HDJVK2847",
+        "type": "cabling",
+        "item_count": "5"
+    },
+    {
+        "projectId":"12345",
+        "rack_number": "2021",
+        "serial_number": "2X385HDJVK2847",
+        "type": "cabling",
+        "item_count": "5"
+    },
+    {
+        "projectId":"12345",
+        "rack_number": "2022",
+        "serial_number": "2X385HDJVK2847",
+        "type": "cabling",
+        "item_count": "5"
+    },
+    {
+        "projectId":"12345",
+        "rack_number": "2023",
+        "serial_number": "2X385HDJVK2847",
+        "type": "cabling",
+        "item_count": "5"
+    },
+    {
+        "projectId":"12345",
+        "rack_number": "2025",
+        "serial_number": "2X385HDJVK2847",
+        "type": "cabling",
+        "item_count": "5"
+    },
+    {
+        "projectId":"12345",
+        "rack_number": "2024",
+        "serial_number": "2X385HDJVK2847",
+        "type": "cabling",
+        "item_count": "5"
+    }
+]

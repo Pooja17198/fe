@@ -1,38 +1,47 @@
 [
     {
         "projectId":"12345",
+        "building": "iad1",
         "block": "1"
     },
     {
         "projectId":"12346",
+        "building": "iad2",
         "block": "12"
     },
     {
         "projectId":"12347",
+        "building": "iad3",
         "block": "13"
     },
     {
         "projectId":"12348",
+        "building": "iad4",
         "block": "14"
     },
     {
         "projectId":"12349",
+        "building": "iad32",
         "block": "15"
     },
     {
         "projectId":"12350",
+        "building": "iad31",
         "block": "16"
     },
     {
         "projectId":"12351",
+        "building": "iad25",
         "block": "17"
     },
     {
         "projectId":"12352",
+        "building": "iad44",
         "block": "18"
     },
     {
         "projectId":"12353",
+        "building": "iad25",
         "block": "19"
     }
 ]
