@@ -1,9 +1,14 @@
 import { h } from "preact";
-import MutableArrayDataProvider = require("@oracle/oraclejet/ojmutablearraydataprovider");
 import { TableIntrinsicProps, ojTable } from "ojs/ojtable";
 import "ojs/ojtable";
 import { useState } from "preact/hooks";
 import { KeySetImpl } from "ojs/ojkeyset";
+import "ojs/ojtable";
+import * as project_building_list from "text!../project_building.json";
+import MutableArrayDataProvider = require("ojs/ojmutablearraydataprovider");
+
+const projectsDataProvider = new MutableArrayDataProvider(JSON.parse(project_building_list), {keyAttributes: "projectId"});
+
 
 let COLUMNS = [{
     "headerText": "Project Id",
@@ -49,7 +54,6 @@ const ProjectTableContainer = (props: Props) => {
         const row = event.detail.value.row as KeySetImpl<any>;
         if (row.values().size > 0) {
             row.values().forEach(element => {
-                console.log(element)
                 props.onProjectChanged(element)
             });
         }

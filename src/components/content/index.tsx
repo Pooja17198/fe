@@ -6,12 +6,59 @@
  * @ignore
  */
 import { h } from "preact";
-import { HomeContainer } from "../HomeContainer/HomeContainer";
+import { useState, useEffect } from "preact/hooks";
+import CoreRouter = require("ojs/ojcorerouter");
+import { ojButton } from "ojs/ojbutton";
+import "ojs/ojbutton";
+import Rack from "../rack/index";
+import Context = require("ojs/ojcontext");
+import HomeContainer from "../home/index";
 
-export function Content() {
+type Props = {
+  pagerouter: CoreRouter;
+  page?: string;
+  routes: Array<object>;
+  onPageChanged: (value: any) => void;
+};
+
+let INIT_SELECTEDRACK: any | null = null;
+
+const Content = (props: Props) => {
+  const [selectedPage, setSelectedPage] = useState<string>("");
+
+  const [selectedRack, setSelectedRack] = useState(INIT_SELECTEDRACK)
+
+  const pageChangeHandler = (page: any) => {
+  };
+
+  useEffect(() => {
+    Context.getPageContext().getBusyContext().applicationBootstrapComplete();
+    setSelectedPage(props.page as string)
+  }, []);
+
+  const rackChangedHandler = (value: any) => {
+    setSelectedRack(value);
+    let rackPage = {
+      path: "rack",
+      id: value
+    }
+    props.onPageChanged(rackPage);
+  };
+
+  let pageContent = (page: string) => {
+    if (page && page.includes("rack")) {
+      return <Rack />
+    }
+    else {
+      return <HomeContainer onRackChanged={rackChangedHandler} />
+    }
+  }
+
   return (
     <div class="oj-web-applayout-max-width oj-web-applayout-content">
-      <HomeContainer />
+      {pageContent(props.page as string)}
     </div>
   );
 };
+
+export default Content;

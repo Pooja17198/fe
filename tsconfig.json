@@ -29,6 +29,9 @@
       ],
       "preact": [
         "./node_modules/preact"
+      ],
+      "home/*": [
+        "./src/components/home-container/*"
       ]
     },
     "declaration": true,

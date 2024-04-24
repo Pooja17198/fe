@@ -5,6 +5,8 @@ import { useState, useCallback } from "preact/hooks";
 import "ojs/ojtable";
 import { TableElement, TableIntrinsicProps, ojTable, ojTableEventMap } from "ojs/ojtable";
 import * as project_info from "text!../project_info.json";
+import { KeySetImpl } from "ojs/ojkeyset";
+
 
 const projectDataProvider = new MutableArrayDataProvider(JSON.parse(project_info), { keyAttributes: "rack_number" });
 
@@ -25,7 +27,11 @@ let COLUMNS = [
     "id": "item_count"
 }]
 
-type Props = { project: number; };
+type Props = { 
+    project: number; 
+    value?: string;
+    onRackChanged: (value: number) => void;
+};
 // const baseServiceUrl = "https://apex.oracle.com/pls/apex/oraclejet/lp/activities/";
 // let INIT_DATAPROVIDER = new RESTDataProvider<ActivityItem["id"], ActivityItem>({
 //   keyAttributes: "id",
@@ -40,6 +46,16 @@ type Props = { project: number; };
 //   },
 // });
 
+const INIT_SELECTEDITEMS = {
+    row: new KeySetImpl(),
+    column: new KeySetImpl()
+};
+
+const INIT_SELECTION_MODE: TableIntrinsicProps['selectionMode'] = {
+    column: 'none',
+    row: 'single'
+};
+
 const ProjectDetailsContainer = (props: Props) => {
 
     const [selectedItemVal, setSelectedItemVal] = useState<any | null>(null);
@@ -48,10 +64,28 @@ const ProjectDetailsContainer = (props: Props) => {
 
     const showItems = useCallback(() => selectedItemVal === null ? false : true, [selectedItemVal]);
 
+    const [selectedItems, setSelectedItems] = useState(INIT_SELECTEDITEMS);
+
+    const [selectedRows, setSelectedRows] = useState([]);
+
+    let selectionText = '';
+
+    const onSelectionChangedHandler = (event: ojTable.selectedChanged<any, any>) => {
+        const row = event.detail.value.row as KeySetImpl<any>;
+        if (row.values().size > 0) {
+            row.values().forEach(element => {
+                props.onRackChanged(element)
+            });
+        }
+    };
+
     return (
         <div id="parentContainer2" class="oj-flex oj-flex-item oj-md-8 oj-sm-12">
             <div>
-                <oj-table class="oj-table oj-table-hover oj-table-responsive" aria-label="Projects Details Table" id="projectDetailsTable" columns={COLUMNS} data={projectDataProvider} scroll-policy="loadMoreOnScroll" scroll-policy-options='{"fetchSize": 5}'></oj-table>
+                <oj-table 
+                    selectionMode={INIT_SELECTION_MODE}
+                    onselectedChanged={onSelectionChangedHandler}
+                    class="oj-table oj-table-hover oj-table-responsive" aria-label="Projects Details Table" id="projectDetailsTable" columns={COLUMNS} data={projectDataProvider} scroll-policy="loadMoreOnScroll" scroll-policy-options='{"fetchSize": 5}'></oj-table>
             </div>
             <div>
                 <ul>
