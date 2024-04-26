@@ -60,10 +60,10 @@ export function Header({ appName, userLogin }: Props) {
             <span>{userLogin}</span>
             <span slot="endIcon" class={getEndIconClass()}></span>
             <oj-menu id="menu1" slot="menu">
-              <oj-option id="pref" value="pref">Preferences</oj-option>
-              <oj-option id="help" value="help">Help</oj-option>
-              <oj-option id="about" value="about">About</oj-option>
-              <oj-option id="out" value="out">Sign Out</oj-option>
+              <oj-option id="pref" value="pref">Preferences (Coming Soon)</oj-option>
+              <oj-option id="help" value="help">Help (Coming Soon)</oj-option>
+              <oj-option id="about" value="about">About (Coming Soon)</oj-option>
+              <oj-option id="out" value="out">Sign Out (Coming Soon)</oj-option>
             </oj-menu>
           </oj-menu-button>
         </oj-toolbar>

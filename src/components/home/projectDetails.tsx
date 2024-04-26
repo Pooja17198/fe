@@ -1,6 +1,5 @@
 import { h } from "preact";
 import MutableArrayDataProvider = require("ojs/ojmutablearraydataprovider");
-// import * as storeData from "text!./store_data.json";
 import { useState, useCallback } from "preact/hooks";
 import "ojs/ojtable";
 import { TableElement, TableIntrinsicProps, ojTable, ojTableEventMap } from "ojs/ojtable";
@@ -80,7 +79,8 @@ const ProjectDetailsContainer = (props: Props) => {
     };
 
     return (
-        <div id="parentContainer2" class="oj-flex oj-flex-item oj-md-8 oj-sm-12">
+        <div id="parentContainer2" class="oj-flex-item oj-md-8 oj-sm-12">
+            <h2>Project {props.project} Details</h2>
             <div>
                 <oj-table 
                     selectionMode={INIT_SELECTION_MODE}
@@ -88,12 +88,11 @@ const ProjectDetailsContainer = (props: Props) => {
                     class="oj-table oj-table-hover oj-table-responsive" aria-label="Projects Details Table" id="projectDetailsTable" columns={COLUMNS} data={projectDataProvider} scroll-policy="loadMoreOnScroll" scroll-policy-options='{"fetchSize": 5}'></oj-table>
             </div>
             <div>
-                <ul>
+                <ul id="projectInfo">
                     <li>Project TPM: Jira Ticket Reporter Name</li>
                     <li>Building: IAD32</li>
                     <li>Block: 5</li>
                     <li>Project ID: <b>{props.project}</b></li>
-                    <li>Other Project Info will load here when the project/building row is expanded</li>
                 </ul>
             </div>
         </div>

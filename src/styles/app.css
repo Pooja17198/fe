@@ -13,6 +13,18 @@
     height:18px
 }
 
-#projectDetailsTable {
-    max-height: 20rem;
+.header-center {
+    text-align: center;
+}
+
+/* .rack-panel {
+    min-width: 50%;
+} */
+
+.home-container {
+    text-align: center;
+}
+
+#projectInfo {
+    list-style-type: none;
 }

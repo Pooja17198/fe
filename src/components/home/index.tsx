@@ -31,15 +31,17 @@ const HomeContainer = (props: Props) => {
     };
 
     return (
-        <div class="oj-flex oj-flex-init">
+        <div class="oj-flex oj-flex-init home-container">
             <ProjectTableContainer data={activityDataProvider} onProjectChanged={projectChangedHandler} />
             {showProjectDetails() && (
                 <ProjectDetailsContainer project={selectedProject} onRackChanged={rackSelectedHandler} />
             )}
             {!showProjectDetails() && (
-                <h4 class="oj-typography-subheading-sm">
-                    Select project to view items
-                </h4>
+                <div id="parentContainer2" class="oj-flex oj-flex-item oj-md-8 oj-sm-12">
+                    <h2 class="header-center">
+                        Select project to view items
+                    </h2>
+                </div>
             )}
         </div>
 

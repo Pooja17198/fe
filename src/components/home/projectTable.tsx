@@ -61,7 +61,7 @@ const ProjectTableContainer = (props: Props) => {
 
     return (
         <div class="projectTable oj-flex-item">
-            <h3 id="projectTableHeader">Projects</h3>
+            <h2 id="projectTableHeader">Projects</h2>
             <oj-table
                 selectionMode={INIT_SELECTION_MODE}
                 onselectedChanged={onSelectionChangedHandler}
