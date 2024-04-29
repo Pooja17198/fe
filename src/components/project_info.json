@@ -1,44 +1,44 @@
 [
     {
         "projectId":"12345",
-        "rack_number": "2018",
+        "rack_number": "4018",
         "serial_number": "2X385HDJVK2847",
         "type": "cabling",
         "item_count": "5"
     },
     {
         "projectId":"12345",
-        "rack_number": "2019",
+        "rack_number": "4019",
         "serial_number": "2X385HDJVK2847",
         "type": "cabling",
         "item_count": "5"
     },
     {
         "projectId":"12345",
-        "rack_number": "2020",
+        "rack_number": "4020",
         "serial_number": "2X385HDJVK2847",
         "type": "cabling",
         "item_count": "5"
     },
     {
         "projectId":"12345",
-        "rack_number": "2021",
+        "rack_number": "4021",
         "serial_number": "2X385HDJVK2847",
         "type": "cabling",
         "item_count": "5"
     },
     {
         "projectId":"12345",
-        "rack_number": "2022",
+        "rack_number": "4022",
         "serial_number": "2X385HDJVK2847",
         "type": "cabling",
         "item_count": "5"
     },
     {
         "projectId":"12345",
-        "rack_number": "2023",
+        "rack_number": "4104",
         "serial_number": "2X385HDJVK2847",
-        "type": "cabling",
+        "type": "validation",
         "item_count": "5"
     },
     {

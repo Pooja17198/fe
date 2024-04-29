@@ -27,23 +27,11 @@ let COLUMNS = [
 }]
 
 type Props = { 
-    project: number; 
+    project: string[]; 
     value?: string;
     onRackChanged: (value: number) => void;
 };
-// const baseServiceUrl = "https://apex.oracle.com/pls/apex/oraclejet/lp/activities/";
-// let INIT_DATAPROVIDER = new RESTDataProvider<ActivityItem["id"], ActivityItem>({
-//   keyAttributes: "id",
-//   url: baseServiceUrl,
-//   transforms: {
-//     fetchFirst: {
-//       request: null!,
-//       response: (): any => {
-//         return { data: [] };
-//       },
-//     },
-//   },
-// });
+
 
 const INIT_SELECTEDITEMS = {
     row: new KeySetImpl(),
@@ -63,10 +51,6 @@ const ProjectDetailsContainer = (props: Props) => {
 
     const showItems = useCallback(() => selectedItemVal === null ? false : true, [selectedItemVal]);
 
-    const [selectedItems, setSelectedItems] = useState(INIT_SELECTEDITEMS);
-
-    const [selectedRows, setSelectedRows] = useState([]);
-
     let selectionText = '';
 
     const onSelectionChangedHandler = (event: ojTable.selectedChanged<any, any>) => {
@@ -80,7 +64,7 @@ const ProjectDetailsContainer = (props: Props) => {
 
     return (
         <div id="parentContainer2" class="oj-flex-item oj-md-8 oj-sm-12">
-            <h2>Project {props.project} Details</h2>
+            <h2>Project {props.project[0]} Details</h2>
             <div>
                 <oj-table 
                     selectionMode={INIT_SELECTION_MODE}
@@ -90,9 +74,9 @@ const ProjectDetailsContainer = (props: Props) => {
             <div>
                 <ul id="projectInfo">
                     <li>Project TPM: Jira Ticket Reporter Name</li>
-                    <li>Building: IAD32</li>
-                    <li>Block: 5</li>
-                    <li>Project ID: <b>{props.project}</b></li>
+                    <li>Building: {props.project[1]}</li>
+                    <li>Block: {props.project[2]}</li>
+                    <li>Project ID: <b>{props.project[0]}</b></li>
                 </ul>
             </div>
         </div>

@@ -8,10 +8,22 @@ import ProjectDetailsContainer from "./projectDetails";
 let INIT_SELECTEDPROJECT: any | null = null;
 
 type Props = {
-  onRackChanged: (value: string) => void;
+  onRackChanged: (value: RackMetadata) => void;
 }
 
-const activityDataProvider = new MutableArrayDataProvider(JSON.parse(project_building_list), { keyAttributes: "projectId" });
+type RackMetadata = {
+    building: string;
+    block: string;
+    rack: string;
+}
+
+type ProjectMetadata = {
+    projectId: string;
+    building: string;
+    block: string;
+}
+
+const activityDataProvider = new MutableArrayDataProvider(JSON.parse(project_building_list), { keyAttributes: ["projectId", "building", "block"] });
 
 const HomeContainer = (props: Props) => {
     const [selectedProject, setSelectedProject] = useState(
@@ -22,12 +34,17 @@ const HomeContainer = (props: Props) => {
         return selectedProject != null ? true : false;
     };
 
-    const projectChangedHandler = (value: any) => {
+    const projectChangedHandler = (value: ProjectMetadata) => {
         setSelectedProject(value);
     };
 
     const rackSelectedHandler = (value: any) => {
-      props.onRackChanged(value)
+        let info = {
+            "building": selectedProject[1],
+            "block": selectedProject[2],
+            "rack": value
+        }
+      props.onRackChanged(info)
     };
 
     return (

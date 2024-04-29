@@ -23,10 +23,21 @@ type Props = {
 
 let INIT_SELECTEDRACK: any | null = null;
 
+type RackMetadata = {
+  building: string;
+  block: string;
+  rack: string;
+}
+
 const Content = (props: Props) => {
   const [selectedPage, setSelectedPage] = useState<string>("");
 
   const [selectedRack, setSelectedRack] = useState(INIT_SELECTEDRACK)
+
+  const [selectedBuilding, setSelectedBuilding] = useState(INIT_SELECTEDRACK)
+
+  const [selectedBlock, setSelectedBlock] = useState(INIT_SELECTEDRACK)
+
 
   const pageChangeHandler = (page: any) => {
   };
@@ -36,18 +47,20 @@ const Content = (props: Props) => {
     setSelectedPage(props.page as string)
   }, []);
 
-  const rackChangedHandler = (value: any) => {
-    setSelectedRack(value);
+  const rackChangedHandler = (value: RackMetadata) => {
+    setSelectedRack(value.rack);
+    setSelectedBuilding(value.building);
+    setSelectedBlock(value.block);
     let rackPage = {
       path: "rack",
-      id: value
+      id: value.rack
     }
     props.onPageChanged(rackPage);
   };
 
   let pageContent = (page: string) => {
     if (page && page.includes("rack")) {
-      return <Rack />
+      return <Rack building={selectedBuilding} block={selectedBlock} rack={selectedRack} />
     }
     else {
       return <HomeContainer onRackChanged={rackChangedHandler} />

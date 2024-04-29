@@ -6,8 +6,31 @@ import { KeySetImpl } from "ojs/ojkeyset";
 import "ojs/ojtable";
 import * as project_building_list from "text!../project_building.json";
 import MutableArrayDataProvider = require("ojs/ojmutablearraydataprovider");
+import { RESTDataProvider } from "ojs/ojrestdataprovider";
 
 const projectsDataProvider = new MutableArrayDataProvider(JSON.parse(project_building_list), {keyAttributes: "projectId"});
+const lvvUrl: string = "";
+let keyAttributes: string = "projectId";
+
+
+const projectsRestDataProvider = new RESTDataProvider({
+    keyAttributes: keyAttributes,
+    url: lvvUrl,
+    transforms: {
+       fetchFirst: {
+          request: async (options) => {
+             const url = new URL(options.url);
+             const { size, offset } = options.fetchParameters;
+             url.searchParams.set("limit", String(size));
+             url.searchParams.set("offset", String(offset));
+          return new Request(url.href);
+          },
+          response: async ({ body }) => {
+            return { data: body };
+          },
+       },
+    },
+  });
 
 
 let COLUMNS = [{
@@ -29,8 +52,14 @@ let COLUMNS = [{
 type Props = {
     data: MutableArrayDataProvider<any, any>;
     value?: string;
-    onProjectChanged: (value: number) => void;
+    onProjectChanged: (value: ProjectMetadata) => void;
 };
+
+type ProjectMetadata = {
+    projectId: string;
+    building: string;
+    block: string;
+}
 
 const INIT_SELECTEDITEMS = {
     row: new KeySetImpl(),
