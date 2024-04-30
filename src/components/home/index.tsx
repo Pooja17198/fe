@@ -42,7 +42,8 @@ const HomeContainer = (props: Props) => {
         let info = {
             "building": selectedProject[1],
             "block": selectedProject[2],
-            "rack": value
+            "rack": value[0],
+            "ticket": value[1]
         }
       props.onRackChanged(info)
     };

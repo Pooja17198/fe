@@ -32,6 +32,8 @@ type RackMetadata = {
 const Content = (props: Props) => {
   const [selectedPage, setSelectedPage] = useState<string>("");
 
+  const [selectedTicket, setSelectedTicket] = useState(INIT_SELECTEDRACK)
+
   const [selectedRack, setSelectedRack] = useState(INIT_SELECTEDRACK)
 
   const [selectedBuilding, setSelectedBuilding] = useState(INIT_SELECTEDRACK)
@@ -47,10 +49,11 @@ const Content = (props: Props) => {
     setSelectedPage(props.page as string)
   }, []);
 
-  const rackChangedHandler = (value: RackMetadata) => {
+  const rackChangedHandler = (value: any) => {
     setSelectedRack(value.rack);
     setSelectedBuilding(value.building);
     setSelectedBlock(value.block);
+    setSelectedTicket(value.ticket);
     let rackPage = {
       path: "rack",
       id: value.rack
@@ -60,7 +63,7 @@ const Content = (props: Props) => {
 
   let pageContent = (page: string) => {
     if (page && page.includes("rack")) {
-      return <Rack building={selectedBuilding} block={selectedBlock} rack={selectedRack} />
+      return <Rack building={selectedBuilding} block={selectedBlock} rack={selectedRack} ticket={selectedTicket} />
     }
     else {
       return <HomeContainer onRackChanged={rackChangedHandler} />

@@ -7,13 +7,13 @@ import * as project_info from "text!../project_info.json";
 import { KeySetImpl } from "ojs/ojkeyset";
 
 
-const projectDataProvider = new MutableArrayDataProvider(JSON.parse(project_info), { keyAttributes: "rack_number" });
+const projectDataProvider = new MutableArrayDataProvider(JSON.parse(project_info), { keyAttributes: ["rack", "ticket"] });
 
 let COLUMNS = [
 {
     "headerText": "Rack Number",
-    "field": "rack_number",
-    "id": "rack_number"
+    "field": "rack",
+    "id": "rack"
 },
 {
     "headerText": "Issue(s) Type",
@@ -21,9 +21,9 @@ let COLUMNS = [
     "id": "type"
 },
 {
-    "headerText": "Issue(s) Count",
-    "field": "item_count",
-    "id": "item_count"
+    "headerText": "Ticket",
+    "field": "ticket",
+    "id": "ticket"
 }]
 
 type Props = { 
