@@ -1,0 +1,50 @@
+/*
+    Document   : override
+    Created on : <date>
+    Author     : <author>
+    Description:
+        This is where any of your application specific styles should be included
+*/
+
+/* Workaround until https://jira.oraclecorp.com/jira/browse/JET-65022 */
+.selectable-table {
+    user-select: text;
+}
+
+.demo-oracle-icon {
+    content: url("images/oracle_logo.svg");
+    display: inline;
+    width: 137px;
+    height: 18px
+}
+
+.header-center {
+    text-align: center;
+}
+
+/* .rack-panel {
+    min-width: 50%;
+} */
+
+.home-container {
+    text-align: center;
+}
+
+#projectInfo {
+    list-style-type: none;
+}
+
+#warning {
+    color: rgb(var(--oj-palette-danger-rgb-170));
+    text-decoration-line: underline !important;
+}
+
+.demo-percentage-width {
+    width: 50% !important;
+}
+
+.h4Style {
+    font-size: 1.5rem;
+    font-weight: 900;
+    line-height: 2rem;
+}

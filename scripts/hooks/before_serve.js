@@ -8,6 +8,24 @@
 'use strict';
 
 module.exports = function (configObj) {
+  /* Write an Express middleware function to inspect the path of the requested 
+URL. If the request is for any of the extensions (js, ts, and so on), 
+the Express instance handles these requests while other requests are
+passed to the app’s index.html file for the JET CoreRouter to manage. 
+*/
+  // function urlRewriteMiddleware(req, res, next) {
+  //   const matchStaticFiles = req.url.match(/(^\/[^.]*$)|(\.html$)/);
+  //   req.url = matchStaticFiles ? "/index.html" : req.url;
+  //   next();
+  // }
+  // return new Promise((resolve, reject) => {
+  //   /* Call the Express middleware function that inspects the URL to rewrite 
+  //      and prepend it to JET’s default middleware so that other options provided 
+  //      by JET’s default middleware, such as live reload continue to work. 
+  //   */
+  //   configObj['preMiddleware'] = [urlRewriteMiddleware]
+  //   resolve(configObj);
+  // });
   return new Promise((resolve, reject) => {
     console.log('Running before_serve hook.');
     // ojet custom connect and serve options

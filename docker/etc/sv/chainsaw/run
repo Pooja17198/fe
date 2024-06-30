@@ -1,0 +1,27 @@
+#!/bin/bash
+exec 2>&1
+
+
+# =============================================================================
+# Launch Chainsaw2
+# =============================================================================
+echo "Launching Chainsaw \n"
+
+# Check for for odo manifest file. If present we are in a cloud machine.
+
+ODO_MANIFEST_FILE="/etc/odo/manifest.json"
+if [ -e $ODO_MANIFEST_FILE ]; then
+
+  # Retrieving compartmentId from Instance Metadata Service.
+  # Refer: https://docs.oracle.com/en-us/iaas/Content/Compute/Tasks/gettingmetadata.htm
+  COMPARTMENT_ID=$(curl -H "Authorization: Bearer Oracle" -L http://169.254.169.254/opc/v2/instance/compartmentId)
+
+  echo "Using namespace: '$ODO_APPLICATION_ALIAS'\n"
+  echo "Compartment ID set to: $COMPARTMENT_ID\n"
+  chainsaw2 --compartment="$COMPARTMENT_ID" \
+            --namespace="$ODO_APPLICATION_ALIAS"
+
+else
+  echo "Could not find odo manifest file. Exiting."
+  exit 1
+fi

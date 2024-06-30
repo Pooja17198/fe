@@ -21,17 +21,17 @@ const _DEFAULT_LINKS: FooterLink[] = [
   {
     name: "About Oracle",
     linkId: "aboutOracle",
-    linkTarget: "http://www.oracle.com/us/corporate/index.html#menu-about"
+    linkTarget: "https://www.oracle.com/us/corporate/index.html#menu-about"
   },
   {
     name: "Contact Us",
     linkId: "contactUs",
-    linkTarget: "http://www.oracle.com/us/corporate/contact/index.html"
+    linkTarget: "https://www.oracle.com/us/corporate/contact/index.html"
   },
   {
     name: "Legal Notices",
     linkId: "legalNotices",
-    linkTarget: "http://www.oracle.com/us/legal/index.html"
+    linkTarget: "https://www.oracle.com/us/legal/index.html"
   },
   {
     name: "Terms Of Use",
@@ -41,7 +41,7 @@ const _DEFAULT_LINKS: FooterLink[] = [
   {
     name: "Your Privacy Rights",
     linkId: "yourPrivacyRights",
-    linkTarget: "http://www.oracle.com/us/legal/privacy/index.html"
+    linkTarget: "https://www.oracle.com/us/legal/privacy/index.html"
   }
 ]
 

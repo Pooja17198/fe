@@ -1,0 +1,7 @@
+#!/bin/bash
+
+VENV="source /scripts/env/bin/activate"
+${VENV} && python3 /scripts/ssv2/update_cert.py
+
+exec 2>&1
+exec /usr/sbin/nginx -g "daemon off;"

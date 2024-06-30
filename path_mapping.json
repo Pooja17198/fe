@@ -1,4 +1,5 @@
 {
+  "baseUrl": "/",
   "use": "local",
   "cdns": {
     "jet": {

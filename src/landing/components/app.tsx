@@ -51,9 +51,12 @@ const pageChangeHandler = (route: Route) => {
 };
 
 export const App = registerCustomElement("app-root", (props: Props) => {
+  const [selectedVendor, setSelectedVendor] = useState("XYZ");
+
     props.appName = "LVV Portal";
-    props.userLogin = "some.person@oracle.com";
+    props.userLogin = sessionStorage.getItem("X-Oracle-Vendor-Email") || "";
     const [routePath, setRoutePath] = useState<string>('');
+
 
     const routerUpdated = (actionable: CoreRouter.ActionableState<CoreRouter.DetailedRouteConfig>): void => {
       // Update our state based on new router state
@@ -61,22 +64,30 @@ export const App = registerCustomElement("app-root", (props: Props) => {
       setRoutePath(newPath);
     };
 
+    const vendorChangedHandler = (vendor: string) => {
+      setSelectedVendor(vendor)
+      console.log(selectedVendor)
+    }
+
     useEffect(() => {
       Context.getPageContext().getBusyContext().applicationBootstrapComplete();
+      setSelectedVendor(sessionStorage.getItem("X-Oracle-Vendor") || "");
       router.currentState.subscribe(routerUpdated);
       router.sync();
-    }, []);
+    }, [selectedVendor]);
     
     return (
       <div id="appContainer" class="oj-web-applayout-page">
         <Header
           appName={props.appName}
           userLogin={props.userLogin}
+          vendorName={selectedVendor}
         />
         <Content 
           page={routePath}
           pagerouter={router} 
           onPageChanged={pageChangeHandler}
+          onVendorChanged={vendorChangedHandler}
           routes={routeArray}/>
         <Footer />
       </div>

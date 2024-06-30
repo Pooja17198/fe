@@ -5,9 +5,9 @@
       "web": "src-web",
       "javascript": ".",
       "typescript": ".",
-      "styles": "styles",
+      "styles": "landing/styles",
       "themes": "themes",
-      "components": "components",
+      "components": "landing/components",
       "exchangeComponents": "exchange_components"
     },
     "staging": {

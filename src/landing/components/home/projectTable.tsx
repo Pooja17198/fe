@@ -8,33 +8,12 @@ import * as project_building_list from "text!../project_building.json";
 import MutableArrayDataProvider = require("ojs/ojmutablearraydataprovider");
 import { RESTDataProvider } from "ojs/ojrestdataprovider";
 
-const projectsDataProvider = new MutableArrayDataProvider(JSON.parse(project_building_list), {keyAttributes: "projectId"});
-const lvvUrl: string = "";
+
 let keyAttributes: string = "projectId";
 
 
-const projectsRestDataProvider = new RESTDataProvider({
-    keyAttributes: keyAttributes,
-    url: lvvUrl,
-    transforms: {
-       fetchFirst: {
-          request: async (options) => {
-             const url = new URL(options.url);
-             const { size, offset } = options.fetchParameters;
-             url.searchParams.set("limit", String(size));
-             url.searchParams.set("offset", String(offset));
-          return new Request(url.href);
-          },
-          response: async ({ body }) => {
-            return { data: body };
-          },
-       },
-    },
-  });
-
-
 let COLUMNS = [{
-    "headerText": "Project Id",
+    "headerText": "Project",
     "field": "projectId",
     "id": "projectId"
 },
@@ -61,24 +40,15 @@ type ProjectMetadata = {
     block: string;
 }
 
-const INIT_SELECTEDITEMS = {
-    row: new KeySetImpl(),
-    column: new KeySetImpl()
-};
-
 const INIT_SELECTION_MODE: TableIntrinsicProps['selectionMode'] = {
     column: 'none',
     row: 'single'
 };
 
+// TODO: Check this once.
+const ACC = {rowHeader: "ProjectName"}
+
 const ProjectTableContainer = (props: Props) => {
-
-    const [selectedItems, setSelectedItems] = useState(INIT_SELECTEDITEMS);
-
-    const [selectedRows, setSelectedRows] = useState([]);
-
-    let selectionText = '';
-
     const onSelectionChangedHandler = (event: ojTable.selectedChanged<any, any>) => {
         const row = event.detail.value.row as KeySetImpl<any>;
         if (row.values().size > 0) {
@@ -92,9 +62,16 @@ const ProjectTableContainer = (props: Props) => {
         <div class="projectTable oj-flex-item">
             <h2 id="projectTableHeader">Projects</h2>
             <oj-table
+                class="selectable-table"
                 selectionMode={INIT_SELECTION_MODE}
                 onselectedChanged={onSelectionChangedHandler}
-                aria-label="Projects Table" id="projectTable" scroll-policy="loadMoreOnScroll" scroll-policy-options='{"fetchSize": 5}' columns={COLUMNS} data={props.data}>
+                aria-label="Projects Table"
+                id="projectTable"
+                accessibility={ACC}
+                scroll-policy="loadMoreOnScroll"
+                scroll-policy-options='{"fetchSize": 5}'
+                columns={COLUMNS}
+                data={props.data}>
             </oj-table>
         </div>
     );
