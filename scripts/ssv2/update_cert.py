@@ -1,12 +1,18 @@
 from ssv2_client_wrapper import SSV2ClientWrapper
+import os
 import sys
 import json
 import logging
 
 from pathlib import Path
 
+cert_env = os.environ['CERT_ENVIRONMENT']
+
 SSV2_ENDPOINT = "https://secret-service-ce.r2.oracleiaas.com/v1"
-SSV2_CERT_PATH = "/secret/lvv-ui-beta/lvv_tls_server_secret/latest"
+if cert_env == "PROD":
+    SSV2_CERT_PATH = "/secret/lvv-ui-prod/lvv_tls_server_secret/latest"
+else:
+    SSV2_CERT_PATH = "/secret/lvv-ui-beta/lvv_tls_server_secret/latest"
 
 CERT_DIR_PATH = Path("/etc/certs/pki")
 CHAIN_FILE_PATH = CERT_DIR_PATH / "lvv_ui_tls_server_cert.pem"
