@@ -7,8 +7,9 @@ import logging
 from pathlib import Path
 
 cert_env = os.environ['CERT_ENVIRONMENT']
+region = open('/etc/region').read().rstrip('\n')
 
-SSV2_ENDPOINT = "https://secret-service-ce.r2.oracleiaas.com/v1"
+SSV2_ENDPOINT = f"https://secret-service-ce.{region}.oracleiaas.com/v1"
 if cert_env == "PROD":
     SSV2_CERT_PATH = "/secret/lvv-ui-prod/lvv_tls_server_secret/latest"
 else:
