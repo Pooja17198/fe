@@ -25,5 +25,10 @@ function convertStringToObject(input: string) {
     return result;
   }
 
-let cookies = convertStringToObject(document.cookie);
-console.log(cookies);
+if (document.cookie) { 
+  let cookies = convertStringToObject(document.cookie);
+  console.log(cookies);
+}
+// For Dev: Add Session Storage Here for Dev purposes
+// sessionStorage.setItem("X-Oracle-Vendor", "vendor2")
+// sessionStorage.setItem("X-Oracle-Vendor-Email", "rakshit.viswanatham@oracle.com")

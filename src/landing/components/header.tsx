@@ -41,7 +41,7 @@ export function Header({ appName, userLogin, vendorName }: Props) {
     return (isSmallWidth ? "oj-icon demo-appheader-avatar" : "oj-component-icon oj-button-menu-dropdown-icon");
   }
 
-  const logoutUrl = `${window.location.host}/logout`;
+  const logoutUrl = `/logout`;
 
   // TODO: Add a Home Button
   return (
