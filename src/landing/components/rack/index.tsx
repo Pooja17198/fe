@@ -89,7 +89,7 @@ let OPTICS_COLUMNS = [{
 }
 ]
 
-const API_URL = window.location.host.includes('localhost') ? "https://lvv.us-phoenix-1.oci.oc-test.com/lvv/cablingTasks/" : `https://${window.location.host}/lvv/cablingTasks/`;
+const API_URL = window.location.host.includes('localhost') ? "https://lvv.us-phoenix-1.oci.oc-test.com/lvv/cablingTasks" : `https://${window.location.host}/lvv/cablingTasks`;
 
 const Rack = (props: Props) => {
 
@@ -106,7 +106,7 @@ const Rack = (props: Props) => {
 
   let dataProvider = new RESTDataProvider({
     keyAttributes: "id",
-    url: `${API_URL}/${props.ticket}actions/getCableValidationFailureTask`,
+    url: `${API_URL}/${props.ticket}/actions/getCableValidationFailureTask`,
     transforms: {
       fetchFirst: {
         request: async (options) => {
@@ -130,7 +130,7 @@ const Rack = (props: Props) => {
     }
   
     // Create and send request to REST service to resolve the ticket
-    const request = new Request(API_URL + props.ticket + "/actions/resolveValidationFailureTask", { method: "POST" });
+    const request = new Request(API_URL + "/" + props.ticket + "/actions/resolveValidationFailureTask", { method: "POST" });
     const response = await fetch(request);
   
     if (response.ok) {
