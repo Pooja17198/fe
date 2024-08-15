@@ -130,7 +130,15 @@ const Rack = (props: Props) => {
     }
   
     // Create and send request to REST service to resolve the ticket
-    const request = new Request(API_URL + "/" + props.ticket + "/actions/resolveValidationFailureTask", { method: "POST" });
+    const myHeaders = new Headers();
+    myHeaders.append("X-OCI-Splat-CSRF", "1");
+
+    const myInit = {
+      method: "POST",
+      headers: myHeaders
+    };
+
+    const request = new Request(API_URL + "/" + props.ticket + "/actions/resolveValidationFailureTask", myInit);
     const response = await fetch(request);
   
     if (response.ok) {
