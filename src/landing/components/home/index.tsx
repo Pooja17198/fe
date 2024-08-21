@@ -26,7 +26,7 @@ type ProjectMetadata = {
     block: string;
 }
 
-const API_URL = window.location.host.includes('localhost') ? "https://lvv.us-phoenix-1.oci.oc-test.com/lvv" : `https://${window.location.host}/lvv`;
+const API_URL = window.location.host.includes('localhost') ? "http://localhost:21000/lvv" : `https://${window.location.host}/lvv`;
 
 const HomeContainer = (props: Props) => {
 

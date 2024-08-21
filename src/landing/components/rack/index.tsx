@@ -89,7 +89,7 @@ let OPTICS_COLUMNS = [{
 }
 ]
 
-const API_URL = window.location.host.includes('localhost') ? "https://lvv.us-phoenix-1.oci.oc-test.com/lvv/cablingTasks" : `https://${window.location.host}/lvv/cablingTasks`;
+const API_URL = window.location.host.includes('localhost') ? "http://localhost:21000/lvv/cablingTasks" : `https://${window.location.host}/lvv/cablingTasks`;
 
 const Rack = (props: Props) => {
 
@@ -103,6 +103,8 @@ const Rack = (props: Props) => {
 
   const [gpuErrors, setGpuErrors] = useState([])
   let gpuDataProvider = new ArrayDataProvider(opticsErrors, { keyAttributes: '' });
+
+  const [illegalPorts, setIllegalPorts] = useState([]);
 
   let dataProvider = new RESTDataProvider({
     keyAttributes: "id",
@@ -155,6 +157,7 @@ const Rack = (props: Props) => {
       setLldpErrors(result.value.data[0].lldpFailures);
       setOpticsErrors(result.value.data[0].opticsFailures);
       setGpuErrors(result.value.data[0].gpuFailures);
+      setIllegalPorts(result.value.data[0].invalidTransceiverFailures);
     }
     fetchData();
   }, []);
@@ -186,9 +189,17 @@ const Rack = (props: Props) => {
       </div>
 
       <div className="oj-flex">
+      <div className="oj-flex-item rack-panel">
+          <h3>Transceiver Action Items</h3>
+          <span className="h4Style oj-text-color-danger">The following transceivers are manufactured by CENTERA and need to be replaced.</span>
+          <br />
+          <span style="white-space: pre-line;">{illegalPorts.map((a: { errorMessage: any; }) => a.errorMessage).join("\n")}</span>
+        </div>
+
         <div className="oj-flex-item rack-panel">
           <h3>Link Action Items</h3>
           <span className="h4Style oj-text-color-danger">The following links need to be checked and replaced.</span>
+          <br />
           <oj-table
               class="selectable-table"
               display="grid"
@@ -208,6 +219,7 @@ const Rack = (props: Props) => {
         <div className="oj-flex-item rack-panel">
           <h3>Optics Action Items</h3>
           <span className="h4Style oj-text-color-danger">Please reseat the cable or replace the bad cable here.</span>
+          <br />
           <oj-table
               display="grid"
               horizontal-grid-visible="enabled"

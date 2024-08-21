@@ -48,7 +48,7 @@ const INIT_SELECTION_MODE: TableIntrinsicProps['selectionMode'] = {
 // TODO: Check it out
 const ACC = {rowHeader: "Rack"}
 
-const API_URL = window.location.host.includes('localhost') ? "https://lvv.us-phoenix-1.oci.oc-test.com/lvv" : `https://${window.location.host}/lvv`;
+const API_URL = window.location.host.includes('localhost') ? "http://localhost:21000/lvv" : `https://${window.location.host}/lvv`;
 
 const ProjectDetailsContainer = (props: Props) => {
 
