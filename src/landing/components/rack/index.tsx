@@ -89,6 +89,8 @@ let OPTICS_COLUMNS = [{
 }
 ]
 
+let INIT_SELECTEDPROJECT: any | null = null;
+
 const API_URL = window.location.host.includes('localhost') ? "http://localhost:21000/lvv/cablingTasks" : `https://${window.location.host}/lvv/cablingTasks`;
 
 const Rack = (props: Props) => {
@@ -105,6 +107,9 @@ const Rack = (props: Props) => {
   let gpuDataProvider = new ArrayDataProvider(opticsErrors, { keyAttributes: '' });
 
   const [illegalPorts, setIllegalPorts] = useState([]);
+  const [deviceUnreachable, setDeviceUnreachable] = useState([]);
+
+  const [rackValidationFailure, setRackValidationFailure] = useState(INIT_SELECTEDPROJECT);
 
   let dataProvider = new RESTDataProvider({
     keyAttributes: "id",
@@ -154,13 +159,25 @@ const Rack = (props: Props) => {
   useEffect(() => {
     const fetchData = async () => {
       const result = await dataProvider.fetchFirst({ size: 100 })[Symbol.asyncIterator]().next();
-      setLldpErrors(result.value.data[0].lldpFailures);
-      setOpticsErrors(result.value.data[0].opticsFailures);
-      setGpuErrors(result.value.data[0].gpuFailures);
-      setIllegalPorts(result.value.data[0].invalidTransceiverFailures);
+      if (result.value.data[0].lldpFailures != null) {
+        setLldpErrors(result.value.data[0].lldpFailures);
+        setOpticsErrors(result.value.data[0].opticsFailures);
+        setGpuErrors(result.value.data[0].gpuFailures);
+        // uncomment after API changes for invalidTranscevierFailures are merged.
+        // setIllegalPorts(result.value.data[0].invalidTransceiverFailures);
+        setRackValidationFailure("validation");
+      } else {
+        setDeviceUnreachable(result.value.data[0].deviceUnreachableFailures);
+        setRackValidationFailure("devicesUnreachable");
+      }
+      
     }
     fetchData();
   }, []);
+
+  const showRackValidationFailure = () => {
+    return rackValidationFailure;
+  };
 
   const physicalDeviceTemplate = (item: ojTable.HeaderTemplateContext<any>) => {
     return (
@@ -188,73 +205,91 @@ const Rack = (props: Props) => {
         <oj-c-button chroming="callToAction" data-testid="resolve-ai-test" size="sm" label="Resolve" onojAction={buttonClickedHandler}></oj-c-button>
       </div>
 
-      <div className="oj-flex">
-      <div className="oj-flex-item rack-panel">
-          <h3>Transceiver Action Items</h3>
-          <span className="h4Style oj-text-color-danger">The following transceivers are manufactured by CENTERA and need to be replaced.</span>
-          <br />
-          <span style="white-space: pre-line;">{illegalPorts.map((a: { errorMessage: any; }) => a.errorMessage).join("\n")}</span>
-        </div>
-
+      {showRackValidationFailure() == "devicesUnreachable" && (
+        <div className="oj-flex">
         <div className="oj-flex-item rack-panel">
-          <h3>Link Action Items</h3>
-          <span className="h4Style oj-text-color-danger">The following links need to be checked and replaced.</span>
-          <br />
-          <oj-table
-              class="selectable-table"
-              display="grid"
-              horizontal-grid-visible="enabled"
-              vertical-grid-visible="enabled"
-              aria-label="Link Action Items"
-              id="LinkActionItemsTable"
-              accessibility={ACC}
-              scroll-policy="loadMoreOnScroll"
-              scroll-policy-options='{"fetchSize": 5}'
-              columns={LLDP_COLUMNS}
-              data={lldpDataProvider}>
-            <template slot="currentDestTemplate" render={currentDestTemplate}/>
-          </oj-table>
+            <h3>Issues</h3>
+            <span className="oj-text-color-danger">{deviceUnreachable}</span>
+          </div>
         </div>
+      )}
 
+      {showRackValidationFailure() == "validation" && (
+        <div className="oj-flex">
         <div className="oj-flex-item rack-panel">
-          <h3>Optics Action Items</h3>
-          <span className="h4Style oj-text-color-danger">Please reseat the cable or replace the bad cable here.</span>
-          <br />
-          <oj-table
-              display="grid"
-              horizontal-grid-visible="enabled"
-              vertical-grid-visible="enabled"
-              aria-label="Optics Action Items"
-              id="OpticsActionItemsTable"
-              accessibility={ACC}
-              scroll-policy="loadMoreOnScroll"
-              scroll-policy-options='{"fetchSize": 5}'
-              columns={OPTICS_COLUMNS}
-              data={opticsDataProvider}>
-            <template slot="physicalDeviceTemplate" render={physicalDeviceTemplate}/>
-          </oj-table>
-        </div>
+            <h3>Transceiver Action Items</h3>
+            <span className="h4Style oj-text-color-danger">The following transceivers are manufactured by CENTERA and need to be replaced.</span>
+            <br />
+            <span style="white-space: pre-line;">{illegalPorts.map((a: { errorMessage: any; }) => a.errorMessage).join("\n")}</span>
+          </div>
 
-        <div className="oj-flex-item rack-panel">
-          <h3>GPU Action Items</h3>
-          <span className="h4Style oj-text-color-danger">Please reseat the cable or replace the bad cable here.</span>
-          <oj-table
-              display="grid"
-              horizontal-grid-visible="enabled"
-              vertical-grid-visible="enabled"
-              aria-label="GPU Action Items"
-              id="GPUActionItemsTable"
-              accessibility={ACC}
-              scroll-policy="loadMoreOnScroll"
-              scroll-policy-options='{"fetchSize": 5}'
-              columns={LLDP_COLUMNS}
-              data={gpuDataProvider}>
-            <template slot="physicalDeviceTemplate" render={physicalDeviceTemplate}/>
-          </oj-table>
-        </div>
+          {lldpErrors && lldpErrors.length > 0 && (
+            <div className="oj-flex-item rack-panel">
+            <h3>Link Action Items</h3>
+            <span className="h4Style oj-text-color-danger">The following links need to be checked and replaced.</span>
+            <br />
+            <oj-table
+                class="selectable-table"
+                display="grid"
+                horizontal-grid-visible="enabled"
+                vertical-grid-visible="enabled"
+                aria-label="Link Action Items"
+                id="LinkActionItemsTable"
+                accessibility={ACC}
+                scroll-policy="loadMoreOnScroll"
+                scroll-policy-options='{"fetchSize": 5}'
+                columns={LLDP_COLUMNS}
+                data={lldpDataProvider}>
+              <template slot="currentDestTemplate" render={currentDestTemplate}/>
+            </oj-table>
+          </div>
+          )}
 
-        * When Action Items are completed, Click the Resolve button at the top of the page.
-      </div>
+          {opticsErrors && opticsErrors.length > 0 && (
+            <div className="oj-flex-item rack-panel">
+              <h3>Optics Action Items</h3>
+              <span className="h4Style oj-text-color-danger">Please reseat the cable or replace the bad cable here.</span>
+              <br />
+              <oj-table
+                  display="grid"
+                  horizontal-grid-visible="enabled"
+                  vertical-grid-visible="enabled"
+                  aria-label="Optics Action Items"
+                  id="OpticsActionItemsTable"
+                  accessibility={ACC}
+                  scroll-policy="loadMoreOnScroll"
+                  scroll-policy-options='{"fetchSize": 5}'
+                  columns={OPTICS_COLUMNS}
+                  data={opticsDataProvider}>
+                <template slot="physicalDeviceTemplate" render={physicalDeviceTemplate}/>
+              </oj-table>
+            </div>
+          )}
+
+          {gpuErrors && gpuErrors.length > 0 && (
+            <div className="oj-flex-item rack-panel">
+              <h3>GPU Action Items</h3>
+              <span className="h4Style oj-text-color-danger">Please reseat the cable or replace the bad cable here.</span>
+              <oj-table
+                  display="grid"
+                  horizontal-grid-visible="enabled"
+                  vertical-grid-visible="enabled"
+                  aria-label="GPU Action Items"
+                  id="GPUActionItemsTable"
+                  accessibility={ACC}
+                  scroll-policy="loadMoreOnScroll"
+                  scroll-policy-options='{"fetchSize": 5}'
+                  columns={LLDP_COLUMNS}
+                  data={gpuDataProvider}>
+                <template slot="physicalDeviceTemplate" render={physicalDeviceTemplate}/>
+              </oj-table>
+            </div>
+          )}
+
+        </div>
+      )}
+    <br />
+    * When Action Items are completed, Click the Resolve button at the top of the page.
     </div>
   );
 };
