@@ -164,7 +164,7 @@ const Rack = (props: Props) => {
         setOpticsErrors(result.value.data[0].opticsFailures);
         setGpuErrors(result.value.data[0].gpuFailures);
         // uncomment after API changes for invalidTranscevierFailures are merged.
-        // setIllegalPorts(result.value.data[0].invalidTransceiverFailures);
+        setIllegalPorts(result.value.data[0].invalidTransceiverFailures);
         setRackValidationFailure("validation");
       } else {
         setDeviceUnreachable(result.value.data[0].deviceUnreachableFailures);
