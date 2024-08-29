@@ -13,7 +13,7 @@ let keyAttributes: string = "projectId";
 
 
 let COLUMNS = [{
-    "headerText": "Project",
+    "headerText": "Project ID",
     "field": "projectId",
     "id": "projectId"
 },
