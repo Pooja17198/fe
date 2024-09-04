@@ -58,16 +58,16 @@ const ProjectDetailsContainer = (props: Props) => {
     const parseTasks = (body: any) => {
         console.log(body)
         let racks: any[] = []
-        for (let task of body['initialCablingTasks']) {
-            racks.push({
-                "building": props.project[1],
-                "block": props.project[2],
-                "rackLocation": task.rackLocation || 9999,
-                "rackSerialNumber": task.rackSerialNumber,
-                "type": "cabling",
-                "ticket": task.ticketId
-            })
-        }
+        // for (let task of body['initialCablingTasks']) {
+        //     racks.push({
+        //         "building": props.project[1],
+        //         "block": props.project[2],
+        //         "rackLocation": task.rackLocation || 9999,
+        //         "rackSerialNumber": task.rackSerialNumber,
+        //         "type": "cabling",
+        //         "ticket": task.ticketId
+        //     })
+        // }
         for (let task of body['validationFailureTasks']) {
             racks.push({
                 "building": props.project[1],
