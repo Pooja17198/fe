@@ -1,11 +1,15 @@
-FROM ocr-docker-remote.artifactory.oci.oraclecorp.com/os/oraclelinux:8
-COPY --from=odo-docker-signed-local.artifactory.oci.oraclecorp.com/base-image-support/ol8:1.34 / /
+FROM ocr-docker-remote.artifactory.oci.oraclecorp.com/os/oraclelinux:9-slim-fips
+COPY --from=odo-docker-signed-local.artifactory.oci.oraclecorp.com/base-image-support/ol9:1.36 / /
 ENTRYPOINT ["/sbin/simple_init.py"]
+RUN microdnf install -y dnf && dnf install 'dnf-command(config-manager)'
+ARG yum_ociregion=-phx
+RUN echo ${yum_ociregion} > /etc/dnf/vars/ociregion
+RUN dnf install oracle-epel-release-el9
 
 ENV PIP_ARGS="--ignore-installed --trusted-host=artifactory.oci.oraclecorp.com -i https://artifactory.oci.oraclecorp.com/api/pypi/global-release-pypi/simple/"
 
 # Installing system packages
-RUN yum install -y \
+RUN dnf install -y \
         bind-utils \
         bzip2 \
         gcc \
@@ -22,9 +26,7 @@ RUN yum install -y \
         openssl \
         openssl-devel \
         patch \
-        \
-        python36 \
-        \
+        python3 \
         readline-devel \
         strace \
         tcpdump \
@@ -33,25 +35,21 @@ RUN yum install -y \
         vim \
         wget \
         which \
-        \
         libcap \
         sudo \
-    && yum clean all
+    && dnf clean all
 
-RUN yum install -y lumberjack-chainsaw2-nodeps-noarch && \
-    yum install yum-plugin-versionlock && \
-    yum-config-manager --add-repo https://artifactory.oci.oraclecorp.com/graalvm-release-yum-local/ && \
-    yum install --setopt=obsoletes=0 graalvm21-ee-17-jdk && \
-    yum versionlock 'graalvm*' && \
-    yum clean all
+RUN dnf install -y lumberjack-chainsaw2-nodeps-noarch && \
+    dnf install yum-plugin-versionlock && \
+    dnf config-manager --add-repo https://artifactory.oci.oraclecorp.com/graalvm-release-yum-local/ && \
+    dnf install --setopt=obsoletes=0 graalvm21-ee-17-jdk && \
+    dnf versionlock 'graalvm*' && \
+    dnf clean all
 
-RUN echo ${yum_ociregion} > /etc/dnf/vars/ociregion && \
-    dnf -y update && \
-    # Explicitly disable PHP to suppress conflicting requests error
-    dnf -y module disable php \
-    && \
-    dnf -y module enable nginx:1.20 && \
-    dnf -y install nginx && \
+# Explicitly disable PHP to suppress conflicting requests error
+RUN dnf -y module disable php && \
+    dnf module enable nginx:1.22 && \
+    dnf install -y nginx && \
     dnf clean all
 
 RUN echo "Start creating nginx."
@@ -83,7 +81,7 @@ RUN mkdir -p /etc/sv/nginx/log
 RUN ln -s /etc/sv/nginx /etc/service/nginx
 
 # Ensure run scripts are executable
-RUN find /etc/sv/ -name run -exec chmod +x {} \;
+# RUN find /etc/sv/ -name run -exec chmod +x {} \;
 
 # Create directory where certs
 RUN mkdir /etc/certs
