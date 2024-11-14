@@ -67,6 +67,8 @@ WORKDIR /scripts
 RUN python3 -m venv env && \
     source env/bin/activate && \
     python3 -m pip install -U pip && \
+    # https://github.com/urllib3/urllib3/issues/2168;
+    python3 -m pip install ${PIP_ARGS} "urllib3<2" && \
     python3 -m pip install ${PIP_ARGS} -r /scripts/ssv2/requirements.txt && \
     python3 -m pip cache purge
 
