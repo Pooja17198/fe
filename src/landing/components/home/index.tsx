@@ -1,10 +1,10 @@
 import { h } from "preact";
 import ProjectTableContainer from "./projectTable";
 import MutableArrayDataProvider = require("ojs/ojmutablearraydataprovider");
-import * as project_building_list from "text!../project_building.json";
 import { useEffect, useState } from "preact/hooks";
 import ProjectDetailsContainer from "./projectDetails";
 import { RESTDataProvider } from "ojs/ojrestdataprovider";
+import "ojs/ojprogress-circle";
 
 
 let INIT_SELECTEDPROJECT: any | null = null;
@@ -23,7 +23,7 @@ type RackMetadata = {
 type ProjectMetadata = {
     projectId: string;
     building: string;
-    block: string;
+    blocks: string[];
 }
 
 const API_URL = window.location.host.includes('localhost') ? "http://localhost:21000/lvv" : `https://${window.location.host}/lvv`;
@@ -31,7 +31,8 @@ const API_URL = window.location.host.includes('localhost') ? "http://localhost:2
 const HomeContainer = (props: Props) => {
 
     const [projectList, setProjectList] = useState([]);
-    let projectListProvider = new MutableArrayDataProvider(projectList, { keyAttributes: ["projectId", "building", "block"] })
+    let projectListProvider = new MutableArrayDataProvider(projectList, { keyAttributes: "projectId" })
+    const [isLoading, setIsLoading] = useState(false);
 
     let dataProvider = new RESTDataProvider({
         keyAttributes: "",
@@ -54,9 +55,11 @@ const HomeContainer = (props: Props) => {
 
     useEffect(() => {
         const fetchData = async () => {
+            setIsLoading(true);                   // Start loading
             const result = await dataProvider.fetchFirst({ size: 100 })[Symbol.asyncIterator]().next();
-            setProjectList(result.value.data)
-        }
+            setProjectList(result.value.data);
+            setIsLoading(false);                  // End loading
+        };
         if (props.vendor) {
             fetchData();
         }
@@ -76,18 +79,26 @@ const HomeContainer = (props: Props) => {
 
     const rackSelectedHandler = (value: any) => {
         let info = {
-            "building": selectedProject[1],
-            "block": selectedProject[2],
-            "rack": value[0],
-            "ticket": value[1],
-            "rackSerialNumber": value[2]
+            "building": value.building,
+            "block": value.block,
+            "rack": value.rackLocation,
+            "ticket": value.ticket,
+            "rackSerialNumber": value.rackSerialNumber
         }
-      props.onRackChanged(info)
+        props.onRackChanged(info)
     };
 
     return (
         <div class="oj-flex oj-flex-init home-container oj-reflow">
-            <ProjectTableContainer data={projectListProvider} onProjectChanged={projectChangedHandler} />
+            {/* Show loading indicator while project list is loading */}
+            {isLoading
+                ? (
+                    <div style="display:flex; justify-content:center; align-items:center; min-height:200px;">
+                        <oj-progress-circle size="md" value={-1} />
+                    </div>
+                )
+                : <ProjectTableContainer data={projectListProvider} onProjectChanged={projectChangedHandler} />
+            }
             {showProjectDetails() && (
                 <ProjectDetailsContainer project={selectedProject} onRackChanged={rackSelectedHandler} />
             )}
@@ -99,7 +110,6 @@ const HomeContainer = (props: Props) => {
                 </div>
             )}
         </div>
-
     );
 };
 

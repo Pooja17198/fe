@@ -1,296 +1,409 @@
 import { h } from "preact";
-import { useEffect, useCallback, useState } from "preact/hooks";
-import CoreRouter = require("ojs/ojcorerouter");
-import 'ojs/ojcollapsible';
-import 'ojs/ojtable';
+import { useEffect, useCallback, useState, useMemo } from "preact/hooks";
+import "ojs/ojtable";
 import "oj-c/button";
-import * as project_building_list from "text!../project_building.json";
-import MutableArrayDataProvider = require("ojs/ojmutablearraydataprovider");
-import { ojTable } from 'ojs/ojtable';
-import { ojButton } from "ojs/ojbutton";
-import { RESTDataProvider } from "ojs/ojrestdataprovider";
 import ArrayDataProvider = require("ojs/ojarraydataprovider");
 
-const lvvUrl: string = "http://localhost:21000/lvv/cablingTasks";
-let keyAttributes: string = "projectId";
-
-
-const INIT_DATAPROVIDER = new RESTDataProvider({
-  keyAttributes: "",
-  url: "http://localhost:21000/lvv",
-  transforms: {
-    fetchFirst: {
-      request: null!,
-      response: (): any => {
-        return { data: [] };
-      },
-    },
-  },
-});
-
 type Props = {
-  onPageChanged: (value: any) => void;
-  building: string;
-  block: string;
-  rack: string;
-  ticket: string;
-  rack_serial: string;
+    onPageChanged: (value: any) => void;
+    building: string;
+    block: string;
+    rack: string;
+    ticket: string;
+    rack_serial: string;
 };
 
-type Route = {
-  path: string;
-  detail?: object;
-  redirect?: string;
-};
-
-let LLDP_COLUMNS = [{
-  "headerText": "Origin",
-  "field": "currentOrigin",
-  "id": "currentOrigin"
-},
-{
-  "headerText": "Current Destination",
-  "field": "currentDestination",
-  "id": "currentDestination",
-  "template": "currentDestTemplate"
-},
-{
-  "headerText": "Expected Destination",
-  "field": "expectedDestination",
-  "id": "expectedDestination"
+interface ValidationFailureDisplayDTO {
+    rackSerial: string;
+    deviceARack: string;
+    deviceAName: string;
+    deviceAPort: string;
+    deviceBRack: string;
+    deviceBName: string;
+    deviceBPort: string;
+    linkStatus: string;
+    lldpStatus: string;
+    deviceBRackExpected: string;
+    deviceBNameExpected: string;
+    deviceBPortExpected: string;
+    txPower: string;
+    rxPower: string;
+    psuFailure: string;
+    psuId: string;
+    _key?: string; // composite key prop for ojs/ojarraydataprovider
 }
-]
 
-let OPTICS_COLUMNS = [{
-  "headerText": "Device",
-  "field": "device",
-  "id": "device"
-},
-{
-  "headerText": "Physical Device",
-  "field": "devicePhys",
-  "id": "devicePhys",
-  "headerTemplate": "physicalDeviceTemplate"
-},
-{
-  "headerText": "Input Power",
-  "field": "inputPower",
-  "id": "inputPower"
-},
-{
-  "headerText": "Output Power",
-  "field": "outputPower",
-  "id": "outputPower"
-},
-{
-  "headerText": "Interface Name",
-  "field": "intfName",
-  "id": "intfName"
+const VALIDATION_FAILURE_COLUMNS = [
+    { headerText: "", field: "deviceAName", id: "select", template: "selectTemplate", resizable: "disabled" as const, sortable: 'disabled' as const },
+    { headerText: "Device A Rack", field: "deviceARack", id: "deviceARack", resizable: "enabled" as const, sortable: 'enabled' as const },
+    { headerText: "Device A Name", field: "deviceAName", id: "deviceAName", resizable: "enabled" as const, sortable: 'enabled' as const },
+    { headerText: "Device A Port", field: "deviceAPort", id: "deviceAPort", resizable: "enabled" as const, sortable: 'enabled' as const },
+    { headerText: "Current Device B Rack", field: "deviceBRack", id: "deviceBRack", resizable: "enabled" as const, sortable: 'enabled' as const },
+    { headerText: "Current Device B Name", field: "deviceBName", id: "deviceBName", resizable: "enabled" as const, sortable: 'enabled' as const },
+    { headerText: "Current Device B Port", field: "deviceBPort", id: "deviceBPort", resizable: "enabled" as const, sortable: 'enabled' as const },
+    { headerText: "Expected Device B Rack", field: "deviceBRackExpected", id: "deviceBRackExpected", resizable: "enabled" as const, sortable: 'enabled' as const },
+    { headerText: "Expected Device B Name", field: "deviceBNameExpected", id: "deviceBNameExpected", resizable: "enabled" as const, sortable: 'enabled' as const },
+    { headerText: "Expected Device B Port", field: "deviceBPortExpected", id: "deviceBPortExpected", resizable: "enabled" as const, sortable: 'enabled' as const },
+    { headerText: "LLDP Status", field: "lldpStatus", id: "lldpStatus", resizable: "enabled" as const, sortable: 'enabled' as const },
+    { headerText: "TX Power", field: "txPower", id: "txPower", resizable: "enabled" as const, sortable: 'enabled' as const },
+    { headerText: "RX Power", field: "rxPower", id: "rxPower", resizable: "enabled" as const, sortable: 'enabled' as const },
+    { headerText: "PSU Failure", field: "psuFailure", id: "psuFailure", resizable: "enabled" as const, sortable: 'enabled' as const },
+];
+
+const CABLING_TASKS_API = window.location.host.includes("localhost")
+    ? "http://localhost:21000/lvv/cablingTasks"
+    : `https://${window.location.host}/lvv/cablingTasks`;
+const LVV_API = window.location.host.includes("localhost")
+    ? "http://localhost:21000/lvv"
+    : `https://${window.location.host}/lvv`;
+
+async function fetchWithRetry(url: string, options: any = {}, maxAttempts: number = 3, delayMs: number = 1000): Promise<Response> {
+    let lastError;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        try {
+            const response = await fetch(url, options);
+            // Retry for network errors or 5xx; accept 404, 400, etc. as non-retryable (customize as needed)
+            if (!response.ok && response.status >= 500) {
+                throw new Error(`Server error: ${response.status}`);
+            }
+            return response; // Success!
+        } catch (err) {
+            lastError = err;
+            if (attempt < maxAttempts - 1) {
+                await new Promise(res => setTimeout(res, delayMs));
+            }
+        }
+    }
+    throw lastError;
 }
-]
-
-let INIT_SELECTEDPROJECT: any | null = null;
-
-const API_URL = window.location.host.includes('localhost') ? "http://localhost:21000/lvv/cablingTasks" : `https://${window.location.host}/lvv/cablingTasks`;
 
 const Rack = (props: Props) => {
+    const ACC = { rowHeader: "ActionItems" };
+    const [rackValidationFailure, setRackValidationFailure] = useState<string | null>(null);
+    const [validationFailures, setValidationFailures] = useState<ValidationFailureDisplayDTO[]>([]);
+    const [selectedLinkKeys, setSelectedLinkKeys] = useState<Set<string>>(new Set());
+    const [isValidating, setIsValidating] = useState(false);
+    const [jobErrorDetails, setJobErrorDetails] = useState<{ code?: number; message?: string } | null>(null);
 
-  // TODO: Check this once.
-  const ACC = {rowHeader: "ActionItems"}
-  const [lldpErrors, setLldpErrors] = useState([])
-  let lldpDataProvider = new ArrayDataProvider(lldpErrors, { keyAttributes: '' });
+    // 1. Add _key to every row so oj-table uses a unique key
+    const processedValidationFailures = useMemo(
+        () =>
+            validationFailures.map(row => ({
+                ...row,
+                _key: `${row.deviceAName}|||${row.deviceAPort}`
+            })),
+        [validationFailures]
+    );
 
-  const [opticsErrors, setOpticsErrors] = useState([])
-  let opticsDataProvider = new ArrayDataProvider(opticsErrors, { keyAttributes: '' });
+    // 2. Use useMemo to prevent re-creating data provider on every render
+    const validationFailuresDataProvider = useMemo(
+        () =>
+            new ArrayDataProvider(
+                processedValidationFailures,
+                { keyAttributes: "_key" }
+            ),
+        [processedValidationFailures]
+    );
 
-  const [gpuErrors, setGpuErrors] = useState([])
-  let gpuDataProvider = new ArrayDataProvider(opticsErrors, { keyAttributes: '' });
-
-  const [illegalPorts, setIllegalPorts] = useState([]);
-  const [deviceUnreachable, setDeviceUnreachable] = useState([]);
-
-  const [rackValidationFailure, setRackValidationFailure] = useState(INIT_SELECTEDPROJECT);
-
-  let dataProvider = new RESTDataProvider({
-    keyAttributes: "id",
-    url: `${API_URL}/${props.ticket}/actions/getCableValidationFailureTask`,
-    transforms: {
-      fetchFirst: {
-        request: async (options) => {
-          const url = new URL(options.url);
-          console.log(url.href);
-          return new Request(url.href);
-        },
-        response: async ({ body, headers, status }) => {
-          const { lldpFailures, opticsFailures } = body;
-          return { data: [body] };
-        },
-      },
-    },
-  })
-
-  const buttonClickedHandler = async () => {
-    const really = confirm("Are you sure you want to resolve the AIs for this Rack");
-    if (!really) {
-      console.log("OK, we canceled that delete.");
-      return;
-    }
-  
-    // Create and send request to REST service to resolve the ticket
-    const myHeaders = new Headers();
-    myHeaders.append("X-OCI-Splat-CSRF", "1");
-
-    const myInit = {
-      method: "POST",
-      headers: myHeaders
+    const resolveClicked = async () => {
+        const really = confirm("Are you sure you want to resolve the AIs for this Rack");
+        if (!really) return;
+        const headers = new Headers();
+        headers.append("X-OCI-Splat-CSRF", "1");
+        const request = new Request(
+            `${CABLING_TASKS_API}/${props.ticket}/actions/resolveValidationFailureTask`,
+            { method: "POST", headers }
+        );
+        const response = await fetch(request);
+        if (response.ok) {
+            props.onPageChanged({ path: "" });
+        } else {
+            alert(`Delete failed with status ${response.status} : ${response.statusText}`);
+        }
     };
 
-    const request = new Request(API_URL + "/" + props.ticket + "/actions/resolveValidationFailureTask", myInit);
-    const response = await fetch(request);
-  
-    if (response.ok) {
-      console.log("Ticket is resolved");
-      props.onPageChanged({ path: "" });
-    } else {
-      alert(`Delete failed with status ${response.status} : ${response.statusText}`);
-    }
-  };
+    const fetchValidationFailures = useCallback(async () => {
+        try {
+            const url = new URL(`${LVV_API}/cablingValidation`);
+            url.searchParams.set("rackSerial", props.rack_serial);
+            const resp = await fetchWithRetry(url.href);
+            if (!resp.ok) {
+                setRackValidationFailure("error");
+                return;
+            }
+            const data: ValidationFailureDisplayDTO[] = await resp.json();
+            if (data && data.length > 0) {
+                setValidationFailures(data);
+                setRackValidationFailure("kiev_validation");
+            } else {
+                setValidationFailures([]);
+                setRackValidationFailure("no_failures");
+            }
+        } catch {
+            setRackValidationFailure("error");
+        }
+    }, [props.rack_serial]);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      const result = await dataProvider.fetchFirst({ size: 100 })[Symbol.asyncIterator]().next();
-      if (result.value.data[0].lldpFailures != null) {
-        setLldpErrors(result.value.data[0].lldpFailures);
-        setOpticsErrors(result.value.data[0].opticsFailures);
-        setGpuErrors(result.value.data[0].gpuFailures);
-        // uncomment after API changes for invalidTranscevierFailures are merged.
-        setIllegalPorts(result.value.data[0].invalidTransceiverFailures);
-        setRackValidationFailure("validation");
-      } else {
-        setDeviceUnreachable(result.value.data[0].deviceUnreachableFailures);
-        setRackValidationFailure("devicesUnreachable");
-      }
-      
-    }
-    fetchData();
-  }, []);
+    const validateClicked = useCallback(async () => {
+        setIsValidating(true);
+        setJobErrorDetails(null);
+        let jobId = null;
+        let jobStatus = null;
+        try {
+            // 1. Post to backend to start job, get jobId
+            const headers = new Headers();
+            headers.append("X-OCI-Splat-CSRF", "1");
+            const url = new URL(`${LVV_API}/cablingValidation`);
+            url.searchParams.set("building", props.building);
+            url.searchParams.set("rackSerialNumber", props.rack_serial);
+            if (selectedLinkKeys.size > 0) {
+                const deviceNames = new Set(
+                    Array.from(selectedLinkKeys).map((key) => key.split("|||")[0])
+                );
+                deviceNames.forEach((name) => url.searchParams.append("deviceNames", name));
+            }
+            const postResp = await fetchWithRetry(url.href, { method: "POST", headers });
+            if (!postResp.ok) {
+                let errMsg = postResp.statusText;
+                try {
+                    const contentType = postResp.headers.get("content-type") || "";
+                    let errorJsonOrText = null;
+                    if (contentType.includes("application/json")) {
+                        errorJsonOrText = await postResp.json();
+                        errMsg =
+                            (errorJsonOrText && errorJsonOrText.message) ||
+                            JSON.stringify(errorJsonOrText) ||
+                            postResp.statusText;
+                    } else {
+                        errorJsonOrText = await postResp.text();
+                        if (errorJsonOrText) errMsg = errorJsonOrText;
+                    }
+                } catch (parseError) {
+                    // Ignore and fallback to statusText
+                }
+                setJobErrorDetails({
+                    code: postResp.status,
+                    message: errMsg,
+                });
+                setRackValidationFailure("error");
+                return;
+            }
+            jobId = await postResp.text();
 
-  const showRackValidationFailure = () => {
-    return rackValidationFailure;
-  };
+            // 2. Poll the job status endpoint up to max attempts
+            const MAX_ATTEMPTS = 40;
+            const POLL_INTERVAL_MS = 30000;
+            for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+                const url = new URL(`${LVV_API}/getValidationJobStatus`);
+                url.searchParams.set("jobId", jobId);
+                url.searchParams.set("building", props.building);
+                url.searchParams.set("rackSerialNumber", props.rack_serial);
+                const statusResp = await fetchWithRetry(url.href, { method: "GET", headers });
+                if (statusResp.ok) {
+                    jobStatus = await statusResp.text();
+                    if (jobStatus === "Succeeded") {
+                        break;
+                    }
+                } else {
+                    let errMsg = statusResp.statusText;
+                    console.log(`Received unexpected response: ${errMsg}`);
+                    try {
+                        const contentType = statusResp.headers.get("content-type") || "";
+                        let errorJsonOrText = null;
+                        if (contentType.includes("application/json")) {
+                            errorJsonOrText = await statusResp.json();
+                            errMsg =
+                                (errorJsonOrText && errorJsonOrText.message) ||
+                                JSON.stringify(errorJsonOrText) ||
+                                statusResp.statusText;
+                        } else {
+                            errorJsonOrText = await statusResp.text();
+                            if (errorJsonOrText) errMsg = errorJsonOrText;
+                        }
+                    } catch (parseError) {
+                        console.log("Caught while parsing err response")
+                        // Ignore and fallback to statusText
+                    } finally {
+                        setRackValidationFailure("error");
+                        jobStatus = "Failed";
+                        setJobErrorDetails({ code: statusResp.status, message: errMsg });
+                        console.log(`Job Status: ${jobStatus}`);
+                    }
+                    break;
+                }
+                // Wait before next poll, unless this is the last attempt
+                if (attempt < MAX_ATTEMPTS - 1) {
+                    await new Promise((res) => setTimeout(res, POLL_INTERVAL_MS));
+                }
+            }
+        } finally {
+            // 3. Only move ahead if succeeded
+            console.log(`Job Status: ${jobStatus}`);
+            if (jobStatus === "Succeeded") {
+                await fetchValidationFailures();
+            } else if (jobStatus === "Pending") {
+                setJobErrorDetails({
+                    code: 200,
+                    message: "Validation Job is taking too long. Please select fewer devices at a time to validate"
+                });
+                setRackValidationFailure("error");
+            }
+            setIsValidating(false);
+        }
+    }, [
+        props.building,
+        props.block,
+        selectedLinkKeys,
+        fetchValidationFailures,
+        props.rack_serial
+    ]);
 
-  const physicalDeviceTemplate = (item: ojTable.HeaderTemplateContext<any>) => {
+    useEffect(() => {
+        fetchValidationFailures();
+    }, [fetchValidationFailures]);
+
+    useEffect(() => {
+        setSelectedLinkKeys((prevKeys) => {
+            const currentKeys = new Set(processedValidationFailures.map(
+                row => row._key
+            ));
+            // Remove any key in prevKeys that's not in currentKeys (i.e., not present in the current data)
+            return new Set([...prevKeys].filter(key => currentKeys.has(key)));
+        });
+    }, [processedValidationFailures]);
+
+    const showRackValidationFailure = () => rackValidationFailure;
+
+    const selectTemplate = (context: any) => {
+        const row = (context?.item && context.item.data) || {};
+        const key = row._key;
+        const isChecked = selectedLinkKeys.has(key);
+        const onChange = (e: any) => {
+            const checked = (e.target as HTMLInputElement).checked;
+            setSelectedLinkKeys((prev) => {
+                const next = new Set(prev);
+                if (checked) next.add(key);
+                else next.delete(key);
+                return next;
+            });
+        };
+        return <input type="checkbox" checked={isChecked} onChange={onChange} />;
+    };
+
     return (
-      <div class="oj-table-column-header-text">
-        <span>Physical Device</span>
-        <br></br>
-        <span>bldg:rack:elevation</span>
-      </div>
-    );
-  };
-
-  const currentDestTemplate = (dest: ojTable.RowTemplateContext<any, any>) => {
-    let value = (dest.data === "Unknown:Unknown:Unknown") ? "Unknown" : dest.data;
-    return (
-      <div>
-        <span>{value}</span>
-      </div>
-    );
-  };
-
-  return (
-    <div>
-      <div class="header-center">
-        <h2>Building: {props.building}, Block: {props.block}, Rack: {props.rack}, Serial: {props.rack_serial} </h2>
-        <oj-c-button chroming="callToAction" data-testid="resolve-ai-test" size="sm" label="Resolve" onojAction={buttonClickedHandler}></oj-c-button>
-      </div>
-
-      {showRackValidationFailure() == "devicesUnreachable" && (
-        <div className="oj-flex">
-        <div className="oj-flex-item rack-panel">
-            <h3>Issues</h3>
-            <span className="oj-text-color-danger">{deviceUnreachable}</span>
-          </div>
-        </div>
-      )}
-
-      {showRackValidationFailure() == "validation" && (
-        <div className="oj-flex">
-        <div className="oj-flex-item rack-panel">
-            <h3>Transceiver Action Items</h3>
-            <span className="h4Style oj-text-color-danger">The following transceivers are manufactured by CENTERA and need to be replaced.</span>
-            <br />
-            <span style="white-space: pre-line;">{illegalPorts.map((a: { errorMessage: any; }) => a.errorMessage).join("\n")}</span>
-          </div>
-
-          {lldpErrors && lldpErrors.length > 0 && (
-            <div className="oj-flex-item rack-panel">
-            <h3>Link Action Items</h3>
-            <span className="h4Style oj-text-color-danger">The following links need to be checked and replaced.</span>
-            <br />
-            <oj-table
-                class="selectable-table"
-                display="grid"
-                horizontal-grid-visible="enabled"
-                vertical-grid-visible="enabled"
-                aria-label="Link Action Items"
-                id="LinkActionItemsTable"
-                accessibility={ACC}
-                scroll-policy="loadMoreOnScroll"
-                scroll-policy-options='{"fetchSize": 5}'
-                columns={LLDP_COLUMNS}
-                data={lldpDataProvider}>
-              <template slot="currentDestTemplate" render={currentDestTemplate}/>
-            </oj-table>
-          </div>
-          )}
-
-          {opticsErrors && opticsErrors.length > 0 && (
-            <div className="oj-flex-item rack-panel">
-              <h3>Optics Action Items</h3>
-              <span className="h4Style oj-text-color-danger">Please reseat the cable or replace the bad cable here.</span>
-              <br />
-              <oj-table
-                  display="grid"
-                  horizontal-grid-visible="enabled"
-                  vertical-grid-visible="enabled"
-                  aria-label="Optics Action Items"
-                  id="OpticsActionItemsTable"
-                  accessibility={ACC}
-                  scroll-policy="loadMoreOnScroll"
-                  scroll-policy-options='{"fetchSize": 5}'
-                  columns={OPTICS_COLUMNS}
-                  data={opticsDataProvider}>
-                <template slot="physicalDeviceTemplate" render={physicalDeviceTemplate}/>
-              </oj-table>
+        <div>
+            <div class="header-center">
+                <h2>
+                    Building: {props.building}, Block: {props.block}, Rack: {props.rack}, Serial: {props.rack_serial}
+                </h2>
+                <oj-c-button
+                    chroming="callToAction"
+                    size="sm"
+                    label="Validate"
+                    onojAction={validateClicked}
+                    style="margin-right: 8px;"
+                    disabled={isValidating}
+                ></oj-c-button>
+                <oj-c-button
+                    chroming="callToAction"
+                    data-testid="resolve-ai-test"
+                    size="sm"
+                    label="Resolve"
+                    onojAction={resolveClicked}
+                    disabled={isValidating}
+                ></oj-c-button>
             </div>
-          )}
-
-          {gpuErrors && gpuErrors.length > 0 && (
-            <div className="oj-flex-item rack-panel">
-              <h3>GPU Action Items</h3>
-              <span className="h4Style oj-text-color-danger">Please reseat the cable or replace the bad cable here.</span>
-              <oj-table
-                  display="grid"
-                  horizontal-grid-visible="enabled"
-                  vertical-grid-visible="enabled"
-                  aria-label="GPU Action Items"
-                  id="GPUActionItemsTable"
-                  accessibility={ACC}
-                  scroll-policy="loadMoreOnScroll"
-                  scroll-policy-options='{"fetchSize": 5}'
-                  columns={LLDP_COLUMNS}
-                  data={gpuDataProvider}>
-                <template slot="physicalDeviceTemplate" render={physicalDeviceTemplate}/>
-              </oj-table>
-            </div>
-          )}
-
+            {isValidating && (
+                <div
+                    style={{
+                        margin: '12px auto',
+                        padding: '12px 20px',
+                        border: '1.5px solid #e53935',
+                        background: '#fff5f5',
+                        color: '#d32f2f',
+                        fontWeight: 'bold',
+                        fontSize: '1.1rem',
+                        borderRadius: '6px',
+                        display: 'block',
+                        boxShadow: '0 1px 4px rgba(229,57,53,0.09)',
+                        textAlign: 'center',
+                        width: 'fit-content'
+                    }}
+                    aria-live="polite"
+                    role="status"
+                >
+                    <span style={{ marginRight: 8 }}>&#8635;</span>
+                    Validation in progress...
+                </div>
+            )}
+            {jobErrorDetails && (
+                <div
+                    style={{
+                        margin: '12px auto',
+                        padding: '12px 20px',
+                        border: '1.5px solid #d32f2f',
+                        background: '#fff5f5',
+                        color: '#d32f2f',
+                        fontWeight: 'bold',
+                        fontSize: '1.1rem',
+                        borderRadius: '6px',
+                        display: 'block',
+                        boxShadow: '0 1px 4px rgba(229,57,53,0.09)',
+                        textAlign: 'center',
+                        width: 'fit-content'
+                    }}
+                    role="alert"
+                >
+                    <div>Validation failed!</div>
+                    {jobErrorDetails.code && <div><b>Code:</b> {jobErrorDetails.code}</div>}
+                    {jobErrorDetails.message && <div><b>Message:</b> {jobErrorDetails.message}</div>}
+                </div>
+            )}
+            {showRackValidationFailure() === "error" && (
+                <div className="oj-flex">
+                    <div className="oj-flex-item rack-panel">
+                        <h3>Error</h3>
+                        <span className="oj-text-color-danger">Failed to load validation failures. Please try again later.</span>
+                    </div>
+                </div>
+            )}
+            {showRackValidationFailure() === "no_failures" && (
+                <div className="oj-flex">
+                    <div className="oj-flex-item rack-panel">
+                        <h3>No Issues Found</h3>
+                        <span className="oj-text-color-success">No validation failures found for this rack.</span>
+                    </div>
+                </div>
+            )}
+            {showRackValidationFailure() === "kiev_validation" && processedValidationFailures.length > 0 && (
+                <div className="oj-flex">
+                    <div className="oj-flex-item rack-panel table-wrapper-full">
+                        <h3>Link Action Items</h3>
+                        <span className="h4Style oj-text-color-danger">The following links need to be checked and replaced.</span>
+                        <br />
+                        <oj-table
+                            class="selectable-table table-full"
+                            display="grid"
+                            horizontal-grid-visible="enabled"
+                            layout = "contents"
+                            vertical-grid-visible="enabled"
+                            aria-label="Validation Failure Action Items"
+                            id="ValidationFailureItemsTable"
+                            accessibility={ACC}
+                            scroll-policy="loadMoreOnScroll"
+                            scroll-policy-options='{"fetchSize": 10}'
+                            columns={VALIDATION_FAILURE_COLUMNS}
+                            data={validationFailuresDataProvider}
+                        >
+                            <template slot="selectTemplate" render={selectTemplate} />
+                        </oj-table>
+                    </div>
+                </div>
+            )}
+            <br />
+            * When Action Items are completed, Click the Resolve button at the top of the page to resolve the corresponding Jira ticket.
         </div>
-      )}
-    <br />
-    * When Action Items are completed, Click the Resolve button at the top of the page.
-    </div>
-  );
+    );
 };
+
 export default Rack;

@@ -4,9 +4,7 @@ import "ojs/ojtable";
 import { useState } from "preact/hooks";
 import { KeySetImpl } from "ojs/ojkeyset";
 import "ojs/ojtable";
-import * as project_building_list from "text!../project_building.json";
 import MutableArrayDataProvider = require("ojs/ojmutablearraydataprovider");
-import { RESTDataProvider } from "ojs/ojrestdataprovider";
 
 
 let keyAttributes: string = "projectId";
@@ -18,15 +16,16 @@ let COLUMNS = [{
     "id": "projectId"
 },
 {
-  "headerText": "Building",
-  "field": "building",
-  "id": "building"
+    "headerText": "Building",
+    "field": "building",
+    "id": "building"
 },
 {
-    "headerText": "Block",
-    "field": "block",
-    "id": "block"
-}]
+    "headerText": "Block(s)",
+    "field": "blocks",
+    "id": "blocks",
+    "template": "blocksTemplate"
+    }]
 
 type Props = {
     data: MutableArrayDataProvider<any, any>;
@@ -37,7 +36,8 @@ type Props = {
 type ProjectMetadata = {
     projectId: string;
     building: string;
-    block: string;
+    blocks: string[];
+    prefilterBlocks?: string[];
 }
 
 const INIT_SELECTION_MODE: TableIntrinsicProps['selectionMode'] = {
@@ -49,13 +49,28 @@ const INIT_SELECTION_MODE: TableIntrinsicProps['selectionMode'] = {
 const ACC = {rowHeader: "ProjectName"}
 
 const ProjectTableContainer = (props: Props) => {
-    const onSelectionChangedHandler = (event: ojTable.selectedChanged<any, any>) => {
+    const onSelectionChangedHandler = async (event: ojTable.selectedChanged<any, any>) => {
         const row = event.detail.value.row as KeySetImpl<any>;
         if (row.values().size > 0) {
-            row.values().forEach(element => {
-                props.onProjectChanged(element)
-            });
+            const result = await (props.data as any).fetchByKeys({ keys: row.values() });
+            if (result && result.results) {
+                for (const key of row.values()) {
+                    const item = result.results.get(key);
+                    if (item && item.data) {
+                        props.onProjectChanged(item.data as ProjectMetadata);
+                    }
+                }
+            }
         }
+    };
+
+    const blocksTemplate = (context: any) => {
+        const row = (context?.item && context.item.data) || {};
+        const blocks: string[] =
+            Array.isArray(row.blocks) && row.blocks.length > 0
+                ? row.blocks
+                : (row.block ? [row.block] : []);
+        return <span>{blocks.length ? blocks.join(", ") : "-"}</span>;
     };
 
     return (
@@ -72,6 +87,7 @@ const ProjectTableContainer = (props: Props) => {
                 scroll-policy-options='{"fetchSize": 5}'
                 columns={COLUMNS}
                 data={props.data}>
+                <template slot="blocksTemplate" render={blocksTemplate} />
             </oj-table>
         </div>
     );
