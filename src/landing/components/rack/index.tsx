@@ -44,10 +44,10 @@ const VALIDATION_FAILURE_COLUMNS = [
     { headerText: "Expected Device B Rack", field: "deviceBRackExpected", id: "deviceBRackExpected", resizable: "enabled" as const, sortable: 'enabled' as const },
     { headerText: "Expected Device B Name", field: "deviceBNameExpected", id: "deviceBNameExpected", resizable: "enabled" as const, sortable: 'enabled' as const },
     { headerText: "Expected Device B Port", field: "deviceBPortExpected", id: "deviceBPortExpected", resizable: "enabled" as const, sortable: 'enabled' as const },
-    { headerText: "LLDP Status", field: "lldpStatus", id: "lldpStatus", resizable: "enabled" as const, sortable: 'enabled' as const },
+    { headerText: "LLDP Status", field: "lldpStatus", id: "lldpStatus", template: "lldpTemplate", resizable: "enabled" as const, sortable: 'enabled' as const },
     { headerText: "TX Power", field: "txPower", id: "txPower", resizable: "enabled" as const, sortable: 'enabled' as const },
     { headerText: "RX Power", field: "rxPower", id: "rxPower", resizable: "enabled" as const, sortable: 'enabled' as const },
-    { headerText: "PSU Failure", field: "psuFailure", id: "psuFailure", resizable: "enabled" as const, sortable: 'enabled' as const },
+    { headerText: "PSU Failure", field: "psuFailure", id: "psuFailure", template: "psuTemplate", resizable: "enabled" as const, sortable: 'enabled' as const },
 ];
 
 const CABLING_TASKS_API = window.location.host.includes("localhost")
@@ -84,6 +84,8 @@ const Rack = (props: Props) => {
     const [selectedLinkKeys, setSelectedLinkKeys] = useState<Set<string>>(new Set());
     const [isValidating, setIsValidating] = useState(false);
     const [jobErrorDetails, setJobErrorDetails] = useState<{ code?: number; message?: string } | null>(null);
+    const [isDownloading, setIsDownloading] = useState(false);
+    const [hasValidated, setHasValidated] = useState(false);
 
     // 1. Add _key to every row so oj-table uses a unique key
     const processedValidationFailures = useMemo(
@@ -121,6 +123,41 @@ const Rack = (props: Props) => {
             alert(`Delete failed with status ${response.status} : ${response.statusText}`);
         }
     };
+    const downloadCsvClicked = useCallback(async () => {
+        setIsDownloading(true);
+        try {
+            const url = new URL(`${LVV_API}/downloadCablingValidationResults`);
+            url.searchParams.set("rackSerial", props.rack_serial);
+            const headers = new Headers();
+            headers.append("Accept", "text/csv");
+            const resp = await fetchWithRetry(url.href, { method: "GET", headers });
+            if (!resp.ok) {
+                throw new Error(`${resp.status} ${resp.statusText}`);
+            }
+            const blob = await resp.blob();
+            const cd = resp.headers.get("content-disposition") || "";
+            let filename = `cabling_validation_${props.rack_serial}.csv`;
+            try {
+                const match = cd.match(/filename\*=UTF-8''([^;]+)|filename="?([^";]+)"?/i);
+                if (match) {
+                    filename = decodeURIComponent((match[1] || match[2]).trim());
+                }
+            } catch {}
+            const objectUrl = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = objectUrl;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(objectUrl);
+        } catch (e: any) {
+            const message = e && e.message ? e.message : "Unknown error";
+            alert(`Download failed: ${message}`);
+        } finally {
+            setIsDownloading(false);
+        }
+    }, [props.rack_serial]);
 
     const fetchValidationFailures = useCallback(async () => {
         try {
@@ -240,6 +277,7 @@ const Rack = (props: Props) => {
             // 3. Only move ahead if succeeded
             console.log(`Job Status: ${jobStatus}`);
             if (jobStatus === "Succeeded") {
+                setHasValidated(true);
                 await fetchValidationFailures();
             } else if (jobStatus === "Pending") {
                 setJobErrorDetails({
@@ -259,8 +297,10 @@ const Rack = (props: Props) => {
     ]);
 
     useEffect(() => {
-        fetchValidationFailures();
-    }, [fetchValidationFailures]);
+        if (hasValidated) {
+            fetchValidationFailures();
+        }
+    }, [hasValidated, fetchValidationFailures]);
 
     useEffect(() => {
         setSelectedLinkKeys((prevKeys) => {
@@ -290,6 +330,27 @@ const Rack = (props: Props) => {
         return <input type="checkbox" checked={isChecked} onChange={onChange} />;
     };
 
+    const lldpTemplate = (context: any) => {
+        const row = (context?.item && context.item.data) || {};
+        const value: string = (row.lldpStatus || '').toString();
+        const isMatch = value.toLowerCase() === 'match';
+        const isMismatch = value.toLowerCase() === 'mismatch';
+        const colorClass = isMatch ? 'oj-text-color-success' : isMismatch ? 'oj-text-color-danger' : '';
+        return <span class={colorClass}>{value}</span>;
+    };
+
+    const psuTemplate = (context: any) => {
+        const row = (context?.item && context.item.data) || {};
+        const hasFailure =
+            row.psuFailure !== null &&
+            row.psuFailure !== undefined &&
+            `${row.psuFailure}`.toLowerCase() !== 'null' &&
+            `${row.psuFailure}` !== '';
+        return hasFailure
+            ? <span class="oj-text-color-danger" aria-label="PSU failure">✗</span>
+            : <span class="oj-text-color-success" aria-label="No PSU failure">✓</span>;
+    };
+
     return (
         <div>
             <div class="header-center">
@@ -311,6 +372,14 @@ const Rack = (props: Props) => {
                     label="Resolve"
                     onojAction={resolveClicked}
                     disabled={isValidating}
+                ></oj-c-button>
+                <oj-c-button
+                    chroming="callToAction"
+                    size="sm"
+                    label="Download CSV"
+                    onojAction={downloadCsvClicked}
+                    style="margin-left: 8px;"
+                    disabled={isValidating || isDownloading || processedValidationFailures.length === 0}
                 ></oj-c-button>
             </div>
             {isValidating && (
@@ -367,7 +436,15 @@ const Rack = (props: Props) => {
                     </div>
                 </div>
             )}
-            {showRackValidationFailure() === "no_failures" && (
+            {!hasValidated && (
+                <div className="oj-flex">
+                    <div className="oj-flex-item rack-panel">
+                        <h3>Please validate the rack by clicking on the validate button above.</h3>
+                        <span>Run validation to view the latest diagnostics and export results.</span>
+                    </div>
+                </div>
+            )}
+            {hasValidated && showRackValidationFailure() === "no_failures" && (
                 <div className="oj-flex">
                     <div className="oj-flex-item rack-panel">
                         <h3>No Issues Found</h3>
@@ -396,6 +473,8 @@ const Rack = (props: Props) => {
                             data={validationFailuresDataProvider}
                         >
                             <template slot="selectTemplate" render={selectTemplate} />
+                            <template slot="lldpTemplate" render={lldpTemplate} />
+                            <template slot="psuTemplate" render={psuTemplate} />
                         </oj-table>
                     </div>
                 </div>
