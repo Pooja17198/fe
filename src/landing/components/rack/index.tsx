@@ -86,18 +86,29 @@ const Rack = (props: Props) => {
     const [jobErrorDetails, setJobErrorDetails] = useState<{ code?: number; message?: string } | null>(null);
     const [isDownloading, setIsDownloading] = useState(false);
     const [hasValidated, setHasValidated] = useState(false);
+    const [hideUnsupported, setHideUnsupported] = useState(true);
 
-    // 1. Add _key to every row so oj-table uses a unique key
+    // 1. Filter out unsupported LLDP Status rows
+    const filteredValidationFailures = useMemo(
+        () => !hideUnsupported
+            ? validationFailures
+            : validationFailures.filter(row =>
+                String(row.lldpStatus).toUpperCase() !== 'UNSUPPORTED'
+            ),
+        [validationFailures, hideUnsupported]
+    );
+
+    // 2. Add _key to every row so oj-table uses a unique key
     const processedValidationFailures = useMemo(
         () =>
-            validationFailures.map(row => ({
+            filteredValidationFailures.map(row => ({
                 ...row,
                 _key: `${row.deviceAName}|||${row.deviceAPort}`
             })),
-        [validationFailures]
+        [filteredValidationFailures]
     );
 
-    // 2. Use useMemo to prevent re-creating data provider on every render
+    // 3. Use useMemo to prevent re-creating data provider on every render
     const validationFailuresDataProvider = useMemo(
         () =>
             new ArrayDataProvider(
@@ -282,7 +293,7 @@ const Rack = (props: Props) => {
             } else if (jobStatus === "Pending") {
                 setJobErrorDetails({
                     code: 200,
-                    message: "Validation Job is taking too long. Please select fewer devices at a time to validate"
+                    message: "Validation Job is taking too long. Please select fewer devices at a time to validate or try again later"
                 });
                 setRackValidationFailure("error");
             }
@@ -450,6 +461,17 @@ const Rack = (props: Props) => {
                     </div>
                 </div>
             )}
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <label style={{ margin: '8px 0', padding: '8px' }}>
+                    <input
+                        type="checkbox"
+                        checked={hideUnsupported}
+                        onChange={e => setHideUnsupported((e.target as HTMLInputElement).checked)}
+                        style={{ marginRight: '8px' }}
+                    />
+                    Hide "UNSUPPORTED" LLDP Status errors
+                </label>
+            </div>
             {showRackValidationFailure() === "kiev_validation" && processedValidationFailures.length > 0 && (
                 <div className="oj-flex">
                     <div className="oj-flex-item rack-panel table-wrapper-full">
