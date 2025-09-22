@@ -297,10 +297,8 @@ const Rack = (props: Props) => {
     ]);
 
     useEffect(() => {
-        if (hasValidated) {
-            fetchValidationFailures();
-        }
-    }, [hasValidated, fetchValidationFailures]);
+        fetchValidationFailures();
+    }, [fetchValidationFailures]);
 
     useEffect(() => {
         setSelectedLinkKeys((prevKeys) => {
@@ -436,7 +434,7 @@ const Rack = (props: Props) => {
                     </div>
                 </div>
             )}
-            {!hasValidated && (
+            {!hasValidated && showRackValidationFailure() === "no_failures" &&  (
                 <div className="oj-flex">
                     <div className="oj-flex-item rack-panel">
                         <h3>Please validate the rack by clicking on the validate button above.</h3>
