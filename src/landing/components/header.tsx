@@ -12,14 +12,17 @@ import "ojs/ojtoolbar";
 import "ojs/ojmenu";
 import "ojs/ojbutton";
 import "ojs/ojselectcombobox";
+import { regions } from "./regions";
 
 type Props = Readonly<{
   appName: string,
   userLogin: string,
-  vendorName: string
+  vendorName: string,
+  regionValue?: string,
+  onRegionChanged?: (region: string) => void
 }>;
 
-export function Header({ appName, userLogin, vendorName }: Props) {
+export function Header({ appName, userLogin, vendorName, regionValue, onRegionChanged }: Props) {
   const mediaQueryRef = useRef<MediaQueryList>(window.matchMedia(ResponsiveUtils.getFrameworkQuery("sm-only")!));
   
   const [isSmallWidth, setIsSmallWidth] = useState(mediaQueryRef.current.matches);
@@ -43,6 +46,16 @@ export function Header({ appName, userLogin, vendorName }: Props) {
 
   const logoutUrl = `/logout`;
 
+  function handleUserMenuAction(e: any) {
+    const detail = e?.detail || {};
+    const actionValue = detail.value || detail.selectedValue || detail.key || detail?.option?.value;
+    const targetId = (e?.target && e.target.id) || (e?.srcElement && e.srcElement.id);
+    const resolved = actionValue || (typeof targetId === "string" && targetId.includes("out") ? "out" : null);
+    if (resolved === "out") {
+      window.location.assign(logoutUrl);
+    }
+  }
+
   // TODO: Add a Home Button
   return (
     <header role="banner" class="oj-web-applayout-header">
@@ -59,19 +72,33 @@ export function Header({ appName, userLogin, vendorName }: Props) {
             {appName} Vendor Name: {vendorName}
           </h1>
         </div>
-        <div class="oj-flex-bar-center-absolute">
-        
-        </div>
         <div class="oj-flex-bar-end">
+          <oj-combobox-one
+              value={regionValue || ""}
+              placeholder="Select Region"
+              label-hint="Region"
+              onvalueChanged={(e: any) => {
+                const newVal = typeof e === "string" ? e : e?.detail?.value;
+                if (onRegionChanged && typeof newVal === "string") {
+                  onRegionChanged(newVal);
+                }
+              }}
+              class="oj-form-control-max-width-lg oj-sm-margin-2x-end"
+              style="min-width: 360px;">
+            <oj-option value="all">All Regions</oj-option>
+            {regions.map((r) => (
+                <oj-option value={r.value}>{r.label}</oj-option>
+            ))}
+          </oj-combobox-one>
         <oj-toolbar>
-          <oj-menu-button id="userMenu" display={getDisplayType()} chroming="borderless">
+          <oj-menu-button id="userMenu" display={getDisplayType()} chroming="borderless" onojAction={handleUserMenuAction}>
             <span aria-label={userLogin}>{userLogin}</span>
             <span slot="endIcon" class={getEndIconClass()}></span>
-            <oj-menu id="menu1" slot="menu">
+            <oj-menu id="menu1" slot="menu" onojAction={handleUserMenuAction}>
               <oj-option id="pref" value="pref">Preferences (Coming Soon)</oj-option>
               <oj-option id="help" value="help">Help (Coming Soon)</oj-option>
               <oj-option id="about" value="about">About (Coming Soon)</oj-option>
-              <oj-option id="out" value="out"><a href={logoutUrl}>Sign Out</a></oj-option>
+              <oj-option id="out" value="out">Sign Out</oj-option>
             </oj-menu>
           </oj-menu-button>
         </oj-toolbar>

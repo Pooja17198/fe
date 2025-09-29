@@ -25,6 +25,7 @@ type Props = {
   routes: Array<object>;
   onPageChanged: (value: any) => void;
   onVendorChanged: (vendor: string) => void;
+  region?: string;
 };
 
 let INIT_DEFAULT: any | null = null;
@@ -86,7 +87,7 @@ const Content = (props: Props) => {
         {/* <oj-form-layout max-columns="1" direction="row">
           <oj-c-input-text label-hint="(Dev Only) Type and Change Vendor, Press Enter" onvalueChanged={vendorChangedHandler}></oj-c-input-text>
         </oj-form-layout> */}
-        <HomeContainer onRackChanged={rackChangedHandler} vendor={selectedVendor} />
+        <HomeContainer onRackChanged={rackChangedHandler} vendor={selectedVendor} region={props.region} />
       </div>
 
     }

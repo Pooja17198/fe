@@ -12,6 +12,7 @@ let INIT_SELECTEDPROJECT: any | null = null;
 type Props = {
   onRackChanged: (value: RackMetadata) => void;
   vendor?: string;
+  region?: string;
 }
 
 type RackMetadata = {
@@ -30,13 +31,13 @@ const API_URL = window.location.host.includes('localhost') ? "http://localhost:2
 
 const HomeContainer = (props: Props) => {
 
-    const [projectList, setProjectList] = useState([]);
-    let projectListProvider = new MutableArrayDataProvider(projectList, { keyAttributes: "projectId" })
+    const [projectList, setProjectList] = useState<any[]>([]);
+    let projectListProvider = new MutableArrayDataProvider<any, any>(projectList, { keyAttributes: "projectId" })
     const [isLoading, setIsLoading] = useState(false);
 
     let dataProvider = new RESTDataProvider({
         keyAttributes: "",
-        url: `${API_URL}/projects?vendorName=${props.vendor}`,
+        url: `${API_URL}/projects?vendorName=${props.vendor}${props.region && props.region !== 'all' ? `&regionName=${props.region}` : ''}`,
         transforms: {
             fetchFirst: {
                 request: async (options) => {
@@ -55,15 +56,15 @@ const HomeContainer = (props: Props) => {
 
     useEffect(() => {
         const fetchData = async () => {
-            setIsLoading(true);                   // Start loading
+            setIsLoading(true);
             const result = await dataProvider.fetchFirst({ size: 100 })[Symbol.asyncIterator]().next();
             setProjectList(result.value.data);
-            setIsLoading(false);                  // End loading
+            setIsLoading(false);
         };
         if (props.vendor) {
             fetchData();
         }
-    }, [props.vendor]);
+    }, [props.vendor, props.region]);
 
     const [selectedProject, setSelectedProject] = useState(
         INIT_SELECTEDPROJECT

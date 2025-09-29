@@ -52,6 +52,7 @@ const pageChangeHandler = (route: Route) => {
 
 export const App = registerCustomElement("app-root", (props: Props) => {
   const [selectedVendor, setSelectedVendor] = useState("XYZ");
+  const [selectedRegion, setSelectedRegion] = useState<string>("");
 
     props.appName = "LVV Portal";
     props.userLogin = sessionStorage.getItem("X-Oracle-Vendor-Email") || "";
@@ -69,6 +70,10 @@ export const App = registerCustomElement("app-root", (props: Props) => {
       console.log(selectedVendor)
     }
 
+    const regionChangedHandler = (region: string) => {
+      setSelectedRegion(region);
+    }
+
     useEffect(() => {
       Context.getPageContext().getBusyContext().applicationBootstrapComplete();
       setSelectedVendor(sessionStorage.getItem("X-Oracle-Vendor") || "");
@@ -82,12 +87,15 @@ export const App = registerCustomElement("app-root", (props: Props) => {
           appName={props.appName}
           userLogin={props.userLogin}
           vendorName={selectedVendor}
+          regionValue={selectedRegion}
+          onRegionChanged={regionChangedHandler}
         />
         <Content 
           page={routePath}
           pagerouter={router} 
           onPageChanged={pageChangeHandler}
           onVendorChanged={vendorChangedHandler}
+          region={selectedRegion}
           routes={routeArray}/>
         <Footer />
       </div>
