@@ -74,7 +74,7 @@ export function Header({ appName, userLogin, vendorName, regionValue, onRegionCh
         </div>
         <div class="oj-flex-bar-end">
           <oj-combobox-one
-              value={regionValue || ""}
+              value={regionValue ? regionValue : "all"}
               placeholder="Select Region"
               label-hint="Region"
               onvalueChanged={(e: any) => {

@@ -35,32 +35,53 @@ const HomeContainer = (props: Props) => {
     let projectListProvider = new MutableArrayDataProvider<any, any>(projectList, { keyAttributes: "projectId" })
     const [isLoading, setIsLoading] = useState(false);
 
-    let dataProvider = new RESTDataProvider({
-        keyAttributes: "",
-        url: `${API_URL}/projects?vendorName=${props.vendor}${props.region && props.region !== 'all' ? `&regionName=${props.region}` : ''}`,
-        transforms: {
-            fetchFirst: {
-                request: async (options) => {
-                    const url = new URL(options.url);
-                    console.log(url.href);
-                    return new Request(url.href);
-                },
-                response: async ({ body, headers, status }) => {
-                    // const { initialCablingTasks, validationFailureTasks } = body;
-                    console.log(body);
-                    return { data: body };
-                },
-            },
-        },
-    })
+    const vendorUrl = `${API_URL}/projects?vendorName=${props.vendor}${props.region && props.region !== 'all' ? `&regionName=${props.region}` : ''}`
+    let params = '';
+    if (props.region && props.region !== 'all') {
+        params = `regionName=${encodeURIComponent(props.region)}`;
+    }
+    const masterUrl = `${API_URL}/allProjects${params ? `?${params}` : ''}`;
 
     useEffect(() => {
         const fetchData = async () => {
             setIsLoading(true);
-            const result = await dataProvider.fetchFirst({ size: 100 })[Symbol.asyncIterator]().next();
-            setProjectList(result.value.data);
+
+            let projects = [];
+            let vendorResponse;
+
+            try {
+                // Fetch from vendorUrl
+                const vendorFetch = await fetch(vendorUrl);
+                vendorResponse = await vendorFetch.json();
+
+                // Assuming the API returns an array of projects
+                if (Array.isArray(vendorResponse) && vendorResponse.length === 0) {
+                    // vendorUrl returned empty: try masterUrl
+                    try {
+                        const masterFetch = await fetch(masterUrl);
+                        if (masterFetch.status === 404) {
+                            // masterUrl returns 404: fallback to vendorResponse
+                            projects = vendorResponse;
+                        } else {
+                            projects = await masterFetch.json();
+                        }
+                    } catch (error) {
+                        // Error fetching masterUrl: fallback to vendorResponse
+                        projects = vendorResponse;
+                    }
+                } else {
+                    // vendorUrl returned data
+                    projects = vendorResponse;
+                }
+            } catch (error) {
+                // Error fetching vendorUrl
+                projects = []; // or handle error as needed
+            }
+
+            setProjectList(projects);
             setIsLoading(false);
         };
+
         if (props.vendor) {
             fetchData();
         }
