@@ -1,5 +1,5 @@
 import { h } from "preact";
-import { useEffect, useCallback, useState, useMemo } from "preact/hooks";
+import { useEffect, useCallback, useState, useMemo, useRef } from "preact/hooks";
 import "ojs/ojtable";
 import "oj-c/button";
 import ArrayDataProvider = require("ojs/ojarraydataprovider");
@@ -11,6 +11,7 @@ type Props = {
     rack: string;
     ticket: string;
     rack_serial: string;
+    region: string
 };
 
 interface ValidationFailureDisplayDTO {
@@ -123,10 +124,11 @@ const Rack = (props: Props) => {
         if (!really) return;
         const headers = new Headers();
         headers.append("X-OCI-Splat-CSRF", "1");
-        const request = new Request(
-            `${CABLING_TASKS_API}/${props.ticket}/actions/resolveValidationFailureTask`,
-            { method: "POST", headers }
-        );
+
+        const url = new URL(`${CABLING_TASKS_API}/${props.ticket}/actions/resolveValidationFailureTask`);
+        url.searchParams.set("regionName", props.region);
+        const request = new Request(url.href, { method: "POST", headers });
+
         const response = await fetch(request);
         if (response.ok) {
             props.onPageChanged({ path: "" });
@@ -139,6 +141,7 @@ const Rack = (props: Props) => {
         try {
             const url = new URL(`${LVV_API}/downloadCablingValidationResults`);
             url.searchParams.set("rackSerial", props.rack_serial);
+            url.searchParams.set("regionName", props.region)
             const headers = new Headers();
             headers.append("Accept", "text/csv");
             const resp = await fetchWithRetry(url.href, { method: "GET", headers });
@@ -173,6 +176,7 @@ const Rack = (props: Props) => {
     const fetchValidationFailures = useCallback(async () => {
         try {
             const url = new URL(`${LVV_API}/cablingValidation`);
+            url.searchParams.set("regionName", props.region);
             url.searchParams.set("rackSerial", props.rack_serial);
             const resp = await fetchWithRetry(url.href);
             if (!resp.ok) {
@@ -190,7 +194,9 @@ const Rack = (props: Props) => {
         } catch {
             setRackValidationFailure("error");
         }
-    }, [props.rack_serial]);
+    }, [
+        props.rack_serial
+    ]);
 
     const validateClicked = useCallback(async () => {
         setIsValidating(true);
@@ -202,8 +208,9 @@ const Rack = (props: Props) => {
             const headers = new Headers();
             headers.append("X-OCI-Splat-CSRF", "1");
             const url = new URL(`${LVV_API}/cablingValidation`);
-            url.searchParams.set("building", props.building);
+            url.searchParams.set("regionName", props.region);
             url.searchParams.set("rackSerialNumber", props.rack_serial);
+            url.searchParams.set("buildingName", props.building);
             if (selectedLinkKeys.size > 0) {
                 const deviceNames = new Set(
                     Array.from(selectedLinkKeys).map((key) => key.split("|||")[0])
@@ -244,7 +251,7 @@ const Rack = (props: Props) => {
             for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
                 const url = new URL(`${LVV_API}/getValidationJobStatus`);
                 url.searchParams.set("jobId", jobId);
-                url.searchParams.set("building", props.building);
+                url.searchParams.set("regionName", props.region);
                 url.searchParams.set("rackSerialNumber", props.rack_serial);
                 const statusResp = await fetchWithRetry(url.href, { method: "GET", headers });
                 if (statusResp.ok) {
@@ -304,7 +311,8 @@ const Rack = (props: Props) => {
         props.block,
         selectedLinkKeys,
         fetchValidationFailures,
-        props.rack_serial
+        props.rack_serial,
+        props.region
     ]);
 
     useEffect(() => {
@@ -320,6 +328,17 @@ const Rack = (props: Props) => {
             return new Set([...prevKeys].filter(key => currentKeys.has(key)));
         });
     }, [processedValidationFailures]);
+
+    const isFirstRender = useRef(true);
+
+    // When region changes, go to home page (except on initial mount)
+    useEffect(() => {
+        if (isFirstRender.current) {
+            isFirstRender.current = false;
+            return;
+        }
+        props.onPageChanged({ path: "home" });
+    }, [props.region]);
 
     const showRackValidationFailure = () => rackValidationFailure;
 

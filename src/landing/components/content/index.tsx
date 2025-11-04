@@ -25,7 +25,7 @@ type Props = {
   routes: Array<object>;
   onPageChanged: (value: any) => void;
   onVendorChanged: (vendor: string) => void;
-  region?: string;
+  region: string;
 };
 
 let INIT_DEFAULT: any | null = null;
@@ -80,7 +80,7 @@ const Content = (props: Props) => {
 
   let pageContent = (page: string) => {
     if (page && page.includes("rack")) {
-      return <Rack onPageChanged={props.onPageChanged} building={selectedBuilding} block={selectedBlock} rack={selectedRack} ticket={selectedTicket} rack_serial={selectedRackSerialNumber} />
+      return <Rack onPageChanged={props.onPageChanged} building={selectedBuilding} block={selectedBlock} rack={selectedRack} ticket={selectedTicket} rack_serial={selectedRackSerialNumber} region={props.region} />
     } else {
       // the input box is for dev only, will remove once in prod
       return <div>

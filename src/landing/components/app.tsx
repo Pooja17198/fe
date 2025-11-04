@@ -52,7 +52,7 @@ const pageChangeHandler = (route: Route) => {
 
 export const App = registerCustomElement("app-root", (props: Props) => {
   const [selectedVendor, setSelectedVendor] = useState("XYZ");
-  const [selectedRegion, setSelectedRegion] = useState<string>("");
+  const [selectedRegion, setSelectedRegion] = useState<string>("us-phoenix-1");
 
     props.appName = "LVV Portal";
     props.userLogin = sessionStorage.getItem("X-Oracle-Vendor-Email") || "";

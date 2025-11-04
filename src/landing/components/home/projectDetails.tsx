@@ -48,8 +48,8 @@ type Project = {
 
 type Props = {
     project: Project;
-    value?: string;
     onRackChanged: (value: any) => void;
+    region: string;
 };
 
 const INIT_SELECTION_MODE: TableIntrinsicProps['selectionMode'] = {
@@ -107,7 +107,7 @@ const ProjectDetailsContainer = (props: Props) => {
             : props.project.blocks || [];
         const uniqueBlocks = Array.from(new Set(initial));
         setActiveBlocks(uniqueBlocks);
-    }, [props.project]);
+    }, [props.project, props.region]);
 
     useEffect(() => {
         const ac = new AbortController();
@@ -121,6 +121,7 @@ const ProjectDetailsContainer = (props: Props) => {
 
             const url = new URL(`${API_URL}/cablingTasks`);
             url.searchParams.set("projectId", props.project.projectId);
+            url.searchParams.set("regionName", props.region)
 
             try {
                 const resp = await fetch(url.href, { signal: ac.signal });
@@ -139,7 +140,7 @@ const ProjectDetailsContainer = (props: Props) => {
         fetchAllData();
 
         return () => ac.abort();
-    }, [props.project]);
+    }, [props.project, props.region]);
 
     useEffect(() => {
         console.log('projectData:', projectData);
