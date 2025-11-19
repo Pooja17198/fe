@@ -109,7 +109,20 @@ const ValidationResultsTab = (props: Props) => {
         const value: string = (row.lldpStatus || '').toString();
         const isMatch = value.toLowerCase() === 'match';
         const isMismatch = value.toLowerCase() === 'mismatch';
-        const colorClass = isMatch ? 'oj-text-color-success' : isMismatch ? 'oj-text-color-danger' : '';
+        const isUnknown = value.toLowerCase() === 'unknown';
+        let colorClass = ""
+        if (isMatch) {
+            colorClass = 'oj-text-color-success';
+        }
+        else if (isMismatch) {
+            colorClass = 'oj-text-color-danger';
+        }
+        else if (isUnknown) {
+            colorClass = 'oj-text-color-warning';
+        }
+        else {
+            colorClass = '';
+        }
         return <span class={colorClass}>{value}</span>;
     };
 
