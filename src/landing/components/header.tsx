@@ -81,8 +81,26 @@ export function Header({ appName, userLogin, vendorName, regionValue, onRegionCh
     const detail = e?.detail || {};
     const actionValue = detail.value || detail.selectedValue || detail.key || detail?.option?.value;
     const targetId = (e?.target && e.target.id) || (e?.srcElement && e.srcElement.id);
-    const resolved = actionValue || (typeof targetId === "string" && targetId.includes("out") ? "out" : null);
-    if (resolved === "out") {
+    let resolved = actionValue;
+    if (!resolved && typeof targetId === "string") {
+      if (targetId.includes("out")) resolved = "out";
+      else if (targetId.includes("help")) resolved = "help";
+      else resolved = null;
+    }
+
+    if (resolved === "help") {
+      const link = document.createElement('a');
+      link.href = "./landing/resources/lvv_portal_tutorial.pdf";  // Path to your PDF file
+      link.download = "lvv_portal_tutorial.pdf"; // The filename user will see
+
+      document.body.appendChild(link);
+
+      link.click();
+
+      document.body.removeChild(link);
+      return;
+    }
+    else if (resolved === "out") {
       window.location.assign(logoutUrl);
     }
   }
@@ -133,7 +151,7 @@ export function Header({ appName, userLogin, vendorName, regionValue, onRegionCh
                 <span slot="endIcon" class={getEndIconClass()}></span>
                 <oj-menu id="menu1" slot="menu" onojAction={handleUserMenuAction}>
                   <oj-option id="pref" value="pref">Preferences (Coming Soon)</oj-option>
-                  <oj-option id="help" value="help">Help (Coming Soon)</oj-option>
+                  <oj-option id="help" value="help">Help</oj-option>
                   <oj-option id="about" value="about">About (Coming Soon)</oj-option>
                   <oj-option id="out" value="out">Sign Out</oj-option>
                 </oj-menu>
