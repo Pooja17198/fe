@@ -116,7 +116,8 @@ export function Header({ appName, userLogin, vendorName, regionValue, onRegionCh
               role="img"
               class="oj-icon demo-oracle-icon"
               title="Oracle Logo"
-              alt="Oracle Logo"></span>
+              alt="Oracle Logo">
+          </span>
             <h1
                 class="oj-sm-only-hide oj-web-applayout-header-title"
                 title="Application Name">
