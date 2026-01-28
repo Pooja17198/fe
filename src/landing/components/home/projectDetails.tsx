@@ -1,43 +1,21 @@
 import { h } from "preact";
-import MutableArrayDataProvider = require("ojs/ojmutablearraydataprovider");
-import { useEffect, useState } from "preact/hooks";
+import ArrayDataProvider = require("ojs/ojarraydataprovider");
+import PagingDataProviderView = require("ojs/ojpagingdataproviderview");
+import { useEffect, useMemo, useState, useRef } from "preact/hooks";
 import "ojs/ojtable";
 import { TableIntrinsicProps, ojTable } from "ojs/ojtable";
-import * as project_info from "text!../project_info.json";
 import { KeySetImpl } from "ojs/ojkeyset";
-import { RESTDataProvider } from "ojs/ojrestdataprovider";
+import "ojs/ojprogress-circle";
+import "ojs/ojpagingcontrol";
 
-
-let COLUMNS = [
-    {
-        "headerText": "Rack Location",
-        "field": "rackLocation",
-        "id": "rackLocation"
-    },
-    {
-        "headerText": "Block",
-        "field": "block",
-        "id": "block"
-    },
-    {
-        "headerText": "Rack Serial Number",
-        "field": "rackSerialNumber",
-        "id": "rackSerialNumber"
-    },
-    {
-        "headerText": "Issue(s) Type",
-        "field": "type",
-        "id": "type",
-        "headerClassName": "oj-sm-only-hide",
-        "className": "oj-sm-only-hide"
-    },
-    {
-        "headerText": "Ticket",
-        "field": "ticket",
-        "id": "ticket",
-        "headerClassName": "oj-sm-only-hide",
-        "className": "oj-sm-only-hide"
-    }]
+const RACK_COLUMNS = [
+    { headerText: "Rack Location", field: "rackLocation", id: "rackLocation", resizable: "enabled" as const, sortable: 'enabled' as const },
+    { headerText: "Block", field: "block", id: "block", resizable: "enabled" as const, sortable: 'enabled' as const },
+    { headerText: "Rack Serial Number", field: "rackSerialNumber", id: "rackSerialNumber", resizable: "enabled" as const, sortable: 'enabled' as const },
+    { headerText: "Issue(s) Type", field: "ticketType", id: "ticketType", resizable: "enabled" as const, sortable: 'enabled' as const },
+    { headerText: "Ticket", field: "ticketId", id: "ticketId", resizable: "enabled" as const, sortable: 'enabled' as const },
+    { headerText: "Rack State", field: "rackState", id: "rackState", resizable: "enabled" as const, sortable: 'enabled' as const }
+];
 
 type Project = {
     projectId: string;
@@ -62,44 +40,60 @@ const ACC = {rowHeader: "Rack"}
 
 const API_URL = window.location.host.includes('localhost') ? "http://localhost:21000/lvv" : `https://${window.location.host}/lvv`;
 
+interface ProjectRackRow {
+    _key: string;
+    building: string;
+    block: string;
+    rackLocation: string;
+    rackSerialNumber: string;
+    ticketType?: string;
+    ticketId?: string;
+    resolveEnabled?: boolean;
+    resolveDisabledReason?: string;
+    rackState?: string;
+    platformName?: string;
+}
+
+async function fetchWithRetry(url: string, options: any = {}, maxAttempts: number = 3, delayMs: number = 1000): Promise<Response> {
+    const signal: AbortSignal | undefined = options?.signal;
+    let lastError;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        if (signal?.aborted) {
+            throw new DOMException('Aborted', 'AbortError');
+        }
+        try {
+            const response = await fetch(url, options);
+            // Retry for network errors or 5xx; accept 404, 400, etc. as non-retryable (customize as needed)
+            if (!response.ok && response.status >= 500) {
+                throw new Error(`Server error: ${response.status}`);
+            }
+            return response; // Success!
+        } catch (err) {
+            // If aborted, stop retrying immediately
+            if (signal?.aborted) {
+                throw err;
+            }
+            lastError = err;
+            if (attempt < maxAttempts - 1) {
+                await new Promise(res => setTimeout(res, delayMs));
+            }
+        }
+    }
+    throw lastError;
+}
+
 const ProjectDetailsContainer = (props: Props) => {
 
-    const [projectData, setProjectData] = useState<any[]>([]);
-    let projectDataProvider = new MutableArrayDataProvider(projectData, { keyAttributes: ['rackLocation', 'ticket', 'rackSerialNumber'] })
-    const [allProjectData, setAllProjectData] = useState<any[]>([]); // Add this state
+    const [allProjectData, setAllProjectData] = useState<ProjectRackRow[]>([]);
     const [loading, setLoading] = useState(false);
+    const [loadError, setLoadError] = useState<string | null>(null);
 
     const [activeBlocks, setActiveBlocks] = useState<string[]>([]);
-
-    const parseTasks = (body: any) => {
-        console.log(body)
-        let racks: any[] = []
-        if (body['initialCablingTasks'] && Array.isArray(body['initialCablingTasks'])) {
-            for (let task of body['initialCablingTasks']) {
-                racks.push({
-                    "building": props.project.building,
-                    "block": task.block || '-',
-                    "rackLocation": task.rackLocation || "9999",
-                    "rackSerialNumber": task.rackSerialNumber,
-                    "type": "cabling",
-                    "ticket": task.ticketId
-                })
-            }
-        }
-        if (body['validationFailureTasks'] && Array.isArray(body['validationFailureTasks'])) {
-            for (let task of body['validationFailureTasks']) {
-                racks.push({
-                    "building": props.project.building,
-                    "block": task.block || '-',
-                    "rackLocation": task.rackLocation || "9999",
-                    "rackSerialNumber": task.rackSerialNumber,
-                    "type": "validation",
-                    "ticket": task.ticketId
-                })
-            }
-        }
-        return racks
-    }
+    const [searchText, setSearchText] = useState("");
+    const [hideMissingSerial, setHideMissingSerial] = useState(false);
+    const [pageSize, setPageSize] = useState<number>(25);
+    const requestSeqRef = useRef(0);
+    const [showAvailable, setShowAvailable] = useState(false);
 
     useEffect(() => {
         const initial = props.project.prefilterBlocks && props.project.prefilterBlocks.length > 0
@@ -111,92 +105,235 @@ const ProjectDetailsContainer = (props: Props) => {
 
     useEffect(() => {
         const ac = new AbortController();
+        const fetchId = ++requestSeqRef.current;
+
         const fetchAllData = async () => {
             setAllProjectData([]); // clear previous
-            setLoading(true);      // <--- Start loading
+            setLoadError(null);
+
             if (!props.project?.projectId) {
-                setLoading(false); // <--- End loading early if nothing to load
+                if (fetchId === requestSeqRef.current) {
+                    setLoading(false);
+                }
                 return;
             }
 
-            const url = new URL(`${API_URL}/cablingTasks`);
-            url.searchParams.set("projectId", props.project.projectId);
-            url.searchParams.set("regionName", props.region)
+            // Start loading for this requestId
+            if (fetchId === requestSeqRef.current) {
+                setLoading(true);
+            }
 
             try {
-                const resp = await fetch(url.href, { signal: ac.signal });
-                if (resp.ok) {
-                    const body = await resp.json();
-                    const rows = parseTasks(body);
-                    setAllProjectData(rows); // Store all tasks for the project
+                const headers = new Headers();
+                const projectRacksUrl = new URL(`${API_URL}/racksInProject`);
+                projectRacksUrl.searchParams.set("projectId", props.project.projectId);
+                projectRacksUrl.searchParams.set("regionName", props.region);
+
+                const rackResp = await fetchWithRetry(projectRacksUrl.href, { method: "GET", headers, signal: ac.signal });
+                if (!rackResp.ok) {
+                    if (fetchId === requestSeqRef.current) {
+                        setAllProjectData([]);
+                        setLoadError(
+                            `Failed to load racks from Storekeeper API (/racksInProject). ` +
+                            `Status: ${rackResp.status} ${rackResp.statusText}`
+                        );
+                    }
+                    return;
                 }
-            } catch (e){
-                console.error('Failed to fetch cablingTasks:', e);
+
+                const rows: ProjectRackRow[] = await rackResp.json();
+                const normalized: ProjectRackRow[] = (rows || []).map((r, idx) => ({
+                    ...r,
+                    _key: `${r.block ?? ''}|${r.rackLocation ?? ''}`
+                }));
+                if (fetchId === requestSeqRef.current) {
+                    setAllProjectData(normalized);
+                }
+            } catch (e) {
+                if ((e as any)?.name === 'AbortError') {
+                    // Request was aborted due to a newer selection/unmount; ignore
+                    return;
+                }
+                console.error('Failed to fetch project racks:', e);
+                if (fetchId === requestSeqRef.current) {
+                    setAllProjectData([]);
+                    const msg = (e as any)?.message ? String((e as any).message) : 'Unknown error';
+                    setLoadError(`Failed to load racks list: ${msg}`);
+                }
             } finally {
-                setLoading(false);  // <--- Stop loading
+                if (fetchId === requestSeqRef.current) {
+                    setLoading(false);  // Stop loading only if this is the latest request
+                }
             }
         };
 
         fetchAllData();
 
-        return () => ac.abort();
+        return () => ac.abort(); // cancel any in-flight request when selection changes/unmounts
     }, [props.project, props.region]);
 
-    useEffect(() => {
-        console.log('projectData:', projectData);
-        // If you also want each row:
-        projectData.forEach((row, idx) => {
-            console.log(`Row ${idx}:`, row);
-        });
-    }, [projectData]);
-
-    useEffect(() => {
-        // Whenever blocks or all data changes, filter locally
+    const filteredRows = useMemo((): ProjectRackRow[] => {
         if (activeBlocks.length === 0) {
-            setProjectData([]);
-            return;
+            return [];
         }
-        setProjectData(allProjectData.filter(row => row.block && activeBlocks.includes(row.block)));
-    }, [activeBlocks, allProjectData]);
 
-    const onSelectionChangedHandler = (event: ojTable.selectedChanged<any, any>) => {
+        let rows = allProjectData.filter((row) => row.block && activeBlocks.includes(row.block));
+
+        if (!showAvailable) {
+            rows = rows.filter((row) => (row.rackState || '').toUpperCase() !== 'AVAILABLE');
+        }
+
+        if (hideMissingSerial) {
+            rows = rows.filter((row) => row.rackSerialNumber && row.rackSerialNumber.trim() !== "");
+        }
+
+        const q = searchText.trim().toLowerCase();
+        if (q) {
+            rows = rows.filter((row) => {
+                const haystack = [
+                    row.rackLocation,
+                    row.block,
+                    row.rackSerialNumber,
+                    row.ticketType || "",
+                    row.ticketId || "",
+                    row.rackState || "",
+                    row.platformName
+                ].join(" ").toLowerCase();
+                return haystack.includes(q);
+            });
+        }
+
+        return rows;
+    }, [activeBlocks, allProjectData, hideMissingSerial, searchText, showAvailable]);
+
+    const baseDataProvider = useMemo(
+        () => new ArrayDataProvider(filteredRows, { keyAttributes: "_key" }),
+        [filteredRows]
+    );
+    const pagingDataProvider = useMemo(
+        () => new PagingDataProviderView(baseDataProvider),
+        [baseDataProvider]
+    );
+
+
+    // Reset paging when filters change or page size changes
+    useEffect(() => {
+        (pagingDataProvider as any).setPage(0, { pageSize });
+    }, [pagingDataProvider, pageSize, searchText, hideMissingSerial, activeBlocks, showAvailable]);
+
+    // This resets the selectedRowKeySet to empty, so that same row selection triggers onSelectionChangedHandler
+    const [selectedRowKeySet, setSelectedRowKeySet] = useState<KeySetImpl<any>>(new KeySetImpl<any>());
+    const emptyColumnKeySet = useMemo(() => new KeySetImpl<any>(), []);
+
+    const onSelectionChangedHandler = async (event: ojTable.selectedChanged<any, any>) => {
         const row = event.detail.value.row as KeySetImpl<any>;
         if (row.values().size > 0) {
-            row.values().forEach(element => {
-                let keyParts: any[] = Array.isArray(element)
-                    ? element
-                    : [element?.rackLocation, element?.ticket, element?.rackSerialNumber];
-                const match = (projectData as any[]).find((r: any) =>
-                    r.rackLocation === keyParts[0] && r.ticket === keyParts[1] && r.rackSerialNumber === keyParts[2]
-                );
-                props.onRackChanged(match || element);
-            });
+            const result = await (baseDataProvider as any).fetchByKeys({ keys: row.values() });
+            for (const key of row.values()) {
+                const item = result.results.get(key);
+                if (item && item.data) {
+                    props.onRackChanged(item.data as ProjectRackRow);
+                }
+            }
         }
     };
 
     return (
         <div id="parentContainer2" class="oj-flex-item oj-md-8 oj-sm-12 oj-reflow">
             <h2>Project {props.project.projectId} Details</h2>
-            <div style="margin-bottom: 12px;">
-                <span style="font-weight: 600;">Filter by block:</span>
-                {(props.project.blocks || []).map((b) => {
-                    const checked = activeBlocks.includes(b);
-                    const onChange = (e: any) => {
-                        const isChecked = (e.target as HTMLInputElement).checked;
-                        setActiveBlocks((prev) => {
-                            const set = new Set(prev);
-                            if (isChecked) set.add(b);
-                            else set.delete(b);
-                            return Array.from(set);
-                        });
-                    };
-                    return (
-                        <label style="margin-left: 8px;">
-                            <input type="checkbox" checked={checked} onChange={onChange} /> {b}
-                        </label>
-                    );
-                })}
+            <div
+                style={{
+                    display: 'flex',
+                    justifyContent: 'center',
+                    marginBottom: '16px'
+                }}
+            >
+            <div style={{ width: '100%', maxWidth: '900px', margin: '0 auto', textAlign: 'center' }}>
+                {/* ROW 1: Search */}
+            <div style={{marginBottom: '12px'}}>
+                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{fontWeight: 600}}>Search:</span>
+                    <input
+                        type="text"
+                        value={searchText}
+                        placeholder="Search rack location / block / serial / type / ticket"
+                        onInput={(e: any) =>
+                            setSearchText((e.target as HTMLInputElement).value)
+                        }
+                        style="min-width: 320px;"
+                    />
+                </label>
             </div>
+            {/* ROW 2: Hide missing serial + Block filters */}
+            <div style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: '16px', alignItems: 'center', marginBottom: '12px' }}>
+                <label style={{display:'flex', alignItems : 'center', gap: '8px' }}>
+                    <input
+                        type="checkbox"
+                        checked={showAvailable}
+                        onChange={(e: any) => setShowAvailable((e.target as HTMLInputElement).checked)}
+                    />
+                    Include in-service racks
+                </label>
+                <div>
+                    <span style={{fontWeight: 600}}>Filter by block:</span>
+                    {(props.project.blocks || []).map((b) => {
+                        const checked = activeBlocks.includes(b);
+                        return (
+                            <label style={{marginLeft: '8px'}}>
+                                <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    onChange={(e: any) => {
+                                        const isChecked = (e.target as HTMLInputElement).checked;
+                                        setActiveBlocks((prev) => {
+                                            const set = new Set(prev);
+                                            isChecked ? set.add(b) : set.delete(b);
+                                            return Array.from(set);
+                                        });
+                                    }}
+                                />
+                                {b}
+                            </label>
+                        );
+                    })}
+                </div>
+            </div>
+            {/* ROW 3: Page size */}
+            <div style={{marginBottom: '12px'}}>
+                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{fontWeight: 600}}>Page size:</span>
+                    <select
+                        value={String(pageSize)}
+                        onChange={(e: any) =>
+                            setPageSize(
+                                parseInt((e.target as HTMLSelectElement).value, 10)
+                            )
+                        }
+                    >
+                        <option value="10">10</option>
+                        <option value="25">25</option>
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                    </select>
+                </label>
+            </div>
+            </div>
+            </div>
+            {!loading && loadError && (
+                <div
+                    style={{
+                        margin: '12px 0',
+                        padding: '10px 12px',
+                        border: '1px solid #e53935',
+                        background: '#fff5f5',
+                        color: '#d32f2f',
+                        borderRadius: '6px'
+                    }}
+                    role="alert"
+                >
+                    {loadError}
+                </div>
+            )}
             {loading ? (
                 <div style="display:flex; justify-content:center; align-items:center; min-height:200px;">
                     <oj-progress-circle size="md" value={-1} />
@@ -205,16 +342,22 @@ const ProjectDetailsContainer = (props: Props) => {
                 <div>
                     <oj-table
                         selectionMode={INIT_SELECTION_MODE}
+                        selected={{ row: selectedRowKeySet, column: emptyColumnKeySet }}
                         onselectedChanged={onSelectionChangedHandler}
                         class="selectable-table oj-table oj-table-hover oj-table-responsive"
                         aria-label="Projects Details Table"
                         id="projectDetailsTable"
-                        columns={COLUMNS}
-                        data={projectDataProvider}
+                        columns={RACK_COLUMNS}
+                        data={pagingDataProvider as any}
                         accessibility={ACC}
-                        scroll-policy="loadMoreOnScroll"
-                        scroll-policy-options='{"fetchSize": 5}'>
+                    >
                     </oj-table>
+                    <div style="margin-top: 10px; display: flex; justify-content: flex-end;">
+                        <oj-paging-control
+                            data={pagingDataProvider as any}
+                            page-size={pageSize}
+                        ></oj-paging-control>
+                    </div>
                 </div>
             )}
         </div>

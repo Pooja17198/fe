@@ -1,37 +1,18 @@
 import { h } from "preact";
-import { useMemo, useState, useEffect } from "preact/hooks";
+import { useMemo, useState, useEffect, useRef } from "preact/hooks";
 import "ojs/ojaccordion";
 import "ojs/ojcollapsible";
 import "ojs/ojtable";
 import "oj-c/button";
 import ArrayDataProvider = require("ojs/ojarraydataprovider");
 
-type DeviceStatus = {
-  deviceName: string;
-  jobStatus: string;
-  elevation?: number;
-  _key: string;
-};
+import { DeviceStatus, ValidationFailure } from "./types";
+import { VALIDATION_TABLE_ACCESSIBILITY } from "./constants";
+import { VALIDATION_FAILURE_COLUMNS } from "./columns";
+import { lldpTemplate, psuTemplate } from "./templates";
+import { getStatusClass } from "./utils";
 
-interface ValidationFailureDisplayDTO {
-  rackSerial: string;
-  deviceARack: string;
-  deviceAName: string;
-  deviceAPort: string;
-  deviceBRack: string;
-  deviceBName: string;
-  deviceBPort: string;
-  linkStatus: string;
-  lldpStatus: string;
-  deviceBRackExpected: string;
-  deviceBNameExpected: string;
-  deviceBPortExpected: string;
-  txPower: string;
-  rxPower: string;
-  psuFailure: string;
-  psuId: string;
-  _key?: string;
-}
+
 
 type Props = {
   devices: DeviceStatus[];
@@ -40,11 +21,9 @@ type Props = {
   rack: string;
   rack_serial: string;
   region: string;
-  validationFailures: ValidationFailureDisplayDTO[];
+  validationFailures: ValidationFailure[];
   selectedLinkKeys: Set<string>;
   setSelectedLinkKeys: (value: Set<string> | ((prev: Set<string>) => Set<string>)) => void;
-  hasValidated: boolean;
-  rackValidationFailure: string | null;
   loading: boolean;
   isValidating: boolean;
   hideUnsupported: boolean;
@@ -52,24 +31,9 @@ type Props = {
   externalExpandedKeysNonce?: number;
 };
 
-const VALIDATION_FAILURE_COLUMNS = [
-  { headerText: "Device A Rack", field: "deviceARack", id: "deviceARack", resizable: "enabled" as const, sortable: 'enabled' as const },
-  { headerText: "Device A Name", field: "deviceAName", id: "deviceAName", resizable: "enabled" as const, sortable: 'enabled' as const },
-  { headerText: "Device A Port", field: "deviceAPort", id: "deviceAPort", resizable: "enabled" as const, sortable: 'enabled' as const },
-  { headerText: "Current Device B Rack", field: "deviceBRack", id: "deviceBRack", resizable: "enabled" as const, sortable: 'enabled' as const },
-  { headerText: "Current Device B Name", field: "deviceBName", id: "deviceBName", resizable: "enabled" as const, sortable: 'enabled' as const },
-  { headerText: "Current Device B Port", field: "deviceBPort", id: "deviceBPort", resizable: "enabled" as const, sortable: 'enabled' as const },
-  { headerText: "Expected Device B Rack", field: "deviceBRackExpected", id: "deviceBRackExpected", resizable: "enabled" as const, sortable: 'enabled' as const },
-  { headerText: "Expected Device B Name", field: "deviceBNameExpected", id: "deviceBNameExpected", resizable: "enabled" as const, sortable: 'enabled' as const },
-  { headerText: "Expected Device B Port", field: "deviceBPortExpected", id: "deviceBPortExpected", resizable: "enabled" as const, sortable: 'enabled' as const },
-  { headerText: "LLDP Status", field: "lldpStatus", id: "lldpStatus", template: "lldpTemplate", resizable: "enabled" as const, sortable: 'enabled' as const },
-  { headerText: "TX Power", field: "txPower", id: "txPower", resizable: "enabled" as const, sortable: 'enabled' as const },
-  { headerText: "RX Power", field: "rxPower", id: "rxPower", resizable: "enabled" as const, sortable: 'enabled' as const },
-  { headerText: "PSU Failure", field: "psuFailure", id: "psuFailure", template: "psuTemplate", resizable: "enabled" as const, sortable: 'enabled' as const },
-];
 
 const DeviceAccordion = (props: Props) => {
-  const ACC = {rowHeader: "ActionItems"};
+  const ACC = VALIDATION_TABLE_ACCESSIBILITY;
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
   const [accordionNonce, setAccordionNonce] = useState(0);
 
@@ -106,41 +70,6 @@ const DeviceAccordion = (props: Props) => {
     return <input type="checkbox" checked={isChecked} onChange={onChange}/>;
   };
 
-  const lldpTemplate = (context: any) => {
-    const row = (context?.item && context.item.data) || {};
-    const value: string = (row.lldpStatus || '').toString();
-    const isMatch = value.toLowerCase() === 'match';
-    const isMismatch = value.toLowerCase() === 'mismatch';
-    const colorClass = isMatch ? 'oj-text-color-success' : isMismatch ? 'oj-text-color-danger' : '';
-    return <span class={colorClass}>{value}</span>;
-  };
-
-  const psuTemplate = (context: any) => {
-    const row = (context?.item && context.item.data) || {};
-    const hasFailure =
-        row.psuFailure !== null &&
-        row.psuFailure !== undefined &&
-        `${row.psuFailure}`.toLowerCase() !== 'null' &&
-        `${row.psuFailure}` !== '';
-    return hasFailure
-        ? <span class="oj-text-color-danger" aria-label="PSU failure">✗</span>
-        : <span class="oj-text-color-success" aria-label="No PSU failure">✓</span>;
-  };
-
-  const handleExpandAll = () => {
-    setAccordionNonce(n => n + 1);
-    const keys = props.devices.filter(device =>
-      processedValidationFailures.some(row => row.deviceAName === device.deviceName)
-    ).map(d => d._key);
-    setExpandedKeys(new Set(keys));
-  }
-
-
-  const handleCollapseAll = () => {
-    setAccordionNonce(n => n + 1);
-    setExpandedKeys(new Set());
-  };
-
   const handleToggle = (key: string, expand: boolean, hasDeviceFailures: boolean) => {
     // Only allow expanding if there are device failures
     if (expand && !hasDeviceFailures) return;
@@ -160,20 +89,40 @@ const DeviceAccordion = (props: Props) => {
       [filteredValidationFailures]
   );
 
-  const getStatusClass = (status: string) => {
-    const s = (status || '').toUpperCase();
-    if (s === 'IN_PROGRESS') return 'status-in-progress';
-    if (s === 'COMPLETED') return 'status-completed';
-    if (s === 'NOT_TRIGGERED') return 'status-not-triggered';
-    return 'status-error';
-  };
-
   const sortedDevices = useMemo(() => {
     return [...props.devices].sort((a, b) => ((b.elevation ?? -Infinity) - (a.elevation ?? -Infinity)));
   }, [props.devices]);
 
+  // Compute selection helpers for "Select All" behavior
+  const allDeviceKeys = useMemo(() => new Set(sortedDevices.map(d => d._key)), [sortedDevices]);
+  const allSelected =
+    allDeviceKeys.size > 0 && Array.from(allDeviceKeys).every(k => props.selectedLinkKeys.has(k));
+  const someSelected =
+    allDeviceKeys.size > 0 &&
+    Array.from(allDeviceKeys).some(k => props.selectedLinkKeys.has(k)) &&
+    !allSelected;
+
+  const selectAllRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = someSelected;
+    }
+  }, [someSelected, allSelected, props.selectedLinkKeys, sortedDevices]);
+
+  const toggleSelectAll = (checked: boolean) => {
+    props.setSelectedLinkKeys(prev => {
+      const next = new Set(prev as Set<string>);
+      if (checked) {
+        allDeviceKeys.forEach(k => next.add(k));
+      } else {
+        allDeviceKeys.forEach(k => next.delete(k));
+      }
+      return next;
+    });
+  };
+
   return (
-      <div>
+      <div class="rack-page">
         {props.loading ? (
           <div class="device-accordion-loader">
             <oj-progress-circle size="md" value={-1} />
@@ -215,6 +164,14 @@ const DeviceAccordion = (props: Props) => {
               })()}
 
               <div class="device-accordion-columns-header full-bleed">
+                <span class="device-col select">
+                  <input
+                    ref={selectAllRef}
+                    type="checkbox"
+                    checked={allSelected}
+                    onChange={(e: any) => toggleSelectAll((e.target as HTMLInputElement).checked)}
+                  />
+                </span>
                 <span>Device</span>
                 <span>Elevation</span>
                 <span>Errors</span>
@@ -240,13 +197,13 @@ const DeviceAccordion = (props: Props) => {
                         >
                           <h3 slot="header" style={{padding: 0, margin: 0, width: '100%'}}>
                             <div className="device-accordion-header-row">
-                              {/* Device + selection */}
+                              {/* Selection checkbox */}
+                              <span className="device-col select" onClick={e => e.stopPropagation()} style={{display: "inline-flex", alignItems: "center", justifyContent: "center"}}>
+                                {selectTemplate({item: {data: {_key: device._key}}})}
+                              </span>
+
+                              {/* Device name */}
                               <span className="device-col name">
-                                <span
-                                  style={{display: "inline-flex", alignItems: "center", marginRight: 8}}
-                                  onClick={e => e.stopPropagation()}>
-                                  {selectTemplate({item: {data: {_key: device._key}}})}
-                                </span>
                                 <span
                                   className="device-accordion-devicename"
                                   title={device.deviceName}
@@ -296,7 +253,7 @@ const DeviceAccordion = (props: Props) => {
                                     accessibility={ACC}
                                     scroll-policy="loadMoreOnScroll"
                                     scroll-policy-options='{"fetchSize": 10}'
-                                    columns={VALIDATION_FAILURE_COLUMNS}
+                                    columns={[...VALIDATION_FAILURE_COLUMNS]}
                                     data={deviceDataProvider}
                                   >
                                     <template slot="lldpTemplate" render={lldpTemplate}/>
@@ -320,5 +277,5 @@ const DeviceAccordion = (props: Props) => {
         )}
       </div>
   );
-}
+};
 export default DeviceAccordion;

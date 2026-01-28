@@ -6,7 +6,7 @@
  * @ignore
  */
 import { h } from "preact";
-import { useState, useEffect } from "preact/hooks";
+import { useState, useEffect, useRef } from "preact/hooks";
 import CoreRouter = require("ojs/ojcorerouter");
 import { ojButton } from "ojs/ojbutton";
 import "ojs/ojbutton";
@@ -35,6 +35,9 @@ type RackMetadata = {
   block: string;
   rack: string;
   ticket: string;
+  rackSerialNumber?: string;
+  resolveEnabled?: boolean;
+  resolveDisabledReason?: string;
 }
 
 const Content = (props: Props) => {
@@ -45,6 +48,11 @@ const Content = (props: Props) => {
   const [selectedBlock, setSelectedBlock] = useState(INIT_DEFAULT)
   const [selectedRackSerialNumber, setSelectedRackSerialNumber] = useState(INIT_DEFAULT)
   const [selectedVendor, setSelectedVendor] = useState(INIT_DEFAULT);
+  const [selectedResolveEnabled, setSelectedResolveEnabled] = useState<boolean>(false);
+  const [selectedResolveDisabledReason, setSelectedResolveDisabledReason] = useState<string>("");
+  const [rackReady, setRackReady] = useState<boolean>(false);
+  const [rackSNVersion, setRackSNVersion] = useState(0);
+
 
   useEffect(() => {
     Context.getPageContext().getBusyContext().applicationBootstrapComplete();
@@ -53,51 +61,65 @@ const Content = (props: Props) => {
   }, [selectedVendor]);
 
   const rackChangedHandler = (value: any) => {
+    console.log("Rack value passed is ", value);
     setSelectedRack(value.rack);
     setSelectedBuilding(value.building);
     setSelectedBlock(value.block);
     setSelectedTicket(value.ticket);
-    setSelectedRackSerialNumber(value.rackSerialNumber)
-    let rackPage = {
-      path: "rack",
-      id: value.rackSerialNumber
-    }
-    props.onPageChanged(rackPage);
+    setSelectedResolveEnabled(Boolean(value.resolveEnabled));
+    setSelectedResolveDisabledReason(String(value.resolveDisabledReason || ""));
+    setSelectedRackSerialNumber(value.rackSerialNumber);
+
+    // If re-selecting the same serial number, also bump:
+    setRackSNVersion(v => v + 1);
+
+    // Defer navigation until after state is committed to avoid undefined props on first Rack render
   };
 
-  const vendorChangedHandler = (event: any) => {
-    if (typeof event == "string") {
-      setSelectedVendor(event)
-      props.onVendorChanged(event);
-      console.log(selectedVendor)
-    }
-    if (event.detail.value) {
-      setSelectedVendor(event.detail.value)
-      props.onVendorChanged(event.detail.value);
-      console.log(selectedVendor)
-    }
-  }
+  useEffect(() => {
+    console.log("Setting rackReady to ", selectedBuilding && selectedBlock && selectedRack && selectedRackSerialNumber);
+    setRackReady(Boolean(selectedBuilding && selectedBlock && selectedRack && selectedRackSerialNumber));
+  }, [selectedBuilding, selectedBlock, selectedRack, selectedRackSerialNumber, rackSNVersion]);
 
-  let pageContent = (page: string) => {
-    if (page && page.includes("rack")) {
-      return <Rack onPageChanged={props.onPageChanged} building={selectedBuilding} block={selectedBlock} rack={selectedRack} ticket={selectedTicket} rack_serial={selectedRackSerialNumber} region={props.region} />
-    } else {
-      // the input box is for dev only, will remove once in prod
-      return <div>
-        {/* <oj-form-layout max-columns="1" direction="row">
-          <oj-c-input-text label-hint="(Dev Only) Type and Change Vendor, Press Enter" onvalueChanged={vendorChangedHandler}></oj-c-input-text>
-        </oj-form-layout> */}
-        <HomeContainer onRackChanged={rackChangedHandler} vendor={selectedVendor} region={props.region} />
-      </div>
-
+  // Navigate to rack only after all required state is set, preventing undefined props on first render
+  useEffect(() => {
+    console.log("Trying to navigate to next page,", rackReady);
+    if (rackReady && !(props.page && props.page.includes("rack"))) {
+      props.onPageChanged({ path: "rack", id: selectedRackSerialNumber });
     }
-  }
+  }, [rackReady, rackSNVersion]);
 
+  const isRack = Boolean(props.page?.includes("rack"));
   return (
     <div class="oj-web-applayout-max-width oj-web-applayout-content">
-      {pageContent(props.page as string)}
+      <div style={{ display: isRack ? 'none' : 'block' }}>
+        <div>
+          <HomeContainer onRackChanged={rackChangedHandler} vendor={selectedVendor} region={props.region} />
+        </div>
+      </div>
+      {isRack && (
+        <>
+          {rackReady ? (
+            <Rack
+                key={String(selectedRackSerialNumber)}
+                onPageChanged={props.onPageChanged}
+                building={selectedBuilding}
+                block={selectedBlock}
+                rack={selectedRack}
+                ticket={selectedTicket}
+                rack_serial={selectedRackSerialNumber}
+                resolveEnabled={selectedResolveEnabled}
+                resolveDisabledReason={selectedResolveDisabledReason}
+                region={props.region}
+            />
+          ) : (
+            <div style={{ padding: '16px' }}>Loading rack context…</div>
+          )}
+        </>
+      )}
     </div>
-  );
+  )
+
 };
 
 export default Content;

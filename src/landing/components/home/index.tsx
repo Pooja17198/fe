@@ -3,7 +3,6 @@ import ProjectTableContainer from "./projectTable";
 import MutableArrayDataProvider = require("ojs/ojmutablearraydataprovider");
 import { useEffect, useState } from "preact/hooks";
 import ProjectDetailsContainer from "./projectDetails";
-import { RESTDataProvider } from "ojs/ojrestdataprovider";
 import "ojs/ojprogress-circle";
 
 
@@ -20,6 +19,10 @@ type RackMetadata = {
     building: string;
     block: string;
     rack: string;
+    ticket?: string;
+    rackSerialNumber?: string;
+    resolveEnabled?: boolean;
+    resolveDisabledReason?: string;
 }
 
 type ProjectMetadata = {
@@ -110,12 +113,15 @@ const HomeContainer = (props: Props) => {
 
     const rackSelectedHandler = (value: any) => {
         let info = {
-            "building": value.building,
-            "block": value.block,
-            "rack": value.rackLocation,
-            "ticket": value.ticket,
-            "rackSerialNumber": value.rackSerialNumber
+            building: value.building,
+            block: value.block,
+            rack: value.rackLocation,
+            ticket: value.ticketId,
+            rackSerialNumber: value.rackSerialNumber,
+            resolveEnabled: Boolean(value.resolveEnabled),
+            resolveDisabledReason: value.resolveDisabledReason || ""
         }
+        console.log("Info passed ", info);
         props.onRackChanged(info)
     };
 

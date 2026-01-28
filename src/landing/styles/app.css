@@ -311,7 +311,7 @@
     padding: 8px 12px 24px;
     box-sizing: border-box;
     /* Ensure header/row columns always fit without horizontal scroll */
-    --device-accordion-cols: 1fr 7rem 6rem 10rem;
+    --device-accordion-cols: minmax(24px, 28px) 1fr 7rem 6rem 10rem;
 }
 
 /* Action buttons bar */
@@ -393,7 +393,7 @@
 /* DeviceAccordion columns layout */
 .rack-page .device-accordion-columns-header {
     display: grid;
-    grid-template-columns: var(--device-accordion-cols, minmax(220px, 1fr) minmax(64px, 120px) minmax(64px, 120px) minmax(120px, 220px));
+    grid-template-columns: var(--device-accordion-cols, minmax(24px, 28px) minmax(220px, 1fr) minmax(64px, 120px) minmax(64px, 120px) minmax(120px, 220px));
     gap: 12px;
     align-items: center;
     padding: 6px 12px;
@@ -407,14 +407,15 @@
 }
 
 /* Align column labels in header grid */
-.rack-page .device-accordion-columns-header span:nth-child(1) { justify-self: start; }
+.rack-page .device-accordion-columns-header span:nth-child(1) { justify-self: center; }
 .rack-page .device-accordion-columns-header span:nth-child(2) { justify-self: start; }
 .rack-page .device-accordion-columns-header span:nth-child(3) { justify-self: start; }
-.rack-page .device-accordion-columns-header span:nth-child(4) { justify-self: end; text-align: right; }
+.rack-page .device-accordion-columns-header span:nth-child(4) { justify-self: start; }
+.rack-page .device-accordion-columns-header span:nth-child(5) { justify-self: end; text-align: right; }
 
 .rack-page .device-accordion-header-row {
     display: grid !important;
-    grid-template-columns: var(--device-accordion-cols, minmax(220px, 1fr) minmax(64px, 120px) minmax(64px, 120px) minmax(120px, 220px)) !important;
+    grid-template-columns: var(--device-accordion-cols, minmax(24px, 28px) minmax(220px, 1fr) minmax(64px, 120px) minmax(64px, 120px) minmax(120px, 220px)) !important;
     gap: 12px;
     align-items: center !important;
     width: 100%;
@@ -426,6 +427,10 @@
     justify-self: start;
     font-variant-numeric: tabular-nums;
     color: #455a64;
+}
+
+.rack-page .device-accordion-header-row .device-col.select {
+    justify-self: center;
 }
 
 .rack-page .device-accordion-header-row .device-col.name {

@@ -1,0 +1,15 @@
+export const VALIDATION_FAILURE_COLUMNS: any[] = [
+  { headerText: "Device A Rack", field: "deviceARack", id: "deviceARack", resizable: "enabled", sortable: "enabled" },
+  { headerText: "Device A Name", field: "deviceAName", id: "deviceAName", resizable: "enabled", sortable: "enabled" },
+  { headerText: "Device A Port", field: "deviceAPort", id: "deviceAPort", resizable: "enabled", sortable: "enabled" },
+  { headerText: "Current Device B Rack", field: "deviceBRack", id: "deviceBRack", resizable: "enabled", sortable: "enabled" },
+  { headerText: "Current Device B Name", field: "deviceBName", id: "deviceBName", resizable: "enabled", sortable: "enabled" },
+  { headerText: "Current Device B Port", field: "deviceBPort", id: "deviceBPort", resizable: "enabled", sortable: "enabled" },
+  { headerText: "Expected Device B Rack", field: "deviceBRackExpected", id: "deviceBRackExpected", resizable: "enabled", sortable: "enabled" },
+  { headerText: "Expected Device B Name", field: "deviceBNameExpected", id: "deviceBNameExpected", resizable: "enabled", sortable: "enabled" },
+  { headerText: "Expected Device B Port", field: "deviceBPortExpected", id: "deviceBPortExpected", resizable: "enabled", sortable: "enabled" },
+  { headerText: "LLDP Status", field: "lldpStatus", id: "lldpStatus", template: "lldpTemplate", resizable: "enabled", sortable: "enabled" },
+  { headerText: "TX Power", field: "txPower", id: "txPower", resizable: "enabled", sortable: "enabled" },
+  { headerText: "RX Power", field: "rxPower", id: "rxPower", resizable: "enabled", sortable: "enabled" },
+  { headerText: "PSU Failure", field: "psuFailure", id: "psuFailure", template: "psuTemplate", resizable: "enabled", sortable: "enabled" },
+];
