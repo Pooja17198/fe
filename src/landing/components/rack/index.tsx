@@ -13,7 +13,10 @@ const Rack = (props: RackProps) => {
   const {
     deviceStatuses,
     devicesLoading,
-    validationFailures,
+    validationFailuresByDevice,
+    totalFailureRows,
+    totalLinkFailureRows,
+    powerFailureDevices,
     selectedLinkKeys,
     setSelectedLinkKeys,
     isValidating,
@@ -35,19 +38,31 @@ const Rack = (props: RackProps) => {
     props.onPageChanged({ path: "home" });
   }, [props.region]);
 
-
   // Expand/Collapse all controls for device accordion
   const handleExpandAll = useCallback(() => {
-    const filteredFailures = hideUnsupported
-      ? validationFailures.filter((row) => String(row.lldpStatus).toUpperCase() !== "UNSUPPORTED")
-      : validationFailures;
-    const deviceNamesWithFailures = new Set(filteredFailures.map((row) => row.deviceAName));
+    const deviceNamesWithFailures = new Set(
+        Object.values(validationFailuresByDevice)
+            .filter((device) => {
+              const hasVisibleLldp = hideUnsupported
+                  ? device.tests.lldp.some((row) => String(row.linkStatus).toUpperCase() !== "UNSUPPORTED")
+                  : device.tests.lldp.length > 0;
+              return (
+                  hasVisibleLldp ||
+                  device.tests.optics.length > 0 ||
+                  device.tests.interfaces.length > 0 ||
+                  device.tests.fecBer.length > 0 ||
+                  device.tests.fans.length > 0
+              );
+            })
+            .map((device) => device.deviceName)
+    );
+
     const keys = deviceStatuses
-      .filter((device) => deviceNamesWithFailures.has(device.deviceName))
-      .map((d) => d._key);
+        .filter((device) => deviceNamesWithFailures.has(device.deviceName))
+        .map((d) => d._key);
     setExternalExpandedKeys(new Set(keys));
     setExternalExpandedKeysNonce((n) => n + 1);
-  }, [hideUnsupported, validationFailures, deviceStatuses]);
+  }, [hideUnsupported, validationFailuresByDevice, deviceStatuses]);
 
   const handleCollapseAll = useCallback(() => {
     setExternalExpandedKeys(new Set());
@@ -55,114 +70,117 @@ const Rack = (props: RackProps) => {
   }, []);
 
   return (
-    <div class="rack-page">
-      <div class="rack-title-box">
-        <span role="img" className="oj-icon rack-img-icon" title="Rack Image" alt="Rack Image"></span>
-        <h2 class="rack-title-headline">
-          <span className="rack-title-key">Building:</span>
-          <span className="rack-title-value">{props.building}</span>
-          <span className="rack-title-key">Block:</span>
-          <span className="rack-title-value">{props.block}</span>
-          <span className="rack-title-key">Rack:</span>
-          <span className="rack-title-value">{props.rack}</span>
-          <span className="rack-title-key">Serial:</span>
-          <span className="rack-title-value">{props.rack_serial}</span>
-        </h2>
-      </div>
-
-      {isValidating && (
-        <div className="alert alert-warning" aria-live="polite" role="status">
-          <span className="alert-icon" aria-hidden="true">⏳</span>
-          Validation in progress...
+      <div class="rack-page">
+        <div class="rack-title-box">
+          <span role="img" className="oj-icon rack-img-icon" title="Rack Image" alt="Rack Image"></span>
+          <h2 class="rack-title-headline">
+            <span className="rack-title-key">Building:</span>
+            <span className="rack-title-value">{props.building}</span>
+            <span className="rack-title-key">Block:</span>
+            <span className="rack-title-value">{props.block}</span>
+            <span className="rack-title-key">Rack:</span>
+            <span className="rack-title-value">{props.rack}</span>
+            <span className="rack-title-key">Serial:</span>
+            <span className="rack-title-value">{props.rack_serial}</span>
+          </h2>
         </div>
-      )}
 
-      {jobErrorDetails && (
-        <div className="alert alert-danger" role="alert">
-          <span className="alert-icon" aria-hidden="true">⚠️</span>
-          <div>Validation failed!</div>
-          {jobErrorDetails.code && (
-            <div>
-              <b>Code:</b> {jobErrorDetails.code}
+        {isValidating && (
+            <div className="alert alert-warning" aria-live="polite" role="status">
+              <span className="alert-icon" aria-hidden="true">⏳</span>
+              Validation in progress...
             </div>
-          )}
-          {jobErrorDetails.message && (
-            <div>
-              <b>Message:</b> {jobErrorDetails.message}
+        )}
+
+        {jobErrorDetails && (
+            <div className="alert alert-danger" role="alert">
+              <span className="alert-icon" aria-hidden="true">⚠️</span>
+              <div>Validation failed!</div>
+              {jobErrorDetails.code && (
+                  <div>
+                    <b>Code:</b> {jobErrorDetails.code}
+                  </div>
+              )}
+              {jobErrorDetails.message && (
+                  <div>
+                    <b>Message:</b> {jobErrorDetails.message}
+                  </div>
+              )}
             </div>
-          )}
+        )}
+
+        <div style={{ margin: "18px 0 32px 0" }}>
+          <div className="device-accordion-toolbar">
+            {/*Title*/}
+            <h3 className="device-accordion-summary-title">
+              <span role="img" className="oj-icon validation-summary-icon" title="Validation Summary Image" alt="Validation Summary Image"></span>
+              Validation Summary
+            </h3>
+
+            <div className="flex-spacer" />
+
+            {/* Primary actions */}
+            <oj-c-button
+                chroming="callToAction"
+                size="sm"
+                label="Validate"
+                onojAction={validate}
+                style="margin-left: 8px; margin-right: 8px;"
+                disabled={isValidating || deviceStatuses.length === 0}
+            ></oj-c-button>
+            <oj-c-button
+                chroming="callToAction"
+                size="sm"
+                label="Resolve"
+                onojAction={resolve}
+                disabled={isValidating || !resolveAllowed}
+                title={isValidating ? "" : resolveTooltip}
+            ></oj-c-button>
+            <oj-c-button
+                chroming="callToAction"
+                size="sm"
+                label="Download CSV"
+                onojAction={downloadCsv}
+                style="margin-left: 8px;"
+                disabled={isValidating || isDownloading || totalFailureRows === 0}
+            ></oj-c-button>
+
+            {/*Unsupported errors checkbox*/}
+            <label>
+              <input
+                  type="checkbox"
+                  checked={hideUnsupported}
+                  onChange={(e) => setHideUnsupported((e.target as HTMLInputElement).checked)}
+              />
+              Hide Unsupported LLDP errors
+            </label>
+
+            {/*Expand All/Collapse All button*/}
+            <oj-c-button chroming="outlined" label="✚" tooltip="Expand All" onojAction={handleExpandAll} size="sm" class="action-btn"></oj-c-button>
+            <oj-c-button chroming="outlined" label="－" tooltip="Collapse All" onojAction={handleCollapseAll} size="sm" class="action-btn"></oj-c-button>
+          </div>
+
+          <DeviceAccordion
+              devices={deviceStatuses}
+              building={props.building}
+              block={props.block}
+              rack={props.rack}
+              rack_serial={props.rack_serial}
+              region={props.region}
+              validationFailuresByDevice={validationFailuresByDevice}
+              totalFailureRows={totalFailureRows}
+              totalLinkFailureRows={totalLinkFailureRows}
+              powerFailureDevices={powerFailureDevices}
+              selectedLinkKeys={selectedLinkKeys}
+              setSelectedLinkKeys={setSelectedLinkKeys}
+              loading={devicesLoading}
+              isValidating={isValidating}
+              hideUnsupported={hideUnsupported}
+              externalExpandedKeys={externalExpandedKeys}
+              externalExpandedKeysNonce={externalExpandedKeysNonce}
+          />
         </div>
-      )}
-
-      <div style={{ margin: "18px 0 32px 0" }}>
-        <div className="device-accordion-toolbar">
-          {/*Title*/}
-          <h3 className="device-accordion-summary-title">
-            <span role="img" className="oj-icon validation-summary-icon" title="Validation Summary Image" alt="Validation Summary Image"></span>
-            Validation Summary
-          </h3>
-
-          <div className="flex-spacer" />
-
-          {/* Primary actions */}
-          <oj-c-button
-            chroming="callToAction"
-            size="sm"
-            label="Validate"
-            onojAction={validate}
-            style="margin-left: 8px; margin-right: 8px;"
-            disabled={isValidating || deviceStatuses.length === 0}
-          ></oj-c-button>
-          <oj-c-button
-            chroming="callToAction"
-            size="sm"
-            label="Resolve"
-            onojAction={resolve}
-            disabled={isValidating || !resolveAllowed}
-            title={isValidating ? "" : resolveTooltip}
-          ></oj-c-button>
-          <oj-c-button
-            chroming="callToAction"
-            size="sm"
-            label="Download CSV"
-            onojAction={downloadCsv}
-            style="margin-left: 8px;"
-            disabled={isValidating || isDownloading || validationFailures.length === 0}
-          ></oj-c-button>
-
-          {/*Unsupported errors checkbox*/}
-          <label>
-            <input
-              type="checkbox"
-              checked={hideUnsupported}
-              onChange={(e) => setHideUnsupported((e.target as HTMLInputElement).checked)}
-            />
-            Hide Unsupported LLDP errors
-          </label>
-
-          {/*Expand All/Collapse All button*/}
-          <oj-c-button chroming="outlined" label="✚" tooltip="Expand All" onojAction={handleExpandAll} size="sm" class="action-btn"></oj-c-button>
-          <oj-c-button chroming="outlined" label="－" tooltip="Collapse All" onojAction={handleCollapseAll} size="sm" class="action-btn"></oj-c-button>
-        </div>
-
-        <DeviceAccordion
-          devices={deviceStatuses}
-          building={props.building}
-          block={props.block}
-          rack={props.rack}
-          rack_serial={props.rack_serial}
-          region={props.region}
-          validationFailures={validationFailures}
-          selectedLinkKeys={selectedLinkKeys}
-          setSelectedLinkKeys={setSelectedLinkKeys}
-          loading={devicesLoading}
-          isValidating={isValidating}
-          hideUnsupported={hideUnsupported}
-          externalExpandedKeys={externalExpandedKeys}
-          externalExpandedKeysNonce={externalExpandedKeysNonce}
-        />
       </div>
-    </div>
   );
 };
 

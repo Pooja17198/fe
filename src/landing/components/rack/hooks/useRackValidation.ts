@@ -1,5 +1,18 @@
-import { useCallback, useEffect, useRef, useState } from "preact/hooks";
-import { DeviceStatus, JobErrorDetails, RackProps, ValidationFailure } from "../types";
+import { useCallback, useEffect, useMemo, useRef, useState } from "preact/hooks";
+import {
+    DeviceStatus,
+    DeviceValidationFailures,
+    FanFailureRow,
+    FecBerFailureRow,
+    InterfaceFailureRow,
+    JobErrorDetails,
+    LldpFailureRow,
+    OpticFailureRow,
+    PowerFailureRow,
+    RackProps,
+    ValidationFailure,
+    ValidationFailuresByDevice,
+} from "../types";
 import { LVV_API, POLLING } from "../constants";
 import { fetchWithRetry, createCsrfHeaders } from "../api";
 import { anyJobInProgress, parseContentDispositionFilename } from "../utils";
@@ -8,7 +21,10 @@ type UseRackValidationResult = {
     // state
     deviceStatuses: DeviceStatus[];
     devicesLoading: boolean;
-    validationFailures: ValidationFailure[];
+    validationFailuresByDevice: ValidationFailuresByDevice;
+    totalFailureRows: number;
+    totalLinkFailureRows: number;
+    powerFailureDevices: number;
     selectedLinkKeys: Set<string>;
     isValidating: boolean;
     jobErrorDetails: JobErrorDetails;
@@ -34,7 +50,8 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
     // core state
     const [deviceStatuses, setDeviceStatuses] = useState<DeviceStatus[]>([]);
     const [devicesLoading, setDevicesLoading] = useState<boolean>(false);
-    const [validationFailures, setValidationFailures] = useState<ValidationFailure[]>([]);
+    const [validationFailuresByDevice, setValidationFailuresByDevice] =
+        useState<ValidationFailuresByDevice>({});
     const [selectedLinkKeys, setSelectedLinkKeys] = useState<Set<string>>(new Set());
     const [isValidating, setIsValidating] = useState(false);
     const [jobErrorDetails, setJobErrorDetails] = useState<JobErrorDetails>(null);
@@ -86,7 +103,6 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
             }
         };
     },[]);
-
 
     const fetchDeviceValidationStatuses = useCallback(async (): Promise<boolean> => {
         setDevicesLoading(true);
@@ -144,12 +160,9 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
             if (!resp.ok) {
                 return;
             }
-            const data: ValidationFailure[] = await resp.json();
-            if (data && data.length > 0) {
-                setValidationFailures(data);
-            } else {
-                setValidationFailures([]);
-            }
+            const data: unknown = await resp.json();
+            const normalized = normalizeValidationFailuresPayload(data, props.rack_serial);
+            setValidationFailuresByDevice(normalized);
         } catch (e: any) {
             if (e?.name === "AbortError") return;
         }
@@ -430,10 +443,21 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
         }
     }, [props.rack_serial, props.region]);
 
+    const summaryStats = useMemo(() => {
+        const values = Object.values(validationFailuresByDevice);
+        const totalFailureRows = values.reduce((sum, item) => sum + item.counts.overallTotal, 0);
+        const totalLinkFailureRows = values.reduce((sum, item) => sum + item.counts.nonPowerTotal, 0);
+        const powerFailureDevices = values.filter((item) => item.hasPsuFailure).length;
+        return {totalFailureRows, totalLinkFailureRows, powerFailureDevices};
+    }, [validationFailuresByDevice]);
+
     return {
         deviceStatuses,
         devicesLoading,
-        validationFailures,
+        validationFailuresByDevice,
+        totalFailureRows: summaryStats.totalFailureRows,
+        totalLinkFailureRows: summaryStats.totalLinkFailureRows,
+        powerFailureDevices: summaryStats.powerFailureDevices,
         selectedLinkKeys,
         isValidating,
         jobErrorDetails,
@@ -447,4 +471,272 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
         resolve,
         downloadCsv,
     };
+}
+
+type RowRecord = Record<string, unknown>;
+
+function asRecord(value: unknown): RowRecord | null {
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+        return value as RowRecord;
+    }
+    return null;
+}
+
+function asArray(value: unknown): unknown[] {
+    return Array.isArray(value) ? value : [];
+}
+
+function text(value: unknown, fallback: string = "Unknown"): string {
+    if (value === null || value === undefined) return fallback;
+    const rendered = String(value).trim();
+    return rendered === "" ? fallback : rendered;
+}
+
+function textOrEmpty(value: unknown): string {
+    if (value === null || value === undefined) return "";
+    return String(value).trim();
+}
+
+function pick(record: RowRecord, keys: string[], fallback: string = "Unknown"): string {
+    for (const key of keys) {
+        if (Object.prototype.hasOwnProperty.call(record, key)) {
+            const value = record[key];
+            if (value !== null && value !== undefined && String(value).trim() !== "") {
+                return String(value).trim();
+            }
+        }
+    }
+    return fallback;
+}
+
+function buildEmptyDeviceValidationFailures(deviceName: string): DeviceValidationFailures {
+    return {
+        deviceName,
+        tests: {
+            lldp: [],
+            optics: [],
+            interfaces: [],
+            fecBer: [],
+            fans: [],
+            power: [],
+        },
+        counts: {
+            lldp: 0,
+            optics: 0,
+            interfaces: 0,
+            fecBer: 0,
+            fans: 0,
+            power: 0,
+            nonPowerTotal: 0,
+            overallTotal: 0,
+        },
+        hasPsuFailure: false,
+    };
+}
+
+function finalizeCounts(device: DeviceValidationFailures): DeviceValidationFailures {
+    const counts = {
+        lldp: device.tests.lldp.length,
+        optics: device.tests.optics.length,
+        interfaces: device.tests.interfaces.length,
+        fecBer: device.tests.fecBer.length,
+        fans: device.tests.fans.length,
+        power: device.tests.power.length,
+        nonPowerTotal:
+            device.tests.lldp.length +
+            device.tests.optics.length +
+            device.tests.interfaces.length +
+            device.tests.fecBer.length +
+            device.tests.fans.length,
+        overallTotal:
+            device.tests.lldp.length +
+            device.tests.optics.length +
+            device.tests.interfaces.length +
+            device.tests.fecBer.length +
+            device.tests.fans.length +
+            device.tests.power.length,
+    };
+    return {
+        ...device,
+        counts,
+        hasPsuFailure: counts.power > 0,
+    };
+}
+
+function mapLldpRow(raw: unknown, deviceName: string, idx: number): LldpFailureRow {
+    const row = asRecord(raw) || {};
+    return {
+        _key: `${deviceName}|lldp|${idx}|${pick(row, ["Device A Port", "deviceAPort"], "")}`,
+        deviceARack: pick(row, ["Device A Rack", "deviceARack"]),
+        deviceAName: pick(row, ["Device A Name", "deviceAName"], deviceName),
+        deviceAPort: pick(row, ["Device A Port", "deviceAPort"]),
+        currentDeviceBRack: pick(row, ["Device B Rack", "Current Device B Rack", "deviceBRack"]),
+        currentDeviceBName: pick(row, ["Device B Name", "Current Device B Name", "deviceBName"]),
+        currentDeviceBPort: pick(row, ["Device B Port", "Current Device B Port", "deviceBPort"]),
+        expectedDeviceBRack: pick(row, ["Expected Device B Rack", "deviceBRackExpected"]),
+        expectedDeviceBName: pick(row, ["Expected Device B Name", "deviceBNameExpected"]),
+        expectedDeviceBPort: pick(row, ["Expected Device B Port", "deviceBPortExpected"]),
+        linkStatus: pick(row, ["LLDP Status", "Link Status", "lldpStatus", "linkStatus"]),
+    };
+}
+
+function mapOpticRow(raw: unknown, deviceName: string, idx: number): OpticFailureRow {
+    const row = asRecord(raw) || {};
+    return {
+        _key: `${deviceName}|optics|${idx}|${pick(row, ["Device Port", "devicePort"], "")}`,
+        deviceName: pick(row, ["Device Name", "deviceName", "Device A Name", "deviceAName"], deviceName),
+        devicePort: pick(row, ["Device Port", "devicePort", "Device A Port", "deviceAPort"]),
+        txPower: pick(row, ["Tx Power", "TX Power", "txPower"]),
+        rxPower: pick(row, ["Rx Power", "RX Power", "rxPower"]),
+    };
+}
+
+function mapInterfaceRow(raw: unknown, deviceName: string, idx: number): InterfaceFailureRow {
+    const row = asRecord(raw) || {};
+    return {
+        _key: `${deviceName}|interfaces|${idx}|${pick(row, ["Device Port", "devicePort"], "")}`,
+        deviceName: pick(row, ["Device Name", "deviceName"], deviceName),
+        devicePort: pick(row, ["Device Port", "devicePort"]),
+        issue: pick(row, ["Issue", "issue"]),
+    };
+}
+
+function mapFecBerRow(raw: unknown, deviceName: string, idx: number): FecBerFailureRow {
+    const row = asRecord(raw) || {};
+    return {
+        _key: `${deviceName}|fecber|${idx}|${pick(row, ["Device Port", "devicePort"], "")}`,
+        deviceRack: pick(row, ["Device Rack", "deviceRack"]),
+        deviceName: pick(row, ["Device Name", "deviceName"], deviceName),
+        devicePort: pick(row, ["Device Port", "devicePort"]),
+        preFecBer: pick(row, ["PRE_FEC_BER", "preFecBer"]),
+        lockStatus: pick(row, ["Lock Status", "lockStatus"]),
+        remoteDevice: pick(row, ["Remote Device", "remoteDevice"]),
+        remoteInterface: pick(row, ["Remote Interface", "remoteInterface"]),
+    };
+}
+
+function mapFanRow(raw: unknown, deviceName: string, idx: number): FanFailureRow {
+    const row = asRecord(raw) || {};
+    return {
+        _key: `${deviceName}|fans|${idx}|${pick(row, ["Fan Slot", "fanSlot"], "")}`,
+        deviceName: pick(row, ["Device Name", "deviceName"], deviceName),
+        fanName: textOrEmpty(row["Fan Name"] ?? row["fanName"]),
+        fanSlot: text(row["Fan Slot"] ?? row["fanSlot"]),
+        status: text(row["Status"] ?? row["status"]),
+    };
+}
+
+function mapPowerRow(raw: unknown, deviceName: string, idx: number): PowerFailureRow {
+    const row = asRecord(raw) || {};
+    return {
+        _key: `${deviceName}|power|${idx}`,
+        deviceName: pick(row, ["Device A Name", "Device Name", "deviceAName", "deviceName"], deviceName),
+    };
+}
+
+function normalizeLegacyValidationRows(rows: ValidationFailure[]): ValidationFailuresByDevice {
+    const byDevice: ValidationFailuresByDevice = {};
+
+    rows.forEach((row, idx) => {
+        const deviceName = text(row.deviceAName, "Unknown");
+        if (!byDevice[deviceName]) {
+            byDevice[deviceName] = buildEmptyDeviceValidationFailures(deviceName);
+        }
+        const current = byDevice[deviceName];
+
+        current.tests.lldp.push({
+            _key: `${deviceName}|legacy-lldp|${idx}|${textOrEmpty(row.deviceAPort)}`,
+            deviceARack: text(row.deviceARack),
+            deviceAName: deviceName,
+            deviceAPort: text(row.deviceAPort),
+            currentDeviceBRack: text(row.deviceBRack),
+            currentDeviceBName: text(row.deviceBName),
+            currentDeviceBPort: text(row.deviceBPort),
+            expectedDeviceBRack: text(row.deviceBRackExpected),
+            expectedDeviceBName: text(row.deviceBNameExpected),
+            expectedDeviceBPort: text(row.deviceBPortExpected),
+            linkStatus: text(row.lldpStatus || row.linkStatus),
+        });
+
+        const hasOptics = textOrEmpty(row.txPower) !== "" || textOrEmpty(row.rxPower) !== "";
+        if (hasOptics) {
+            current.tests.optics.push({
+                _key: `${deviceName}|legacy-optics|${idx}|${textOrEmpty(row.deviceAPort)}`,
+                deviceName,
+                devicePort: text(row.deviceAPort),
+                txPower: text(row.txPower),
+                rxPower: text(row.rxPower),
+            });
+        }
+
+        const psuFailure = textOrEmpty(row.psuFailure);
+        if (psuFailure !== "" && psuFailure.toLowerCase() !== "null") {
+            current.tests.power.push({
+                _key: `${deviceName}|legacy-power|${idx}`,
+                deviceName,
+            });
+        }
+    });
+
+    Object.keys(byDevice).forEach((deviceName) => {
+        byDevice[deviceName] = finalizeCounts(byDevice[deviceName]);
+    });
+
+    return byDevice;
+}
+
+function normalizeValidationFailuresPayload(
+    payload: unknown,
+    rackSerial: string
+): ValidationFailuresByDevice {
+    if (Array.isArray(payload)) {
+        return normalizeLegacyValidationRows(payload as ValidationFailure[]);
+    }
+
+    const payloadRecord = asRecord(payload);
+    if (!payloadRecord) return {};
+
+    let rackNode: unknown = payloadRecord[rackSerial];
+    if (!rackNode) {
+        const keys = Object.keys(payloadRecord);
+        if (keys.length === 1) {
+            rackNode = payloadRecord[keys[0]];
+        }
+    }
+
+    const rackRecord = asRecord(rackNode);
+    if (!rackRecord) return {};
+
+    const byDevice: ValidationFailuresByDevice = {};
+
+    Object.entries(rackRecord).forEach(([deviceName, deviceResults]) => {
+        const resultsRecord = asRecord(deviceResults);
+        if (!resultsRecord) {
+            return;
+        }
+
+        const current = buildEmptyDeviceValidationFailures(deviceName);
+        current.tests.lldp = asArray(resultsRecord["LLDP Errors"]).map((row, idx) =>
+            mapLldpRow(row, deviceName, idx)
+        );
+        current.tests.optics = asArray(resultsRecord["Optic Errors"]).map((row, idx) =>
+            mapOpticRow(row, deviceName, idx)
+        );
+        current.tests.interfaces = asArray(resultsRecord["Interface Errors"]).map((row, idx) =>
+            mapInterfaceRow(row, deviceName, idx)
+        );
+        current.tests.fecBer = asArray(resultsRecord["FEC_BER Errors"]).map((row, idx) =>
+            mapFecBerRow(row, deviceName, idx)
+        );
+        current.tests.fans = asArray(resultsRecord["Fan Errors"]).map((row, idx) =>
+            mapFanRow(row, deviceName, idx)
+        );
+        current.tests.power = asArray(resultsRecord["Power Errors"]).map((row, idx) =>
+            mapPowerRow(row, deviceName, idx)
+        );
+
+        byDevice[deviceName] = finalizeCounts(current);
+    });
+
+    return byDevice;
 }

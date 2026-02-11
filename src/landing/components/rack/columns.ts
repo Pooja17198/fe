@@ -1,15 +1,105 @@
-export const VALIDATION_FAILURE_COLUMNS: any[] = [
-  { headerText: "Device A Rack", field: "deviceARack", id: "deviceARack", resizable: "enabled", sortable: "enabled" },
-  { headerText: "Device A Name", field: "deviceAName", id: "deviceAName", resizable: "enabled", sortable: "enabled" },
-  { headerText: "Device A Port", field: "deviceAPort", id: "deviceAPort", resizable: "enabled", sortable: "enabled" },
-  { headerText: "Current Device B Rack", field: "deviceBRack", id: "deviceBRack", resizable: "enabled", sortable: "enabled" },
-  { headerText: "Current Device B Name", field: "deviceBName", id: "deviceBName", resizable: "enabled", sortable: "enabled" },
-  { headerText: "Current Device B Port", field: "deviceBPort", id: "deviceBPort", resizable: "enabled", sortable: "enabled" },
-  { headerText: "Expected Device B Rack", field: "deviceBRackExpected", id: "deviceBRackExpected", resizable: "enabled", sortable: "enabled" },
-  { headerText: "Expected Device B Name", field: "deviceBNameExpected", id: "deviceBNameExpected", resizable: "enabled", sortable: "enabled" },
-  { headerText: "Expected Device B Port", field: "deviceBPortExpected", id: "deviceBPortExpected", resizable: "enabled", sortable: "enabled" },
-  { headerText: "LLDP Status", field: "lldpStatus", id: "lldpStatus", template: "lldpTemplate", resizable: "enabled", sortable: "enabled" },
-  { headerText: "TX Power", field: "txPower", id: "txPower", resizable: "enabled", sortable: "enabled" },
-  { headerText: "RX Power", field: "rxPower", id: "rxPower", resizable: "enabled", sortable: "enabled" },
-  { headerText: "PSU Failure", field: "psuFailure", id: "psuFailure", template: "psuTemplate", resizable: "enabled", sortable: "enabled" },
+const DEFAULT_COLUMN_SETTINGS = {
+  resizable: "enabled",
+  sortable: "enabled",
+} as const;
+
+export const LLDP_FAILURE_COLUMNS: any[] = [
+  { headerText: "Device A Rack", field: "deviceARack", id: "deviceARack", ...DEFAULT_COLUMN_SETTINGS },
+  { headerText: "Device A Name", field: "deviceAName", id: "deviceAName", ...DEFAULT_COLUMN_SETTINGS },
+  { headerText: "Device A Port", field: "deviceAPort", id: "deviceAPort", ...DEFAULT_COLUMN_SETTINGS },
+  {
+    headerText: "Current Device B Rack",
+    field: "currentDeviceBRack",
+    id: "currentDeviceBRack",
+    ...DEFAULT_COLUMN_SETTINGS,
+  },
+  {
+    headerText: "Current Device B Name",
+    field: "currentDeviceBName",
+    id: "currentDeviceBName",
+    ...DEFAULT_COLUMN_SETTINGS,
+  },
+  {
+    headerText: "Current Device B Port",
+    field: "currentDeviceBPort",
+    id: "currentDeviceBPort",
+    ...DEFAULT_COLUMN_SETTINGS,
+  },
+  {
+    headerText: "Expected Device B Rack",
+    field: "expectedDeviceBRack",
+    id: "expectedDeviceBRack",
+    ...DEFAULT_COLUMN_SETTINGS,
+  },
+  {
+    headerText: "Expected Device B Name",
+    field: "expectedDeviceBName",
+    id: "expectedDeviceBName",
+    ...DEFAULT_COLUMN_SETTINGS,
+  },
+  {
+    headerText: "Expected Device B Port",
+    field: "expectedDeviceBPort",
+    id: "expectedDeviceBPort",
+    ...DEFAULT_COLUMN_SETTINGS,
+  },
+  {
+    headerText: "Link Status",
+    field: "linkStatus",
+    id: "linkStatus",
+    template: "lldpStatusTemplate",
+    ...DEFAULT_COLUMN_SETTINGS,
+  },
+];
+
+export const OPTIC_FAILURE_COLUMNS: any[] = [
+  { headerText: "Device Name", field: "deviceName", id: "deviceName", ...DEFAULT_COLUMN_SETTINGS },
+  { headerText: "Device Port", field: "devicePort", id: "devicePort", ...DEFAULT_COLUMN_SETTINGS },
+  { headerText: "Tx Power", field: "txPower", id: "txPower", ...DEFAULT_COLUMN_SETTINGS },
+  { headerText: "Rx Power", field: "rxPower", id: "rxPower", ...DEFAULT_COLUMN_SETTINGS },
+];
+
+export const INTERFACE_FAILURE_COLUMNS: any[] = [
+  { headerText: "Device Name", field: "deviceName", id: "deviceName", ...DEFAULT_COLUMN_SETTINGS },
+  { headerText: "Device Port", field: "devicePort", id: "devicePort", ...DEFAULT_COLUMN_SETTINGS },
+  { headerText: "Issue", field: "issue", id: "issue", ...DEFAULT_COLUMN_SETTINGS },
+];
+
+export const FEC_BER_FAILURE_COLUMNS: any[] = [
+  { headerText: "Device Rack", field: "deviceRack", id: "deviceRack", ...DEFAULT_COLUMN_SETTINGS },
+  { headerText: "Device Name", field: "deviceName", id: "deviceName", ...DEFAULT_COLUMN_SETTINGS },
+  { headerText: "Device Port", field: "devicePort", id: "devicePort", ...DEFAULT_COLUMN_SETTINGS },
+  { headerText: "PRE_FEC_BER", field: "preFecBer", id: "preFecBer", ...DEFAULT_COLUMN_SETTINGS },
+  {
+    headerText: "Lock Status",
+    field: "lockStatus",
+    id: "lockStatus",
+    template: "booleanStatusTemplate",
+    ...DEFAULT_COLUMN_SETTINGS,
+  },
+  {
+    headerText: "Remote Device",
+    field: "remoteDevice",
+    id: "remoteDevice",
+    ...DEFAULT_COLUMN_SETTINGS,
+  },
+  {
+    headerText: "Remote Interface",
+    field: "remoteInterface",
+    id: "remoteInterface",
+    ...DEFAULT_COLUMN_SETTINGS,
+  },
+];
+
+export const FAN_FAILURE_COLUMNS: any[] = [
+  { headerText: "Device Name", field: "deviceName", id: "deviceName", ...DEFAULT_COLUMN_SETTINGS },
+  { headerText: "Fan Name", field: "fanName", id: "fanName", ...DEFAULT_COLUMN_SETTINGS },
+  { headerText: "Fan Slot", field: "fanSlot", id: "fanSlot", ...DEFAULT_COLUMN_SETTINGS },
+  {
+    headerText: "Status",
+    field: "status",
+    id: "status",
+    template: "booleanStatusTemplate",
+    ...DEFAULT_COLUMN_SETTINGS,
+  },
 ];

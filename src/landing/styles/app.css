@@ -12,7 +12,6 @@
     user-select: text;
 }
 
-
 .demo-oracle-icon {
     content: url("images/oracle_logo.svg");
     display: inline;
@@ -166,7 +165,7 @@
     font-size: 0.85em !important;
     border-radius: 4px;
     padding: 2px 8px;
-    margin-left: auto !important;
+    margin-left: 0 !important;
     flex-shrink: 0;
     min-width: 74px;
     text-align: right;
@@ -311,7 +310,7 @@
     padding: 8px 12px 24px;
     box-sizing: border-box;
     /* Ensure header/row columns always fit without horizontal scroll */
-    --device-accordion-cols: minmax(24px, 28px) 1fr 7rem 6rem 10rem;
+    --device-accordion-cols: minmax(24px, 28px) 1fr 7rem minmax(200px, 2fr) 8rem 10rem;
 }
 
 /* Action buttons bar */
@@ -393,7 +392,7 @@
 /* DeviceAccordion columns layout */
 .rack-page .device-accordion-columns-header {
     display: grid;
-    grid-template-columns: var(--device-accordion-cols, minmax(24px, 28px) minmax(220px, 1fr) minmax(64px, 120px) minmax(64px, 120px) minmax(120px, 220px));
+    grid-template-columns: var(--device-accordion-cols, minmax(24px, 28px) minmax(220px, 1fr) minmax(64px, 120px) minmax(200px, 2fr) minmax(96px, 140px) minmax(120px, 220px));
     gap: 12px;
     align-items: center;
     padding: 6px 12px;
@@ -411,16 +410,16 @@
 .rack-page .device-accordion-columns-header span:nth-child(2) { justify-self: start; }
 .rack-page .device-accordion-columns-header span:nth-child(3) { justify-self: start; }
 .rack-page .device-accordion-columns-header span:nth-child(4) { justify-self: start; }
-.rack-page .device-accordion-columns-header span:nth-child(5) { justify-self: end; text-align: right; }
+.rack-page .device-accordion-columns-header span:nth-child(5) { justify-self: center; }
+.rack-page .device-accordion-columns-header span:nth-child(6) { justify-self: end; text-align: right; }
 
 .rack-page .device-accordion-header-row {
     display: grid !important;
-    grid-template-columns: var(--device-accordion-cols, minmax(24px, 28px) minmax(220px, 1fr) minmax(64px, 120px) minmax(64px, 120px) minmax(120px, 220px)) !important;
+    grid-template-columns: var(--device-accordion-cols, minmax(24px, 28px) minmax(220px, 1fr) minmax(64px, 120px) minmax(200px, 2fr) minmax(96px, 140px) minmax(120px, 220px)) !important;
     gap: 12px;
     align-items: center !important;
     width: 100%;
 }
-
 
 /* Per-column alignment and truncation */
 .rack-page .device-accordion-header-row .device-col.elevation {
@@ -444,6 +443,10 @@
     justify-self: start;
 }
 
+.rack-page .device-accordion-header-row .device-col.psu-status {
+    justify-self: center;
+}
+
 .rack-page .device-accordion-header-row .device-col.status {
     justify-self: end;
 }
@@ -454,4 +457,58 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+.device-accordion-error-breakdown {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.device-accordion-error-chip {
+    background: #f8f1ff;
+    color: #5b21b6;
+    border: 1px solid #e9d5ff;
+    border-radius: 12px;
+    padding: 2px 8px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.device-accordion-psu-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 600;
+    font-size: 0.82rem;
+}
+
+.device-accordion-psu-label {
+    color: #334155;
+}
+
+.device-accordion-unknown {
+    color: #94a3b8;
+    font-weight: 600;
+}
+
+.test-section-header {
+    margin: 0;
+    padding: 0;
+    display: inline-flex;
+    width: 100%;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.95rem;
+    color: #1e3a5f;
+    font-weight: 600;
+}
+
+.test-section-count {
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    color: #1d4ed8;
+    border-radius: 999px;
+    padding: 2px 10px;
+    font-size: 0.75rem;
 }
