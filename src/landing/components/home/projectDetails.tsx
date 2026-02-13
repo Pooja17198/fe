@@ -14,9 +14,7 @@ const RACK_COLUMNS = [
     { headerText: "Rack Serial Number", field: "rackSerialNumber", id: "rackSerialNumber", resizable: "enabled" as const, sortable: 'enabled' as const },
     { headerText: "Issue(s) Type", field: "ticketType", id: "ticketType", resizable: "enabled" as const, sortable: 'enabled' as const },
     { headerText: "Ticket", field: "ticketId", id: "ticketId", resizable: "enabled" as const, sortable: 'enabled' as const },
-    { headerText: "Rack State", field: "rackState", id: "rackState", resizable: "enabled" as const, sortable: 'enabled' as const },
-    { headerText: "Validation Status", field: "validationStatus", id: "validationStatus", resizable: "enabled" as const, sortable: 'enabled' as const },
-    { headerText: "Number of Deployable Devices", field: "devicesInDeployedState", id: "devicesInDeployedState", resizable: "enabled" as const, sortable: 'enabled' as const }
+    { headerText: "Rack State", field: "rackState", id: "rackState", resizable: "enabled" as const, sortable: 'enabled' as const }
 ];
 
 type Project = {
@@ -53,9 +51,6 @@ interface ProjectRackRow {
     resolveEnabled?: boolean;
     resolveDisabledReason?: string;
     rackState?: string;
-    validationStatus?: string;
-    devicesInDeployedState?: number;
-    fabricType?: string[];
     platformName?: string;
 }
 
@@ -99,11 +94,13 @@ const ProjectDetailsContainer = (props: Props) => {
     const [pageSize, setPageSize] = useState<number>(25);
     const requestSeqRef = useRef(0);
     const [showAvailable, setShowAvailable] = useState(false);
-    const [selectedFabricTypes, setSelectedFabricTypes] = useState<string[]>([]);
 
     useEffect(() => {
-        // Default: no block filters selected
-        setActiveBlocks([]);
+        const initial = props.project.prefilterBlocks && props.project.prefilterBlocks.length > 0
+            ? props.project.prefilterBlocks
+            : props.project.blocks || [];
+        const uniqueBlocks = Array.from(new Set(initial));
+        setActiveBlocks(uniqueBlocks);
     }, [props.project, props.region]);
 
     useEffect(() => {
@@ -131,10 +128,6 @@ const ProjectDetailsContainer = (props: Props) => {
                 const projectRacksUrl = new URL(`${API_URL}/racksInProject`);
                 projectRacksUrl.searchParams.set("projectId", props.project.projectId);
                 projectRacksUrl.searchParams.set("regionName", props.region);
-                // Pass server-side filter for available racks when selected
-                if (showAvailable) {
-                    projectRacksUrl.searchParams.set("showAvailableRacks", "true");
-                }
 
                 const rackResp = await fetchWithRetry(projectRacksUrl.href, { method: "GET", headers, signal: ac.signal });
                 if (!rackResp.ok) {
@@ -177,49 +170,21 @@ const ProjectDetailsContainer = (props: Props) => {
         fetchAllData();
 
         return () => ac.abort(); // cancel any in-flight request when selection changes/unmounts
-    }, [props.project, props.region, showAvailable]);
-
-    // Allowed fabric substrings; discover actual values dynamically from response
-    const ALLOWED_FABRIC_SUBSTR = ["cfab", "gfab", "jfab", "mfab", "mgmt", "utility"];
-    const availableFabricTypes = useMemo(() => {
-        const set = new Set<string>();
-        for (const row of allProjectData) {
-            (row.fabricType || []).forEach((ft) => {
-                const lc = String(ft).toLowerCase();
-                if (ALLOWED_FABRIC_SUBSTR.some((s) => lc.includes(s))) {
-                    set.add(String(ft));
-                }
-            });
-        }
-        return Array.from(set).sort();
-    }, [allProjectData]);
-    // Default: no fabric type filters selected when data changes
-    useEffect(() => {
-        setSelectedFabricTypes([]);
-    }, [availableFabricTypes]);
+    }, [props.project, props.region]);
 
     const filteredRows = useMemo((): ProjectRackRow[] => {
-        // Start with all rows; only apply filters when user selects options
-        let rows = allProjectData.slice();
-
-        if (activeBlocks.length > 0) {
-            rows = rows.filter((row) => row.block && activeBlocks.includes(row.block));
+        if (activeBlocks.length === 0) {
+            return [];
         }
 
+        let rows = allProjectData.filter((row) => row.block && activeBlocks.includes(row.block));
+
+        if (!showAvailable) {
+            rows = rows.filter((row) => (row.rackState || '').toUpperCase() !== 'AVAILABLE');
+        }
 
         if (hideMissingSerial) {
             rows = rows.filter((row) => row.rackSerialNumber && row.rackSerialNumber.trim() !== "");
-        }
-
-        if (selectedFabricTypes.length > 0) {
-            rows = rows.filter((row) => {
-                const fts = (row.fabricType || []).map((s) => String(s).toLowerCase());
-                return selectedFabricTypes.some((sel) => {
-                    const selLower = String(sel).toLowerCase();
-                    // Match if any fabricType contains the selected option as substring (case-insensitive)
-                    return fts.some((ft) => ft.includes(selLower));
-                });
-            });
         }
 
         const q = searchText.trim().toLowerCase();
@@ -232,9 +197,6 @@ const ProjectDetailsContainer = (props: Props) => {
                     row.ticketType || "",
                     row.ticketId || "",
                     row.rackState || "",
-                    row.validationStatus || "",
-                    String(row.devicesInDeployedState ?? ""),
-                    ...(row.fabricType || []),
                     row.platformName
                 ].join(" ").toLowerCase();
                 return haystack.includes(q);
@@ -242,7 +204,7 @@ const ProjectDetailsContainer = (props: Props) => {
         }
 
         return rows;
-    }, [activeBlocks, allProjectData, hideMissingSerial, searchText, showAvailable, selectedFabricTypes]);
+    }, [activeBlocks, allProjectData, hideMissingSerial, searchText, showAvailable]);
 
     const baseDataProvider = useMemo(
         () => new ArrayDataProvider(filteredRows, { keyAttributes: "_key" }),
@@ -257,7 +219,7 @@ const ProjectDetailsContainer = (props: Props) => {
     // Reset paging when filters change or page size changes
     useEffect(() => {
         (pagingDataProvider as any).setPage(0, { pageSize });
-    }, [pagingDataProvider, pageSize, searchText, hideMissingSerial, activeBlocks, showAvailable, selectedFabricTypes]);
+    }, [pagingDataProvider, pageSize, searchText, hideMissingSerial, activeBlocks, showAvailable]);
 
     // This resets the selectedRowKeySet to empty, so that same row selection triggers onSelectionChangedHandler
     const [selectedRowKeySet, setSelectedRowKeySet] = useState<KeySetImpl<any>>(new KeySetImpl<any>());
@@ -277,7 +239,7 @@ const ProjectDetailsContainer = (props: Props) => {
     };
 
     return (
-        <div id="parentContainer2" class="oj-flex-item oj-md-8 oj-sm-12 oj-reflow" aria-busy={loading ? "true" : "false"}>
+        <div id="parentContainer2" class="oj-flex-item oj-md-8 oj-sm-12 oj-reflow">
             <h2>Project {props.project.projectId} Details</h2>
             <div
                 style={{
@@ -302,27 +264,22 @@ const ProjectDetailsContainer = (props: Props) => {
                     />
                 </label>
             </div>
-            {/* ROW 2: Filters */}
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-                {/* Include in-service racks */}
-                <div style={{ display: 'flex', justifyContent: 'center' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <input
-                            type="checkbox"
-                            checked={showAvailable}
-                            onChange={(e: any) => setShowAvailable((e.target as HTMLInputElement).checked)}
-                        />
-                        Include in-service racks
-                    </label>
-                </div>
-
-                {/* Filter by block */}
-                <div style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: '12px' }}>
-                    <span style={{ fontWeight: 600 }}>Filter by block:</span>
+            {/* ROW 2: Hide missing serial + Block filters */}
+            <div style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: '16px', alignItems: 'center', marginBottom: '12px' }}>
+                <label style={{display:'flex', alignItems : 'center', gap: '8px' }}>
+                    <input
+                        type="checkbox"
+                        checked={showAvailable}
+                        onChange={(e: any) => setShowAvailable((e.target as HTMLInputElement).checked)}
+                    />
+                    Include in-service racks
+                </label>
+                <div>
+                    <span style={{fontWeight: 600}}>Filter by block:</span>
                     {(props.project.blocks || []).map((b) => {
                         const checked = activeBlocks.includes(b);
                         return (
-                            <label style={{ marginLeft: '8px' }}>
+                            <label style={{marginLeft: '8px'}}>
                                 <input
                                     type="checkbox"
                                     checked={checked}
@@ -336,31 +293,6 @@ const ProjectDetailsContainer = (props: Props) => {
                                     }}
                                 />
                                 {b}
-                            </label>
-                        );
-                    })}
-                </div>
-
-                {/* Filter by fabric type */}
-                <div style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: '12px' }}>
-                    <span style={{ fontWeight: 600 }}>Filter by fabric type:</span>
-                    {availableFabricTypes.map((t) => {
-                        const checked = selectedFabricTypes.includes(t);
-                        return (
-                            <label style={{ marginLeft: '8px' }}>
-                                <input
-                                    type="checkbox"
-                                    checked={checked}
-                                    onChange={(e: any) => {
-                                        const isChecked = (e.target as HTMLInputElement).checked;
-                                        setSelectedFabricTypes((prev) => {
-                                            const set = new Set(prev);
-                                            isChecked ? set.add(t) : set.delete(t);
-                                            return Array.from(set);
-                                        });
-                                    }}
-                                />
-                                {t}
                             </label>
                         );
                     })}
@@ -403,9 +335,8 @@ const ProjectDetailsContainer = (props: Props) => {
                 </div>
             )}
             {loading ? (
-                <div style="display:flex; justify-content:center; align-items:center; min-height:200px; gap:8px;" aria-live="polite" role="status">
+                <div style="display:flex; justify-content:center; align-items:center; min-height:200px;">
                     <oj-progress-circle size="md" value={-1} />
-                    <span>Loading project racks...</span>
                 </div>
             ) : (
                 <div>
