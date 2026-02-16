@@ -3,12 +3,19 @@ import "oj-c/button";
 import DeviceAccordion from "./DeviceAccordion";
 import { useRackValidation } from "./hooks/useRackValidation";
 import { RackProps } from "./types";
+import { useBuildingBadLinks } from "../network-monitoring/useBuildingBadLinks";
+import { BadLinksBanner } from "../network-monitoring/BadLinksBanner";
 
 const Rack = (props: RackProps) => {
   const isFirstRender = useRef(true);
   const [hideUnsupported, setHideUnsupported] = useState(true);
   const [externalExpandedKeys, setExternalExpandedKeys] = useState<Set<string>>(new Set());
   const [externalExpandedKeysNonce, setExternalExpandedKeysNonce] = useState(0);
+
+    // Network monitoring (building-scoped):
+    // - Fetches bad links only for the CURRENT rack's building.
+    // - Banner is rendered below and will be hidden automatically if list is empty.
+    const badLinks = useBuildingBadLinks(props.building, props.region);
 
   const {
     deviceStatuses,
@@ -84,6 +91,8 @@ const Rack = (props: RackProps) => {
             <span className="rack-title-value">{props.rack_serial}</span>
           </h2>
         </div>
+
+        <BadLinksBanner building={props.building} badLinks={badLinks} />
 
         {isValidating && (
             <div className="alert alert-warning" aria-live="polite" role="status">
