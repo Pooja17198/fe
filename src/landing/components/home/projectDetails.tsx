@@ -94,14 +94,31 @@ const ProjectDetailsContainer = (props: Props) => {
     const [pageSize, setPageSize] = useState<number>(25);
     const requestSeqRef = useRef(0);
     const [showAvailable, setShowAvailable] = useState(false);
+    const allBlocks = useMemo(() => {
+        const src = Array.isArray(props.project?.blocks) ? props.project.blocks : [];
+        return Array.from(
+            new Set(
+                src
+                    .map((b) => (b == null ? '' : String(b)))
+                    .map((b) => b.trim())
+                    .filter((b) => b.length > 0)
+            )
+        );
+    }, [props.project]);
 
+    // Default to Select All
     useEffect(() => {
-        const initial = props.project.prefilterBlocks && props.project.prefilterBlocks.length > 0
-            ? props.project.prefilterBlocks
-            : props.project.blocks || [];
-        const uniqueBlocks = Array.from(new Set(initial));
-        setActiveBlocks(uniqueBlocks);
-    }, [props.project, props.region]);
+        setActiveBlocks(allBlocks);
+    }, [allBlocks, props.region]);
+
+    // Select All checkbox
+    const allSelected = allBlocks.length > 0 && activeBlocks.length === allBlocks.length;
+    const noneSelected = activeBlocks.length === 0;
+    const someSelected = !allSelected && !noneSelected;
+    const selectAllRef = useRef<HTMLInputElement>(null);
+    useEffect(() => {
+        if (selectAllRef.current) selectAllRef.current.indeterminate = someSelected;
+    }, [someSelected]);
 
     useEffect(() => {
         const ac = new AbortController();
@@ -276,7 +293,20 @@ const ProjectDetailsContainer = (props: Props) => {
                 </label>
                 <div>
                     <span style={{fontWeight: 600}}>Filter by block:</span>
-                    {(props.project.blocks || []).map((b) => {
+                    {/*checkbox: Select All */}
+                    <label style={{ marginLeft: '8px' }}>
+                        <input
+                            ref={selectAllRef}
+                            type="checkbox"
+                            checked={allSelected}
+                            onChange={(e: any) => {
+                                const checked = (e.target as HTMLInputElement).checked;
+                                setActiveBlocks(checked ? allBlocks : []);
+                            }}
+                        />
+                        Select All
+                    </label>
+                    {(allBlocks || []).map((b) => {
                         const checked = activeBlocks.includes(b);
                         return (
                             <label style={{marginLeft: '8px'}}>
