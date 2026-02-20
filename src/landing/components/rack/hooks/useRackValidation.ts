@@ -102,7 +102,7 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
                 // Keep the aborted controller so in-flight loops can detect aborted === true
             }
         };
-    },[]);
+    }, []);
 
     const fetchDeviceValidationStatuses = useCallback(async (): Promise<boolean> => {
         setDevicesLoading(true);

@@ -237,16 +237,29 @@ const DeviceAccordion = (props: Props) => {
     ].filter((entry) => entry.count > 0);
 
     if (chips.length === 0) {
-      return <span className="device-accordion-failure-count">0</span>;
+      const zeroClass = `device-accordion-failure-count ${deviceFailures.hasPsuFailure ? "danger" : "success"}`;
+      return <span className={zeroClass}>0</span>;
     }
 
     return (
         <span className="device-accordion-error-breakdown">
-        {chips.map((chip) => (
-            <span key={chip.label} className="device-accordion-error-chip" title={`${chip.label}: ${chip.count}`}>
-            {chip.label}:{chip.count}
-          </span>
-        ))}
+        {chips.map((chip) => {
+            const typeClass =
+              chip.label === "LLDP" ? "chip-lldp" :
+              chip.label === "OPT"  ? "chip-opt"  :
+              chip.label === "INT"  ? "chip-int"  :
+              chip.label === "FEC"  ? "chip-fec"  :
+              chip.label === "FAN"  ? "chip-fan"  : "";
+            return (
+              <span
+                key={chip.label}
+                className={`device-accordion-error-chip ${typeClass}`}
+                title={`${chip.label}: ${chip.count}`}
+              >
+                {chip.label}:{chip.count}
+              </span>
+            );
+        })}
       </span>
     );
   };
