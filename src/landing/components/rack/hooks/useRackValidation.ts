@@ -31,6 +31,8 @@ type UseRackValidationResult = {
     isDownloading: boolean;
 
     // derived
+    eligibleDeviceNames: Set<string>;
+    eligibleDeviceCount: number;
     resolveAllowed: boolean;
     resolveTooltip: string;
 
@@ -64,9 +66,31 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
         : props.resolveDisabledReason && String(props.resolveDisabledReason).trim() !== ""
             ? String(props.resolveDisabledReason)
             : "No active Jira ticket found for this rack.";
+    const eligibleDeviceNames = useMemo(
+        () => deviceStatuses.filter(isDeviceValidationEligible).map((device) => device.deviceName),
+        [deviceStatuses]
+    );
+    const eligibleDeviceNameSet = useMemo(() => new Set(eligibleDeviceNames), [eligibleDeviceNames]);
 
     // Only run effects when rack context is complete (prevents running on Home page)
     const rackContextReady = Boolean(props.region && props.rack_serial && props.rack && props.building);
+
+    // Keep selected device keys constrained to validation-eligible devices.
+    useEffect(() => {
+        setSelectedLinkKeys((prev) => {
+            let changed = false;
+            const next = new Set<string>();
+            prev.forEach((key) => {
+                const deviceName = selectedKeyToDeviceName(key);
+                if (eligibleDeviceNameSet.has(deviceName)) {
+                    next.add(key);
+                } else {
+                    changed = true;
+                }
+            });
+            return changed ? next : prev;
+        });
+    }, [eligibleDeviceNameSet]);
 
     // track rack key and always abort any prior in-flight requests before creating a fresh controller
     useEffect(() => {
@@ -102,7 +126,7 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
                 // Keep the aborted controller so in-flight loops can detect aborted === true
             }
         };
-    }, []);
+    },[]);
 
     const fetchDeviceValidationStatuses = useCallback(async (): Promise<boolean> => {
         setDevicesLoading(true);
@@ -122,15 +146,13 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
             });
             if (!resp.ok) throw new Error(`${resp.status} ${resp.statusText}`);
 
-            const data: DeviceStatus[] = await resp.json();
-            if (data && data.length > 0) {
-                setDeviceStatuses(
-                    data.map((device) => ({
-                        ...device,
-                        _key: device.deviceName,
-                    }))
+            const data: unknown = await resp.json();
+            const normalizedDevices = normalizeDeviceStatusesPayload(data);
+            if (normalizedDevices.length > 0) {
+                setDeviceStatuses(normalizedDevices);
+                const inProgress = anyJobInProgress(
+                    normalizedDevices.filter((device) => isDeviceValidationEligible(device))
                 );
-                const inProgress = anyJobInProgress(data);
                 setIsValidating(inProgress);
                 return inProgress;
             } else {
@@ -204,10 +226,29 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
         url.searchParams.set("rackSerialNumber", props.rack_serial);
         url.searchParams.set("buildingName", props.building);
 
-        if (selectedLinkKeys.size > 0) {
-            const deviceNames = new Set(Array.from(selectedLinkKeys).map((key) => key.split("|||")[0]));
-            deviceNames.forEach((name) => url.searchParams.append("deviceNames", name));
+        if (eligibleDeviceNames.length === 0) {
+            return {
+                error: {
+                    code: 400,
+                    message:
+                        "No monitored and deployed devices are available in this rack. Validation can run only on monitored and deployed devices.",
+                },
+            };
         }
+
+        const requestedDeviceNames = new Set<string>();
+        if (selectedLinkKeys.size > 0) {
+            Array.from(selectedLinkKeys).forEach((key) => {
+                const deviceName = selectedKeyToDeviceName(key);
+                if (eligibleDeviceNameSet.has(deviceName)) {
+                    requestedDeviceNames.add(deviceName);
+                }
+            });
+        }
+        if (requestedDeviceNames.size === 0) {
+            eligibleDeviceNames.forEach((name) => requestedDeviceNames.add(name));
+        }
+        requestedDeviceNames.forEach((name) => url.searchParams.append("deviceNames", name));
 
         const resp = await fetchWithRetry(url.href, {
             method: "POST",
@@ -231,7 +272,15 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
             }
             return {error: {code: resp.status, message: errMsg}};
         }
-    }, [props.building, selectedLinkKeys, props.rack, props.region, props.rack_serial]);
+    }, [
+        props.building,
+        selectedLinkKeys,
+        props.rack,
+        props.region,
+        props.rack_serial,
+        eligibleDeviceNames,
+        eligibleDeviceNameSet,
+    ]);
 
     // poll validation job and keep UI state in sync
     const pollValidationJob = useCallback(
@@ -264,50 +313,86 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
                 }
 
                 if (statusResp.ok) {
-                    const data: DeviceStatus[] = await statusResp.json();
+                    const data: unknown = await statusResp.json();
+                    const polledStatuses = normalizeDeviceStatusesPayload(data);
 
                     let shouldFetchFailures = false;
 
-                    for (const device of data) {
+                    for (const device of polledStatuses) {
                         const prevStatus = previousStatuses.get(device.deviceName);
                         // Fetch validation failures if a device's job has just completed
-                        if (!shouldFetchFailures && prevStatus !== "COMPLETED" && device.jobStatus === "COMPLETED" && typeof prevStatus !== "undefined") {
+                        if (!shouldFetchFailures && prevStatus !== "COMPLETED" && device.jobStatus === "COMPLETED" ) {
                             shouldFetchFailures = true;
                             break;
                         }
                     }
 
                     // update map for next poll
-                    data.forEach((device) => {
+                    polledStatuses.forEach((device) => {
                         previousStatuses.set(device.deviceName, device.jobStatus);
                     });
                     previousStatusesRef.current = previousStatuses;
 
                     // update UI state
-                    if (data && data.length > 0) {
-                        setDeviceStatuses((prev) =>
-                            data.map((device) => {
-                                const prior = prev.find((d) => d.deviceName === device.deviceName);
-                                const merged: DeviceStatus = {...device, _key: device.deviceName};
-                                if (typeof device.elevation !== "number" && typeof prior?.elevation === "number") {
-                                    merged.elevation = prior.elevation;
-                                }
-                                return merged;
-                            })
-                        );
+                    if (polledStatuses.length > 0) {
+                        const polledByName = new Set(polledStatuses.map((device) => device.deviceName));
 
-                        const inProgress = anyJobInProgress(data);
+                        setDeviceStatuses((prev) => {
+                            const mergedByName = new Map(prev.map((device) => [device.deviceName, device]));
+
+                            polledStatuses.forEach((device) => {
+                                const prior = mergedByName.get(device.deviceName);
+                                mergedByName.set(device.deviceName, {
+                                    ...prior,
+                                    ...device,
+                                    elevation:
+                                        typeof device.elevation === "number"
+                                            ? device.elevation
+                                            : typeof prior?.elevation === "number"
+                                                ? prior.elevation
+                                                : undefined,
+                                    validationEligible:
+                                        typeof prior?.validationEligible === "boolean"
+                                            ? prior.validationEligible
+                                            : device.validationEligible,
+                                    validationEligibilityReason:
+                                        prior?.validationEligibilityReason ?? device.validationEligibilityReason,
+                                    _key: device.deviceName,
+                                });
+                            });
+
+                            // Preserve devices not returned by polling endpoint, but mark as non-eligible.
+                            if (prev.length > polledStatuses.length) {
+                                prev.forEach((device) => {
+                                    if (!polledByName.has(device.deviceName)) {
+                                        const prior = mergedByName.get(device.deviceName) || device;
+                                        if (prior.validationEligible !== false) {
+                                            mergedByName.set(device.deviceName, {
+                                                ...prior,
+                                                validationEligible: false,
+                                                validationEligibilityReason: MONITORED_DEPLOYED_ONLY_REASON,
+                                            });
+                                        }
+                                    }
+                                });
+                            }
+
+                            return Array.from(mergedByName.values());
+                        });
+
+                        const inProgress = anyJobInProgress(
+                            polledStatuses.filter((device) => isDeviceValidationEligible(device))
+                        );
                         setIsValidating(inProgress);
 
-                        // If all jobs are completed, we stop polling after fetching failures
+                        // If all jobs are completed, always refresh failures before stopping.
+                        // This avoids stale/empty UI when returning to the page and the previous
+                        // status map has been reset.
                         if (!inProgress) {
-                            if (shouldFetchFailures) {
-                                await fetchValidationFailures();
-                            }
+                            await fetchValidationFailures();
                             return;
                         }
                     } else {
-                        setDeviceStatuses([]);
                         setIsValidating(false);
                     }
 
@@ -463,6 +548,8 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
         jobErrorDetails,
         isDownloading,
 
+        eligibleDeviceNames: eligibleDeviceNameSet,
+        eligibleDeviceCount: eligibleDeviceNames.length,
         resolveAllowed,
         resolveTooltip,
 
@@ -474,12 +561,208 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
 }
 
 type RowRecord = Record<string, unknown>;
+const MONITORED_DEPLOYED_ONLY_REASON =
+    "Device is not in monitored and deployed state.";
 
 function asRecord(value: unknown): RowRecord | null {
     if (value && typeof value === "object" && !Array.isArray(value)) {
         return value as RowRecord;
     }
     return null;
+}
+
+function selectedKeyToDeviceName(key: string): string {
+    return String(key || "").split("|||")[0];
+}
+
+function isDeviceValidationEligible(device: DeviceStatus): boolean {
+    return device.validationEligible !== false;
+}
+
+function normalizeDeviceStatusesPayload(payload: unknown): DeviceStatus[] {
+    const rows = asArray(payload);
+    const devicesByName = new Map<string, DeviceStatus>();
+
+    rows.forEach((item) => {
+        const record = asRecord(item);
+        if (!record) return;
+
+        const deviceName = pick(record, ["deviceName", "name", "device_name"], "");
+        if (!deviceName) return;
+
+        const prior = devicesByName.get(deviceName);
+        const statusValue = pick(record, ["jobStatus", "status", "validationStatus"], "NOT_TRIGGERED");
+        const elevation = toInteger(record["elevation"] ?? record["slot"]);
+        const eligibility = inferValidationEligibility(record);
+
+        devicesByName.set(deviceName, {
+            deviceName,
+            jobStatus: statusValue || prior?.jobStatus || "NOT_TRIGGERED",
+            elevation:
+                typeof elevation === "number"
+                    ? elevation
+                    : typeof prior?.elevation === "number"
+                        ? prior.elevation
+                        : undefined,
+            validationEligible:
+                typeof eligibility.eligible === "boolean"
+                    ? eligibility.eligible
+                    : prior?.validationEligible,
+            validationEligibilityReason: eligibility.reason || prior?.validationEligibilityReason,
+            _key: deviceName,
+        });
+    });
+
+    return Array.from(devicesByName.values());
+}
+
+function inferValidationEligibility(record: RowRecord): { eligible: boolean; reason?: string } {
+    const explicitEligibility = firstBoolean([
+        record["validationEligible"],
+        record["isValidationEligible"],
+        record["canValidate"],
+        record["canRunValidation"],
+        record["validatable"],
+        record["isValidatable"],
+        record["eligibleForValidation"],
+        record["validationSupported"],
+    ]);
+    if (explicitEligibility !== null) {
+        return explicitEligibility
+            ? { eligible: true }
+            : { eligible: false, reason: MONITORED_DEPLOYED_ONLY_REASON };
+    }
+
+    const monitored = inferMonitored(record);
+    const deployed = inferDeployed(record);
+
+    if (monitored !== null && deployed !== null) {
+        return monitored && deployed
+            ? { eligible: true }
+            : { eligible: false, reason: MONITORED_DEPLOYED_ONLY_REASON };
+    }
+    if (monitored !== null) {
+        return monitored
+            ? { eligible: true }
+            : { eligible: false, reason: MONITORED_DEPLOYED_ONLY_REASON };
+    }
+    if (deployed !== null) {
+        return deployed
+            ? { eligible: true }
+            : { eligible: false, reason: MONITORED_DEPLOYED_ONLY_REASON };
+    }
+
+    // If API does not expose monitored/deployed hints, keep backward-compatible behavior.
+    return { eligible: true };
+}
+
+function inferMonitored(record: RowRecord): boolean | null {
+    const explicit = firstBoolean([
+        record["isMonitored"],
+        record["monitored"],
+        record["monitoringEnabled"],
+        record["isMonitoringEnabled"],
+    ]);
+    if (explicit !== null) return explicit;
+
+    const configAttributes = asRecord(record["configAttributes"]);
+    if (configAttributes) {
+        if (Object.prototype.hasOwnProperty.call(configAttributes, "monitoring.interfaces")) {
+            return toPresenceFlag(configAttributes["monitoring.interfaces"]) ?? false;
+        }
+    }
+
+    const monitoringInterfaces = readRecordPath(record, ["monitoring", "interfaces"]);
+    const monitoringInterfacesDirect = record["monitoringInterfaces"];
+    const monitorByPresence = toPresenceFlag(monitoringInterfaces);
+    if (monitorByPresence !== null) return monitorByPresence;
+    const monitorByPresenceDirect = toPresenceFlag(monitoringInterfacesDirect);
+    if (monitorByPresenceDirect !== null) return monitorByPresenceDirect;
+
+    return null;
+}
+
+function inferDeployed(record: RowRecord): boolean | null {
+    const explicit = firstBoolean([record["isDeployed"], record["deployed"]]);
+    if (explicit !== null) return explicit;
+
+    const stateCandidates = [
+        record["deviceState"],
+        record["state"],
+        record["deploymentState"],
+        record["lifecycleState"],
+        readRecordPath(record, ["state", "conf", "device.state"]),
+        readRecordPath(record, ["state", "device.state"]),
+        readRecordPath(record, ["conf", "device.state"]),
+    ];
+
+    const normalizedState = firstString(stateCandidates);
+    if (!normalizedState) return null;
+
+    return normalizedState.toLowerCase() === "deployed";
+}
+
+function readRecordPath(record: RowRecord, path: string[]): unknown {
+    let current: unknown = record;
+    for (const key of path) {
+        const currentRecord = asRecord(current);
+        if (!currentRecord || !Object.prototype.hasOwnProperty.call(currentRecord, key)) {
+            return undefined;
+        }
+        current = currentRecord[key];
+    }
+    return current;
+}
+
+function firstBoolean(values: unknown[]): boolean | null {
+    for (const value of values) {
+        const parsed = toBoolean(value);
+        if (parsed !== null) return parsed;
+    }
+    return null;
+}
+
+function firstString(values: unknown[]): string | null {
+    for (const value of values) {
+        if (value === null || value === undefined) continue;
+        if (typeof value === "string" && value.trim() !== "") {
+            return value.trim();
+        }
+    }
+    return null;
+}
+
+function toBoolean(value: unknown): boolean | null {
+    if (typeof value === "boolean") return value;
+    if (typeof value === "number") {
+        if (value === 1) return true;
+        if (value === 0) return false;
+    }
+    if (typeof value === "string") {
+        const normalized = value.trim().toLowerCase();
+        if (["true", "yes", "y", "1", "enabled"].includes(normalized)) return true;
+        if (["false", "no", "n", "0", "disabled"].includes(normalized)) return false;
+    }
+    return null;
+}
+
+function toPresenceFlag(value: unknown): boolean | null {
+    const parsedBoolean = toBoolean(value);
+    if (parsedBoolean !== null) return parsedBoolean;
+    if (Array.isArray(value)) return value.length > 0;
+    if (value && typeof value === "object") return true;
+    if (typeof value === "string") return value.trim() !== "";
+    if (value === null || value === undefined) return null;
+    return null;
+}
+
+function toInteger(value: unknown): number | undefined {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value === "string") {
+        const parsed = Number.parseInt(value.trim(), 10);
+        if (Number.isFinite(parsed)) return parsed;
+    }
+    return undefined;
 }
 
 function asArray(value: unknown): unknown[] {
@@ -612,6 +895,7 @@ function mapFecBerRow(raw: unknown, deviceName: string, idx: number): FecBerFail
         lockStatus: pick(row, ["Lock Status", "lockStatus"]),
         remoteDevice: pick(row, ["Remote Device", "remoteDevice"]),
         remoteInterface: pick(row, ["Remote Interface", "remoteInterface"]),
+        errorMessage: textOrEmpty(row["Error Message"] ?? row["errorMessage"]),
     };
 }
 
@@ -623,6 +907,7 @@ function mapFanRow(raw: unknown, deviceName: string, idx: number): FanFailureRow
         fanName: textOrEmpty(row["Fan Name"] ?? row["fanName"]),
         fanSlot: text(row["Fan Slot"] ?? row["fanSlot"]),
         status: text(row["Status"] ?? row["status"]),
+        errorMessage: textOrEmpty(row["Error Message"] ?? row["errorMessage"]),
     };
 }
 
