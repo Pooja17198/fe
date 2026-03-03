@@ -20,6 +20,7 @@ import { formatStatusLabel, getStatusClass } from "./utils";
 
 type Props = {
   devices: DeviceStatus[];
+  eligibleDeviceNames: Set<string>;
   building: string;
   block: string;
   rack: string;
@@ -161,7 +162,7 @@ const DeviceAccordion = (props: Props) => {
     return filtered;
   }, [props.validationFailuresByDevice, props.hideUnsupported]);
 
-  const selectTemplate = (context: any) => {
+  const selectTemplate = (context: any, disabled: boolean = false, disabledReason: string = "") => {
     const row = (context?.item && context.item.data) || {};
     const key = row._key;
     const isChecked = props.selectedLinkKeys.has(key);
@@ -174,7 +175,15 @@ const DeviceAccordion = (props: Props) => {
         return next;
       });
     };
-    return <input type="checkbox" checked={isChecked} onChange={onChange} />;
+    return (
+        <input
+            type="checkbox"
+            checked={isChecked}
+            onChange={onChange}
+            disabled={disabled}
+            title={disabled ? disabledReason || "Validation is available only for monitored and deployed devices." : ""}
+        />
+    );
   };
 
   const handleToggle = (key: string, expand: boolean, hasDeviceFailures: boolean) => {
@@ -193,12 +202,21 @@ const DeviceAccordion = (props: Props) => {
   }, [props.devices]);
 
   // Compute selection helpers for "Select All" behavior
-  const allDeviceKeys = useMemo(() => new Set(sortedDevices.map((d) => d._key)), [sortedDevices]);
+  const eligibleDeviceKeys = useMemo(
+      () =>
+          new Set(
+              sortedDevices
+                  .filter((device) => props.eligibleDeviceNames.has(device.deviceName))
+                  .map((device) => device._key)
+          ),
+      [sortedDevices, props.eligibleDeviceNames]
+  );
   const allSelected =
-      allDeviceKeys.size > 0 && Array.from(allDeviceKeys).every((k) => props.selectedLinkKeys.has(k));
+      eligibleDeviceKeys.size > 0 &&
+      Array.from(eligibleDeviceKeys).every((k) => props.selectedLinkKeys.has(k));
   const someSelected =
-      allDeviceKeys.size > 0 &&
-      Array.from(allDeviceKeys).some((k) => props.selectedLinkKeys.has(k)) &&
+      eligibleDeviceKeys.size > 0 &&
+      Array.from(eligibleDeviceKeys).some((k) => props.selectedLinkKeys.has(k)) &&
       !allSelected;
 
   const selectAllRef = useRef<HTMLInputElement>(null);
@@ -212,9 +230,9 @@ const DeviceAccordion = (props: Props) => {
     props.setSelectedLinkKeys((prev) => {
       const next = new Set(prev as Set<string>);
       if (checked) {
-        allDeviceKeys.forEach((k) => next.add(k));
+        eligibleDeviceKeys.forEach((k) => next.add(k));
       } else {
-        allDeviceKeys.forEach((k) => next.delete(k));
+        eligibleDeviceKeys.forEach((k) => next.delete(k));
       }
       return next;
     });
@@ -243,23 +261,23 @@ const DeviceAccordion = (props: Props) => {
 
     return (
         <span className="device-accordion-error-breakdown">
-        {chips.map((chip) => {
-            const typeClass =
-              chip.label === "LLDP" ? "chip-lldp" :
-              chip.label === "OPT"  ? "chip-opt"  :
-              chip.label === "INT"  ? "chip-int"  :
-              chip.label === "FEC"  ? "chip-fec"  :
-              chip.label === "FAN"  ? "chip-fan"  : "";
-            return (
-              <span
-                key={chip.label}
-                className={`device-accordion-error-chip ${typeClass}`}
-                title={`${chip.label}: ${chip.count}`}
-              >
+         {chips.map((chip) => {
+           const typeClass =
+               chip.label === "LLDP" ? "chip-lldp" :
+                   chip.label === "OPT"  ? "chip-opt"  :
+                       chip.label === "INT"  ? "chip-int"  :
+                           chip.label === "FEC"  ? "chip-fec"  :
+                               chip.label === "FAN"  ? "chip-fan"  : "";
+           return (
+               <span
+                   key={chip.label}
+                   className={`device-accordion-error-chip ${typeClass}`}
+                   title={`${chip.label}: ${chip.count}`}
+               >
                 {chip.label}:{chip.count}
               </span>
-            );
-        })}
+           );
+         })}
       </span>
     );
   };
@@ -275,10 +293,28 @@ const DeviceAccordion = (props: Props) => {
               {/*Validation summary*/}
               {!props.isValidating &&
                   (() => {
-                    const numUnreachable = props.devices.filter((d) => d.jobStatus === "DEVICE_UNREACHABLE").length;
-                    const hasAnyValidated = props.devices.some(
+                    const eligibleDevices = props.devices.filter((d) =>
+                        props.eligibleDeviceNames.has(d.deviceName)
+                    );
+                    const hasEligibleDevices = eligibleDevices.length > 0;
+                    const numUnreachable = eligibleDevices.filter((d) => d.jobStatus === "DEVICE_UNREACHABLE").length;
+                    const hasAnyValidated = eligibleDevices.some(
                         (d) => d.jobStatus !== "NOT_TRIGGERED" && d.jobStatus !== "IN_PROGRESS"
                     );
+                    if (!hasEligibleDevices) {
+                      return (
+                          <div class="device-accordion-summary-card info">
+                            <div>
+                              <span class="device-accordion-message-title">
+                                All devices are listed below.
+                              </span>
+                              <span class="device-accordion-message-title">
+                                Validation can only be run on devices in monitored and deployed state.
+                              </span>
+                            </div>
+                          </div>
+                      );
+                    }
                     if (hasAnyValidated) {
                       return (
                           <div class="device-accordion-summary-card info">
@@ -314,6 +350,12 @@ const DeviceAccordion = (props: Props) => {
                   type="checkbox"
                   checked={allSelected}
                   onChange={(e: any) => toggleSelectAll((e.target as HTMLInputElement).checked)}
+                  disabled={eligibleDeviceKeys.size === 0}
+                  title={
+                    eligibleDeviceKeys.size === 0
+                        ? "No monitored and deployed devices are available for validation."
+                        : ""
+                  }
               />
             </span>
                 <span>Device</span>
@@ -331,6 +373,11 @@ const DeviceAccordion = (props: Props) => {
                   const hasDeviceFailures = deviceFailures.counts.nonPowerTotal > 0;
                   const psuStatus = getPsuStatusLabel(device.jobStatus, deviceFailures.hasPsuFailure);
                   const isExpanded = expandedKeys.has(device._key);
+                  const isValidationEligible = props.eligibleDeviceNames.has(device.deviceName);
+                  const statusToRender = isValidationEligible ? device.jobStatus : "NOT_ELIGIBLE";
+                  const disabledReason =
+                      device.validationEligibilityReason ||
+                      "Validation is available only for monitored and deployed devices.";
 
                   return (
                       <oj-collapsible
@@ -349,7 +396,11 @@ const DeviceAccordion = (props: Props) => {
                                 onClick={(e) => e.stopPropagation()}
                                 style={{ display: "inline-flex", alignItems: "center", justifyContent: "center" }}
                             >
-                        {selectTemplate({ item: { data: { _key: device._key } } })}
+                        {selectTemplate(
+                            { item: { data: { _key: device._key } } },
+                            !isValidationEligible,
+                            disabledReason
+                        )}
                       </span>
 
                             {/* Device name */}
@@ -380,8 +431,8 @@ const DeviceAccordion = (props: Props) => {
 
                             {/* Status */}
                             <span className="device-col status">
-                        <span className={`device-accordion-status ${getStatusClass(device.jobStatus)}`}>
-                          {formatStatusLabel(device.jobStatus)}
+                        <span className={`device-accordion-status ${getStatusClass(statusToRender)}`}>
+                          {formatStatusLabel(statusToRender)}
                         </span>
                       </span>
                           </div>
@@ -443,7 +494,7 @@ const DeviceAccordion = (props: Props) => {
         ) : (
             <div class="device-accordion-empty-state">
               <span class="device-accordion-empty-icon">ⓘ</span>
-              <span class="device-accordion-empty-title">No devices(in deployed state) found to validate in this rack</span>
+              <span class="device-accordion-empty-title">No devices found in this rack</span>
             </div>
         )}
       </div>

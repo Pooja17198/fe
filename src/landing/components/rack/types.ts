@@ -2,6 +2,8 @@ export type DeviceStatus = {
   deviceName: string;
   jobStatus: string;
   elevation?: number;
+  validationEligible?: boolean;
+  validationEligibilityReason?: string;
   _key: string;
 };
 
@@ -75,6 +77,7 @@ export interface FecBerFailureRow {
   lockStatus: string;
   remoteDevice: string;
   remoteInterface: string;
+  errorMessage: string;
 }
 
 export interface FanFailureRow {
@@ -83,6 +86,7 @@ export interface FanFailureRow {
   fanName: string;
   fanSlot: string;
   status: string;
+  errorMessage: string;
 }
 
 export interface PowerFailureRow {

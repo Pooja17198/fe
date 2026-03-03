@@ -22,6 +22,8 @@ const Rack = (props: RackProps) => {
     isValidating,
     jobErrorDetails,
     isDownloading,
+    eligibleDeviceNames,
+    eligibleDeviceCount,
     resolveAllowed,
     resolveTooltip,
     validate,
@@ -126,7 +128,14 @@ const Rack = (props: RackProps) => {
                 label="Validate"
                 onojAction={validate}
                 style="margin-left: 8px; margin-right: 8px;"
-                disabled={isValidating || deviceStatuses.length === 0}
+                disabled={isValidating || eligibleDeviceCount === 0}
+                title={
+                  isValidating
+                    ? ""
+                    : eligibleDeviceCount === 0
+                    ? "Validation is available only for monitored and deployed devices."
+                    : ""
+                }
             ></oj-c-button>
             <oj-c-button
                 chroming="callToAction"
@@ -162,6 +171,7 @@ const Rack = (props: RackProps) => {
 
           <DeviceAccordion
               devices={deviceStatuses}
+              eligibleDeviceNames={eligibleDeviceNames}
               building={props.building}
               block={props.block}
               rack={props.rack}

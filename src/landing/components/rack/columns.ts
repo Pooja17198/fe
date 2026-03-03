@@ -89,6 +89,12 @@ export const FEC_BER_FAILURE_COLUMNS: any[] = [
     id: "remoteInterface",
     ...DEFAULT_COLUMN_SETTINGS,
   },
+  {
+    headerText: "Error Message",
+    field: "errorMessage",
+    id: "errorMessage",
+    ...DEFAULT_COLUMN_SETTINGS,
+  },
 ];
 
 export const FAN_FAILURE_COLUMNS: any[] = [
@@ -100,6 +106,12 @@ export const FAN_FAILURE_COLUMNS: any[] = [
     field: "status",
     id: "status",
     template: "booleanStatusTemplate",
+    ...DEFAULT_COLUMN_SETTINGS,
+  },
+  {
+    headerText: "Error Message",
+    field: "errorMessage",
+    id: "errorMessage",
     ...DEFAULT_COLUMN_SETTINGS,
   },
 ];

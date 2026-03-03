@@ -370,6 +370,10 @@
     background: #eeeeee;
     color: #888888;
 }
+.device-accordion-status.status-not-eligible {
+    background: #f1f5f9;
+    color: #64748b;
+}
 .device-accordion-status.status-error {
     background: #ffe7e7;
     color: #d32f2f;
@@ -399,6 +403,7 @@
     color: #b91c1c;
     border-color: #fecdd3;
 }
+
 
 /* DeviceAccordion columns layout */
 .rack-page .device-accordion-columns-header {
@@ -441,6 +446,12 @@
 
 .rack-page .device-accordion-header-row .device-col.select {
     justify-self: center;
+}
+
+.rack-page .device-accordion-header-row .device-col.select input:disabled,
+.rack-page .device-accordion-columns-header .device-col.select input:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
 }
 
 .rack-page .device-accordion-header-row .device-col.name {

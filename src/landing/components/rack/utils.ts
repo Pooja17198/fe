@@ -9,10 +9,14 @@ export function getStatusClass(status: string): string {
   if (s === "IN_PROGRESS") return "status-in-progress";
   if (s === "COMPLETED") return "status-completed";
   if (s === "NOT_TRIGGERED") return "status-not-triggered";
+  if (s === "NOT_ELIGIBLE") return "status-not-eligible";
   return "status-error";
 }
 
 export function formatStatusLabel(status: string): string {
+  if ((status || "").toUpperCase() === "NOT_ELIGIBLE") {
+    return "Not eligible";
+  }
   return (status || "")
     .replace(/_/g, " ")
     .replace(/\w\S*/g, (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
