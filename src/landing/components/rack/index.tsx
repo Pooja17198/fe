@@ -24,12 +24,58 @@ const Rack = (props: RackProps) => {
     isDownloading,
     eligibleDeviceNames,
     eligibleDeviceCount,
+    resolveFeatureEnabled,
     resolveAllowed,
     resolveTooltip,
     validate,
     resolve,
     downloadCsv,
   } = useRackValidation(props);
+
+  // Lightweight toast for non-intrusive errors
+  const [toastMsg, setToastMsg] = useState<string>("");
+  const [toastVisible, setToastVisible] = useState<boolean>(false);
+  const toastTimerRef = useRef<number | null>(null);
+
+  const showToast = useCallback((msg: string) => {
+    setToastMsg(msg);
+    setToastVisible(true);
+    if (toastTimerRef.current) {
+      window.clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = null;
+    }
+    toastTimerRef.current = window.setTimeout(() => {
+      setToastVisible(false);
+      toastTimerRef.current = null;
+    }, 4000);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) {
+        window.clearTimeout(toastTimerRef.current);
+      }
+    };
+  }, []);
+
+  // Log reason when Resolve is disabled
+  useEffect(() => {
+    if (!resolveFeatureEnabled) {
+      const reason = (props as any)?.resolveDisabledReason;
+      const msg = reason && String(reason).trim() !== "" ? reason : "(no reason provided by backend)";
+      console.info("Resolve disabled for this rack:", msg);
+    }
+  }, [resolveFeatureEnabled, (props as any)?.resolveDisabledReason]);
+
+  const handleResolve = useCallback(async () => {
+    const result = await resolve();
+    if (!(result as any)?.ok) {
+      const msg = (result as any)?.message;
+      if (msg && msg !== "Cancelled") {
+        showToast(String(msg));
+      }
+    }
+  }, [resolve, showToast]);
 
   // When region changes, go to home page (except on initial mount)
   useEffect(() => {
@@ -141,7 +187,7 @@ const Rack = (props: RackProps) => {
                 chroming="callToAction"
                 size="sm"
                 label="Resolve"
-                onojAction={resolve}
+                onojAction={handleResolve}
                 disabled={isValidating || !resolveAllowed}
                 title={isValidating ? "" : resolveTooltip}
             ></oj-c-button>
@@ -189,6 +235,30 @@ const Rack = (props: RackProps) => {
               externalExpandedKeys={externalExpandedKeys}
               externalExpandedKeysNonce={externalExpandedKeysNonce}
           />
+
+          {toastVisible && (
+            <div
+              role="status"
+              aria-live="polite"
+              onClick={() => setToastVisible(false)}
+              style={{
+                position: "fixed",
+                right: "16px",
+                bottom: "16px",
+                background: "#1f2937",
+                color: "#fff",
+                padding: "10px 12px",
+                borderRadius: "6px",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+                cursor: "pointer",
+                maxWidth: "360px",
+                zIndex: 9999,
+              }}
+              title="Click to dismiss"
+            >
+              {toastMsg}
+            </div>
+          )}
         </div>
       </div>
   );

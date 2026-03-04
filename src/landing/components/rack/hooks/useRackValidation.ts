@@ -33,13 +33,14 @@ type UseRackValidationResult = {
     // derived
     eligibleDeviceNames: Set<string>;
     eligibleDeviceCount: number;
+    resolveFeatureEnabled: boolean;
     resolveAllowed: boolean;
     resolveTooltip: string;
 
     // actions
     setSelectedLinkKeys: (value: Set<string> | ((prev: Set<string>) => Set<string>)) => void;
     validate: () => Promise<void>;
-    resolve: () => Promise<void>;
+    resolve: () => Promise<{ ok: true } | { ok: false; message: string }>;
     downloadCsv: () => Promise<void>;
 };
 
@@ -60,12 +61,15 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
     const [isDownloading, setIsDownloading] = useState(false);
 
     // derived
-    const resolveAllowed = Boolean(props.resolveEnabled) && Boolean(props.ticket);
-    const resolveTooltip = resolveAllowed
-        ? ""
-        : props.resolveDisabledReason && String(props.resolveDisabledReason).trim() !== ""
+    const resolveFeatureEnabled = props.resolveEnabled !== false; // default to enabled if undefined
+    const resolveAllowed = resolveFeatureEnabled && Boolean(props.ticket);
+    const resolveTooltip = !resolveFeatureEnabled
+        ? (props.resolveDisabledReason && String(props.resolveDisabledReason).trim() !== ""
             ? String(props.resolveDisabledReason)
-            : "No active Jira ticket found for this rack.";
+            : "Resolve disabled for this region")
+        : Boolean(props.ticket)
+            ? ""
+            : "No open ticket";
     const eligibleDeviceNames = useMemo(
         () => deviceStatuses.filter(isDeviceValidationEligible).map((device) => device.deviceName),
         [deviceStatuses]
@@ -469,13 +473,12 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
         }
     }, [startValidationJob, pollValidationJob, fetchValidationFailures]);
 
-    const resolve = useCallback(async () => {
+    const resolve = useCallback(async (): Promise<{ ok: true } | { ok: false; message: string }> => {
         if (!resolveAllowed) {
-            alert(resolveTooltip);
-            return;
+            return { ok: false, message: resolveTooltip };
         }
         const really = confirm("Are you sure you want to resolve the AIs for this Rack");
-        if (!really) return;
+        if (!really) return { ok: false, message: "Cancelled" };
 
         const headers = createCsrfHeaders();
         const url = new URL(`${LVV_API}/cablingTasks/${props.ticket}/actions/resolveValidationFailureTask`);
@@ -485,8 +488,22 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
         const response = await fetch(request, {signal: pageAbortRef.current?.signal as AbortSignal | undefined});
         if (response.ok) {
             props.onPageChanged({path: ""});
+            return { ok: true };
         } else {
-            alert(`Delete failed with status ${response.status} : ${response.statusText}`);
+            let errMsg = response.statusText;
+            try {
+                const ct = response.headers.get("content-type") || "";
+                if (ct.includes("application/json")) {
+                    const j = await response.json();
+                    errMsg = (j && (j.message || j.error || JSON.stringify(j))) || errMsg;
+                } else {
+                    const t = await response.text();
+                    if (t) errMsg = t;
+                }
+            } catch {
+                // ignore parse errors
+            }
+            return { ok: false, message: errMsg };
         }
     }, [resolveAllowed, resolveTooltip, props.ticket, props.region, props.onPageChanged]);
 
@@ -550,6 +567,7 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
 
         eligibleDeviceNames: eligibleDeviceNameSet,
         eligibleDeviceCount: eligibleDeviceNames.length,
+        resolveFeatureEnabled,
         resolveAllowed,
         resolveTooltip,
 

@@ -66,7 +66,7 @@ const Content = (props: Props) => {
     setSelectedBuilding(value.building);
     setSelectedBlock(value.block);
     setSelectedTicket(value.ticket);
-    setSelectedResolveEnabled(Boolean(value.resolveEnabled));
+    setSelectedResolveEnabled(value.resolveEnabled !== false);
     setSelectedResolveDisabledReason(String(value.resolveDisabledReason || ""));
     setSelectedRackSerialNumber(value.rackSerialNumber);
 
