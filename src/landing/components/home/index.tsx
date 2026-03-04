@@ -118,7 +118,7 @@ const HomeContainer = (props: Props) => {
             rack: value.rackLocation,
             ticket: value.ticketId,
             rackSerialNumber: value.rackSerialNumber,
-            resolveEnabled: Boolean(value.resolveEnabled),
+            resolveEnabled: value.resolveEnabled !== false,
             resolveDisabledReason: value.resolveDisabledReason || ""
         }
         console.log("Info passed ", info);
