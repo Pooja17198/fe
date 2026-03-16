@@ -40,14 +40,33 @@ const routeArray: Array<any> = [
 const router = new CoreRouter<CoreRouter.DetailedRouteConfig>(routeArray, {
   urlAdapter: new UrlPathParamAdapter("/"),
 });
-
 type Route = {
-  path: string,
-  id: string
-}
+  path: string;
+  id?: string;
+  query?: Record<string, string>;
+};
 
-const pageChangeHandler = (route: Route) => {
-  router.go({ path: route.path, params: {id: route.id} });
+const pageChangeHandler = async (route: Route) => {
+  // Navigate via CoreRouter using path/params; master accepts passing params for all routes
+  await router.go({ path: route.path, params: { id: route.id } as any });
+
+  // Unified URL normalization approach:
+  // 1) Clear any existing query
+  // 2) If route.query provided, add those params
+  // 3) Normalize home to '/'
+  try {
+    const basePath = route.path === 'home' ? '/' : window.location.pathname;
+    const u = new URL(window.location.origin + basePath);
+    if (route.query) {
+      Object.entries(route.query).forEach(([k, v]) => {
+        if (v != null) u.searchParams.set(k, String(v));
+      });
+    }
+    const nextUrl = u.toString();
+    window.history.replaceState({}, '', nextUrl);
+  } catch (e) {
+    console.error(e);
+  }
 };
 
 export const App = registerCustomElement("app-root", (props: Props) => {
@@ -77,6 +96,20 @@ export const App = registerCustomElement("app-root", (props: Props) => {
     useEffect(() => {
       Context.getPageContext().getBusyContext().applicationBootstrapComplete();
       setSelectedVendor(sessionStorage.getItem("X-Oracle-Vendor") || "");
+
+      // If user lands directly on a shared /rack/{id}?region=... URL, hydrate the app region from URL.
+      // This ensures rack refresh/share uses the correct region for allDevicesInRack.
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const regionFromUrl = params.get("region");
+        if (regionFromUrl && regionFromUrl.trim() && regionFromUrl !== selectedRegion) {
+          setSelectedRegion(regionFromUrl);
+        }
+      } catch (e) {
+        // malformed URL
+        console.error(e);
+      }
+
       router.currentState.subscribe(routerUpdated);
       router.sync();
     }, [selectedVendor]);

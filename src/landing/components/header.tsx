@@ -26,6 +26,8 @@ export function Header({ appName, userLogin, vendorName, regionValue, onRegionCh
 
   const [isSmallWidth, setIsSmallWidth] = useState(mediaQueryRef.current.matches);
 
+  const regionRef = useRef<HTMLInputElement | null>(null);
+
   useEffect(() => {
     mediaQueryRef.current.addEventListener("change", handleMediaQueryChange);
     return (() => mediaQueryRef.current.removeEventListener("change", handleMediaQueryChange));
@@ -85,18 +87,23 @@ export function Header({ appName, userLogin, vendorName, regionValue, onRegionCh
     if (!resolved && typeof targetId === "string") {
       if (targetId.includes("out")) resolved = "out";
       else if (targetId.includes("help")) resolved = "help";
+      else if (targetId.includes("home")) resolved = "home";
       else resolved = null;
     }
 
-    if (resolved === "help") {
-      const link = document.createElement('a');
-      link.href = "./landing/resources/lvv_portal_tutorial.pdf";  // Path to your PDF file
-      link.download = "lvv_portal_tutorial.pdf"; // The filename user will see
-
+    if (resolved === "home") {
+      window.location.assign("/");
+      return;
+    }
+    else if (resolved === "help") {
+      const pdfUrl = `${window.location.origin}/landing/resources/lvv_portal_tutorial.pdf`;
+      const link = document.createElement("a");
+      link.href = pdfUrl;
+      link.download = "lvv_portal_tutorial.pdf";
+      link.target = "_blank";
+      link.rel = "noopener";
       document.body.appendChild(link);
-
       link.click();
-
       document.body.removeChild(link);
       return;
     }
@@ -127,9 +134,25 @@ export function Header({ appName, userLogin, vendorName, regionValue, onRegionCh
           <div class="oj-flex-bar-end">
             {regions.length > 0 && (
                 <oj-combobox-one
+                    ref={regionRef}
                     value={regionValue}
                     placeholder="Select Region"
                     label-hint="Region"
+                    onMouseDown={(e: any) => {
+                      const host = regionRef.current as HTMLElement | null;
+                      if (!host) return;
+
+                      const input = host.querySelector(
+                        'input.oj-combobox-input, input[type="text"]'
+                      ) as HTMLInputElement | null;
+                      if (!input) return;
+
+                      if (input.value) {
+                        try {
+                          setTimeout(() => {input.setSelectionRange(0, input.value.length)}, 100);
+                        } catch {}
+                      }
+                    }}
                     onvalueChanged={(e: any) => {
                       const newVal = typeof e === "string" ? e : e?.detail?.value;
                       if (onRegionChanged && typeof newVal === "string") {
@@ -151,9 +174,8 @@ export function Header({ appName, userLogin, vendorName, regionValue, onRegionCh
                 <span aria-label={userLogin}>{userLogin}</span>
                 <span slot="endIcon" class={getEndIconClass()}></span>
                 <oj-menu id="menu1" slot="menu" onojAction={handleUserMenuAction}>
-                  <oj-option id="pref" value="pref">Preferences (Coming Soon)</oj-option>
+                  <oj-option id="home" value="home">Home</oj-option>
                   <oj-option id="help" value="help">Help</oj-option>
-                  <oj-option id="about" value="about">About (Coming Soon)</oj-option>
                   <oj-option id="out" value="out">Sign Out</oj-option>
                 </oj-menu>
               </oj-menu-button>

@@ -40,6 +40,44 @@ type RackMetadata = {
   resolveDisabledReason?: string;
 }
 
+function decodeRackUrlContext(): Partial<RackMetadata> {
+  // URL format: /rack/{rackSerialNumber}?region=...&building=...&block=...&rack=...&ticket=...&resolveEnabled=...&resolveDisabledReason=...
+  const match = window.location.pathname.match(/^\/rack\/([^/]+)\/?$/);
+  if (!match) return {};
+  const [, id] = match;
+  const params = new URLSearchParams(window.location.search);
+
+  const building = params.get("building") ? decodeURIComponent(params.get("building") as string) : "";
+  const block = params.get("block") ? decodeURIComponent(params.get("block") as string) : "";
+  const rack = params.get("rack") ? decodeURIComponent(params.get("rack") as string) : "";
+  const ticketParam = params.get("ticket");
+  const ticket = ticketParam && ticketParam.trim() !== "" ? decodeURIComponent(ticketParam) : undefined;
+
+  // If ticket is present: force resolveEnabled=true and resolveDisabledReason=null
+  // If ticket is absent: use resolveEnabled/resolveDisabledReason from URL, and treat ticket as null/undefined
+  const result: Partial<RackMetadata> = {
+    rackSerialNumber: decodeURIComponent(id),
+    building,
+    block,
+    rack,
+  };
+
+  if (ticket) {
+    result.ticket = ticket;
+    result.resolveEnabled = true;
+    // intentionally do not set resolveDisabledReason (keeps it null in state)
+  } else {
+    // No ticket: read resolve fields from URL
+    result.resolveEnabled = params.get("resolveEnabled") === "true";
+    result.resolveDisabledReason = params.get("resolveDisabledReason")
+      ? decodeURIComponent(params.get("resolveDisabledReason") as string)
+      : "";
+    // and do not set ticket (remains null in state)
+  }
+
+  return result;
+}
+
 const Content = (props: Props) => {
   const [selectedPage, setSelectedPage] = useState<string>("");
   const [selectedTicket, setSelectedTicket] = useState(INIT_DEFAULT)
@@ -60,6 +98,29 @@ const Content = (props: Props) => {
     setSelectedVendor(sessionStorage.getItem("X-Oracle-Vendor") || "");
   }, [selectedVendor]);
 
+  // Hydrate rack context from URL when user refreshes /rack/{id}
+  useEffect(() => {
+    const isRackUrl = window.location.pathname.includes("/rack/");
+    if (!isRackUrl) return;
+
+    // Only hydrate if we don't already have rack context
+    if (selectedRackSerialNumber && selectedBuilding && selectedBlock && selectedRack) return;
+
+    const ctx = decodeRackUrlContext();
+    if (ctx.rackSerialNumber) setSelectedRackSerialNumber(ctx.rackSerialNumber);
+    // If URL region differs from current selected region, we currently keep the app's selected region.
+    // Region in URL is mainly for hydration / sharing; selection is still controlled by Header.
+    if (ctx.building) setSelectedBuilding(ctx.building);
+    if (ctx.block) setSelectedBlock(ctx.block);
+    if (ctx.rack) setSelectedRack(ctx.rack);
+    if (typeof ctx.ticket === "string") setSelectedTicket(ctx.ticket);
+    if (typeof ctx.resolveEnabled === "boolean") setSelectedResolveEnabled(Boolean(ctx.resolveEnabled));
+    if (typeof ctx.resolveDisabledReason === "string") setSelectedResolveDisabledReason(String(ctx.resolveDisabledReason || ""));
+
+    // Bump version so downstream effects (rackReady/navigation) can proceed
+    setRackSNVersion((v) => v + 1);
+  }, [selectedRackSerialNumber, selectedBuilding, selectedBlock, selectedRack]);
+
   const rackChangedHandler = (value: any) => {
     console.log("Rack value passed is ", value);
     setSelectedRack(value.rack);
@@ -72,7 +133,6 @@ const Content = (props: Props) => {
 
     // If re-selecting the same serial number, also bump:
     setRackSNVersion(v => v + 1);
-
     // Defer navigation until after state is committed to avoid undefined props on first Rack render
   };
 
@@ -85,7 +145,24 @@ const Content = (props: Props) => {
   useEffect(() => {
     console.log("Trying to navigate to next page,", rackReady);
     if (rackReady && !(props.page && props.page.includes("rack"))) {
-      props.onPageChanged({ path: "rack", id: selectedRackSerialNumber });
+      // Build query according to rules:
+      // - If ticket is present (non-empty), include ticket only; omit resolveEnabled/resolveDisabledReason
+      // - If ticket is absent, include resolveEnabled and resolveDisabledReason; omit ticket
+      const hasTicket = String(selectedTicket || "").trim() !== "";
+      const queryObj: Record<string, string> = {
+        region: String(props.region || ""),
+        building: String(selectedBuilding || ""),
+        block: String(selectedBlock || ""),
+        rack: String(selectedRack || ""),
+      };
+      if (hasTicket) {
+        queryObj.ticket = String(selectedTicket);
+      } else {
+        queryObj.resolveEnabled = String(Boolean(selectedResolveEnabled));
+        queryObj.resolveDisabledReason = String(selectedResolveDisabledReason || "");
+      }
+
+      props.onPageChanged({ path: "rack", id: selectedRackSerialNumber, query: queryObj });
     }
   }, [rackReady, rackSNVersion]);
 
