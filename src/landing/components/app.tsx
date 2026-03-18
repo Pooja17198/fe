@@ -40,6 +40,11 @@ const routeArray: Array<any> = [
 const router = new CoreRouter<CoreRouter.DetailedRouteConfig>(routeArray, {
   urlAdapter: new UrlPathParamAdapter("/"),
 });
+
+// ─── Session constants ────────────────────────────────────────────────────────
+const TOKEN_REFRESH_MS      = 15 * 60 * 1000;     // refresh IDCS token every 15 min
+const RELAUNCH_AUTH_URL     = "/";          // force fresh login flow
+
 type Route = {
   path: string;
   id?: string;
@@ -70,12 +75,16 @@ const pageChangeHandler = async (route: Route) => {
 };
 
 export const App = registerCustomElement("app-root", (props: Props) => {
-  const [selectedVendor, setSelectedVendor] = useState("XYZ");
-  const [selectedRegion, setSelectedRegion] = useState<string>("us-phoenix-1");
+    const [selectedVendor, setSelectedVendor] = useState("XYZ");
+    const [selectedRegion, setSelectedRegion] = useState<string>("us-phoenix-1");
 
     props.appName = "LVV Portal";
     props.userLogin = sessionStorage.getItem("X-Oracle-Vendor-Email") || "";
     const [routePath, setRoutePath] = useState<string>('');
+
+    const tokenRefreshTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+    const refreshInFlightRef = useRef(false);
+    const redirectingRef     = useRef(false);
 
 
     const routerUpdated = (actionable: CoreRouter.ActionableState<CoreRouter.DetailedRouteConfig>): void => {
@@ -87,11 +96,53 @@ export const App = registerCustomElement("app-root", (props: Props) => {
     const vendorChangedHandler = (vendor: string) => {
       setSelectedVendor(vendor)
       console.log(selectedVendor)
-    }
+    };
 
     const regionChangedHandler = (region: string) => {
       setSelectedRegion(region);
-    }
+    };
+
+    const redirectToLogin = () => {
+      if (redirectingRef.current) return;
+      redirectingRef.current = true;
+      stopTokenRefresh();
+      window.location.assign(RELAUNCH_AUTH_URL);
+    };
+
+// ─── Token refresh (SPLAT/IDCS callback) ────────────────────────────────────
+    const refreshToken = async () => {
+      if (refreshInFlightRef.current || redirectingRef.current) return;
+      refreshInFlightRef.current = true;
+      const refreshUrl = `/callback?refresh&_=${Date.now()}`;
+      try {
+        const response = await fetch(refreshUrl, {
+          method: "GET",
+          credentials: "same-origin",
+          cache: "no-store",
+          redirect: "follow",
+        });
+
+        if (!response.ok) {
+          throw new Error(`Refresh failed with status ${response.status}`);
+        }
+      } catch (err) {
+        console.error("Token refresh failed, redirecting to login.", err);
+        redirectToLogin();
+      } finally {
+        refreshInFlightRef.current = false;
+      }
+    };
+
+      const startTokenRefresh = () => {
+        void refreshToken();
+        tokenRefreshTimer.current = setInterval(() => {
+          void refreshToken();
+        }, TOKEN_REFRESH_MS);
+      };
+
+      const stopTokenRefresh = () => {
+        if (tokenRefreshTimer.current) clearInterval(tokenRefreshTimer.current);
+      };
 
     useEffect(() => {
       Context.getPageContext().getBusyContext().applicationBootstrapComplete();
@@ -112,7 +163,12 @@ export const App = registerCustomElement("app-root", (props: Props) => {
 
       router.currentState.subscribe(routerUpdated);
       router.sync();
-    }, [selectedVendor]);
+      startTokenRefresh();
+
+      return () => {
+        stopTokenRefresh();
+      };
+    }, []);
     
     return (
       <div id="appContainer" class="oj-web-applayout-page">
