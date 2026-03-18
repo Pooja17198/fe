@@ -76,6 +76,23 @@ const EMPTY_DEVICE_FAILURES: DeviceValidationFailures = {
   hasPsuFailure: false,
 };
 
+function getSectionColumns(section: TestSectionConfig, sectionRows: any[]): any[] {
+  if (section.id !== "fecBer") {
+    return [...section.columns];
+  }
+
+  const hasErrorMessage = sectionRows.some((row) => {
+    const errorMessage = row?.errorMessage;
+    return typeof errorMessage === "string" && errorMessage.trim() !== "";
+  });
+
+  if (hasErrorMessage) {
+    return [...section.columns];
+  }
+
+  return section.columns.filter((column) => column.id !== "errorMessage");
+}
+
 function getRowsForSection(
     deviceFailures: DeviceValidationFailures,
     section: TestSectionConfig["id"]
@@ -445,6 +462,7 @@ const DeviceAccordion = (props: Props) => {
                                 {TEST_SECTIONS.map((section) => {
                                   const sectionRows = getRowsForSection(deviceFailures, section.id);
                                   if (!sectionRows.length) return null;
+                                  const sectionColumns = getSectionColumns(section, sectionRows);
                                   const sectionDataProvider = new ArrayDataProvider(sectionRows, {
                                     keyAttributes: "_key",
                                   });
@@ -472,7 +490,7 @@ const DeviceAccordion = (props: Props) => {
                                                 accessibility={ACC}
                                                 scroll-policy="loadMoreOnScroll"
                                                 scroll-policy-options='{"fetchSize": 10}'
-                                                columns={[...section.columns]}
+                                                columns={sectionColumns}
                                                 data={sectionDataProvider}
                                             >
                                               <template slot="lldpStatusTemplate" render={lldpStatusTemplate} />
