@@ -16,7 +16,62 @@ import {
   OPTIC_FAILURE_COLUMNS,
 } from "./columns";
 import { booleanStatusTemplate, lldpStatusTemplate, psuStatusTemplate } from "./templates";
-import { formatStatusLabel, getStatusClass } from "./utils";
+import { formatStatusLabel, getStatusClass, isDeviceStatusCompleted } from "./utils";
+
+type ValidationAgeColor = "green" | "orange" | "red";
+
+const VALIDATION_AGE_THRESHOLDS_MS = {
+  // when currentTime - lastValidated <= GREEN_MAX then display green color
+  // else when currentTime - lastValidated >= RED_MIN then display red color
+  // else display orange color
+  GREEN_MAX: 2 * 60 * 1000,
+  RED_MIN: 10 * 60 * 1000,
+} as const;
+
+function parseLastValidatedTimestampMs(lastValidatedAt?: string | null): number | null {
+  if (!lastValidatedAt || lastValidatedAt.trim() === "") return null;
+  const parsedTimestampMs = Date.parse(lastValidatedAt);
+  return Number.isFinite(parsedTimestampMs) ? parsedTimestampMs : null;
+}
+
+function resolveValidationAgeColor(
+    lastValidatedAt: string | null | undefined,
+    referenceTimeMs: number
+): ValidationAgeColor {
+  const lastValidatedTimestampMs = parseLastValidatedTimestampMs(lastValidatedAt);
+  if (lastValidatedTimestampMs === null) return "red";
+
+  const elapsedSinceValidationMs = Math.max(0, referenceTimeMs - lastValidatedTimestampMs);
+  if (elapsedSinceValidationMs <= VALIDATION_AGE_THRESHOLDS_MS.GREEN_MAX) return "green";
+  if (elapsedSinceValidationMs >= VALIDATION_AGE_THRESHOLDS_MS.RED_MIN) return "red";
+  return "orange";
+}
+
+function getNextValidationColorTransitionAtMs(
+    lastValidatedAt: string | null | undefined,
+    referenceTimeMs: number
+): number | null {
+  const lastValidatedTimestampMs = parseLastValidatedTimestampMs(lastValidatedAt);
+  if (lastValidatedTimestampMs === null) return null;
+
+  const elapsedSinceValidationMs = Math.max(0, referenceTimeMs - lastValidatedTimestampMs);
+  if (elapsedSinceValidationMs <= VALIDATION_AGE_THRESHOLDS_MS.GREEN_MAX) {
+    return lastValidatedTimestampMs + VALIDATION_AGE_THRESHOLDS_MS.GREEN_MAX + 50;
+  }
+  if (elapsedSinceValidationMs < VALIDATION_AGE_THRESHOLDS_MS.RED_MIN) {
+    return lastValidatedTimestampMs + VALIDATION_AGE_THRESHOLDS_MS.RED_MIN + 50;
+  }
+  return null;
+}
+
+function isDeviceNotEligibleForValidation(
+    device: DeviceStatus,
+    _deviceFailures: DeviceValidationFailures
+): boolean {
+  // Eligibility is computed upstream in useRackValidation and attached on DeviceStatus.
+  // Treat explicit false as not eligible; undefined stays backward-compatible as eligible.
+  return device.validationEligible === false;
+}
 
 type Props = {
   devices: DeviceStatus[];
@@ -55,6 +110,7 @@ const TEST_SECTIONS: TestSectionConfig[] = [
 
 const EMPTY_DEVICE_FAILURES: DeviceValidationFailures = {
   deviceName: "",
+  lastValidated: null,
   tests: {
     lldp: [],
     optics: [],
@@ -76,6 +132,7 @@ const EMPTY_DEVICE_FAILURES: DeviceValidationFailures = {
   hasPsuFailure: false,
 };
 
+
 function getSectionColumns(section: TestSectionConfig, sectionRows: any[]): any[] {
   if (section.id !== "fecBer") {
     return [...section.columns];
@@ -91,6 +148,13 @@ function getSectionColumns(section: TestSectionConfig, sectionRows: any[]): any[
   }
 
   return section.columns.filter((column) => column.id !== "errorMessage");
+}
+
+function buildDeviceFailuresFallback(deviceName: string): DeviceValidationFailures {
+  return {
+    ...EMPTY_DEVICE_FAILURES,
+    deviceName,
+  };
 }
 
 function getRowsForSection(
@@ -125,6 +189,7 @@ const DeviceAccordion = (props: Props) => {
   const ACC = VALIDATION_TABLE_ACCESSIBILITY;
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
   const [accordionNonce, setAccordionNonce] = useState(0);
+  const [validationReferenceTimeMs, setValidationReferenceTimeMs] = useState<number>(Date.now());
 
   useEffect(() => {
     if (typeof props.externalExpandedKeysNonce === "number") {
@@ -218,6 +283,43 @@ const DeviceAccordion = (props: Props) => {
     return [...props.devices].sort((a, b) => (b.elevation ?? -Infinity) - (a.elevation ?? -Infinity));
   }, [props.devices]);
 
+  useEffect(() => {
+    setValidationReferenceTimeMs(Date.now());
+  }, [props.validationFailuresByDevice]);
+
+  useEffect(() => {
+    const currentTimeMs = Date.now();
+    const upcomingColorTransitionTimesMs = sortedDevices
+        .map((device) => {
+          const deviceFailures =
+              filteredFailuresByDevice[device.deviceName] || buildDeviceFailuresFallback(device.deviceName);
+          if (isDeviceNotEligibleForValidation(device, deviceFailures)) {
+            return null;
+          }
+          if (!isDeviceStatusCompleted(device.jobStatus)) {
+            return null;
+          }
+          return getNextValidationColorTransitionAtMs(deviceFailures.lastValidated ?? null, currentTimeMs);
+        })
+        .filter((value): value is number => typeof value === "number" && Number.isFinite(value));
+
+    if (upcomingColorTransitionTimesMs.length === 0) {
+      return;
+    }
+
+    // Schedule only the nearest upcoming transition time across all devices.
+    const earliestTransitionTimeMs = Math.min(...upcomingColorTransitionTimesMs);
+    // Keep a minimum 1s delay to avoid immediate/negative timer jitter near boundary.
+    const waitDurationMs = Math.max(1000, earliestTransitionTimeMs - currentTimeMs);
+    const transitionTimeoutId = window.setTimeout(() => {
+      setValidationReferenceTimeMs(Date.now());
+    }, waitDurationMs);
+
+    return () => {
+      window.clearTimeout(transitionTimeoutId);
+    };
+  }, [sortedDevices, filteredFailuresByDevice, validationReferenceTimeMs]);
+
   // Compute selection helpers for "Select All" behavior
   const eligibleDeviceKeys = useMemo(
       () =>
@@ -299,6 +401,25 @@ const DeviceAccordion = (props: Props) => {
     );
   };
 
+  const renderLastValidated = (device: DeviceStatus, deviceFailures: DeviceValidationFailures) => {
+    if (isDeviceNotEligibleForValidation(device, deviceFailures)) {
+      return <span className="device-last-validated-na">N/A</span>;
+    }
+
+    if (!isDeviceStatusCompleted(device.jobStatus)) {
+      return null;
+    }
+
+    const validationColor = resolveValidationAgeColor(deviceFailures.lastValidated, validationReferenceTimeMs);
+    return (
+        <span
+            className={`device-last-validated-dot ${validationColor}`}
+            title={`Last validated indicator: ${validationColor}`}
+            aria-label={`Last validated status ${validationColor}`}
+        />
+    );
+  };
+
   return (
       <div class="rack-page">
         {props.loading ? (
@@ -360,7 +481,27 @@ const DeviceAccordion = (props: Props) => {
                     }
                   })()}
 
-              <div class="device-accordion-columns-header full-bleed">
+              <div class="device-last-validated-legend full-bleed">
+                <span className="device-accordion-legend-title">Last Validated Legend</span>
+                <span className="device-accordion-legend-item">
+                  <span className="device-last-validated-dot green legend" />
+                  Within last 2 minutes
+                </span>
+                <span className="device-accordion-legend-item">
+                  <span className="device-last-validated-dot orange legend" />
+                  Between 2 to 10 min ago
+                </span>
+                <span className="device-accordion-legend-item">
+                  <span className="device-last-validated-dot red legend" />
+                  Over 10 minutes ago
+                </span>
+                <span className="device-accordion-legend-item">
+                  <span className="device-last-validated-na">N/A</span>
+                  Not eligible for validation
+                </span>
+              </div>
+
+              <div class="device-accordion-columns-header full-bleed device-table-columns-header">
             <span class="device-col select">
               <input
                   ref={selectAllRef}
@@ -379,14 +520,13 @@ const DeviceAccordion = (props: Props) => {
                 <span>Elevation</span>
                 <span>Errors</span>
                 <span>PSU Status</span>
+                <span>Last Validated</span>
                 <span>Status</span>
               </div>
               <oj-accordion id="deviceAccordion" key={accordionNonce} multiple={true}>
                 {sortedDevices.map((device, idx) => {
-                  const deviceFailures = filteredFailuresByDevice[device.deviceName] || {
-                    ...EMPTY_DEVICE_FAILURES,
-                    deviceName: device.deviceName,
-                  };
+                  const deviceFailures =
+                      filteredFailuresByDevice[device.deviceName] || buildDeviceFailuresFallback(device.deviceName);
                   const hasDeviceFailures = deviceFailures.counts.nonPowerTotal > 0;
                   const psuStatus = getPsuStatusLabel(device.jobStatus, deviceFailures.hasPsuFailure);
                   const isExpanded = expandedKeys.has(device._key);
@@ -445,6 +585,8 @@ const DeviceAccordion = (props: Props) => {
                           </span>
                         )}
                       </span>
+
+                            <span className="device-col last-validated">{renderLastValidated(device, deviceFailures)}</span>
 
                             {/* Status */}
                             <span className="device-col status">

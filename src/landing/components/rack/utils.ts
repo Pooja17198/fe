@@ -22,6 +22,10 @@ export function formatStatusLabel(status: string): string {
     .replace(/\w\S*/g, (w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
 }
 
+export function isDeviceStatusCompleted(jobStatus: string | null | undefined): boolean {
+  return (jobStatus || "").toUpperCase() === "COMPLETED";
+}
+
 export function parseContentDispositionFilename(cdHeader: string, fallback: string): string {
   try {
     const match = cdHeader.match(/filename\*=UTF-8''([^;]+)|filename="?([^";]+)"?/i);

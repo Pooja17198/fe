@@ -310,7 +310,7 @@
     padding: 8px 12px 24px;
     box-sizing: border-box;
     /* Ensure header/row columns always fit without horizontal scroll */
-    --device-accordion-cols: minmax(24px, 28px) 1fr 7rem minmax(200px, 2fr) 8rem 10rem;
+    --device-accordion-cols: minmax(24px, 28px) minmax(300px, 1.5fr) 7rem minmax(220px, 2fr) 8rem 8rem 7.1rem;
 }
 
 /* Action buttons bar */
@@ -408,7 +408,7 @@
 /* DeviceAccordion columns layout */
 .rack-page .device-accordion-columns-header {
     display: grid;
-    grid-template-columns: var(--device-accordion-cols, minmax(24px, 28px) minmax(220px, 1fr) minmax(64px, 120px) minmax(200px, 2fr) minmax(96px, 140px) minmax(120px, 220px));
+    grid-template-columns: var(--device-accordion-cols, minmax(24px, 28px) minmax(300px, 1.5fr) minmax(64px, 120px) minmax(220px, 2fr) minmax(96px, 140px) minmax(90px, 140px) minmax(120px, 220px));
     gap: 12px;
     align-items: center;
     padding: 6px 12px;
@@ -427,11 +427,12 @@
 .rack-page .device-accordion-columns-header span:nth-child(3) { justify-self: start; }
 .rack-page .device-accordion-columns-header span:nth-child(4) { justify-self: start; }
 .rack-page .device-accordion-columns-header span:nth-child(5) { justify-self: center; }
-.rack-page .device-accordion-columns-header span:nth-child(6) { justify-self: end; text-align: right; }
+.rack-page .device-accordion-columns-header span:nth-child(6) { justify-self: center; }
+.rack-page .device-accordion-columns-header span:nth-child(7) { justify-self: end; text-align: right; }
 
 .rack-page .device-accordion-header-row {
     display: grid !important;
-    grid-template-columns: var(--device-accordion-cols, minmax(24px, 28px) minmax(220px, 1fr) minmax(64px, 120px) minmax(200px, 2fr) minmax(96px, 140px) minmax(120px, 220px)) !important;
+    grid-template-columns: var(--device-accordion-cols, minmax(24px, 28px) minmax(300px, 1.5fr) minmax(64px, 120px) minmax(220px, 2fr) minmax(96px, 140px) minmax(90px, 140px) minmax(120px, 220px)) !important;
     gap: 12px;
     align-items: center !important;
     width: 100%;
@@ -461,6 +462,10 @@
     min-width: 0; /* allow child to truncate */
 }
 
+.rack-page .device-accordion-header-row .device-col.last-validated {
+    justify-self: center;
+}
+
 .rack-page .device-accordion-header-row .device-col.errors {
     justify-self: start;
 }
@@ -471,6 +476,87 @@
 
 .rack-page .device-accordion-header-row .device-col.status {
     justify-self: end;
+}
+
+.device-last-validated-legend {
+    display: grid;
+    grid-template-columns: max-content repeat(4, minmax(0, 1fr));
+    align-items: center;
+    column-gap: 16px;
+    row-gap: 8px;
+    padding: 10px 12px;
+    margin: 10px 0 6px;
+    background: #ffffff;
+    border: 1px solid #d8e1ed;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(31, 42, 68, 0.06);
+}
+
+.device-accordion-legend-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #2a3f5f;
+    white-space: nowrap;
+}
+
+.device-accordion-legend-item {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 8px;
+    color: #36506f;
+    font-size: 0.88rem;
+    white-space: nowrap;
+}
+
+@media (max-width: 1320px) {
+    .device-last-validated-legend {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .device-accordion-legend-title {
+        grid-column: 1 / -1;
+    }
+}
+
+.device-last-validated-dot {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 999px;
+    flex-shrink: 0;
+}
+
+.device-last-validated-dot.legend {
+    width: 10px;
+    height: 10px;
+}
+
+.device-last-validated-dot.green {
+    background: #12b76a;
+}
+
+.device-last-validated-dot.orange {
+    background: #f79009;
+}
+
+.device-last-validated-dot.red {
+    background: #f04438;
+}
+
+.device-last-validated-na {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    height: 22px;
+    border-radius: 11px;
+    background: #eef2f7;
+    border: 1px solid #d0d5dd;
+    color: #475467;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1;
 }
 
 /* Optional: better truncation for long device names in the name column */

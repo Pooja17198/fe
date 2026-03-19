@@ -813,6 +813,7 @@ function pick(record: RowRecord, keys: string[], fallback: string = "Unknown"): 
 function buildEmptyDeviceValidationFailures(deviceName: string): DeviceValidationFailures {
     return {
         deviceName,
+        lastValidated: null,
         tests: {
             lldp: [],
             optics: [],
@@ -1019,6 +1020,11 @@ function normalizeValidationFailuresPayload(
         }
 
         const current = buildEmptyDeviceValidationFailures(deviceName);
+        const lastValidatedValue = resultsRecord["Last Validated"];
+        current.lastValidated =
+            lastValidatedValue === null || lastValidatedValue === undefined
+                ? null
+                : String(lastValidatedValue).trim() || null;
         current.tests.lldp = asArray(resultsRecord["LLDP Errors"]).map((row, idx) =>
             mapLldpRow(row, deviceName, idx)
         );

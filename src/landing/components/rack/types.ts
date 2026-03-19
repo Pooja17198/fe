@@ -96,6 +96,7 @@ export interface PowerFailureRow {
 
 export interface DeviceValidationFailures {
   deviceName: string;
+  lastValidated?: string | null;
   tests: {
     lldp: LldpFailureRow[];
     optics: OpticFailureRow[];

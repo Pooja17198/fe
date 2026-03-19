@@ -93,7 +93,7 @@ const ProjectDetailsContainer = (props: Props) => {
     const [hideMissingSerial, setHideMissingSerial] = useState(false);
     const [pageSize, setPageSize] = useState<number>(25);
     const requestSeqRef = useRef(0);
-    const [showAvailable, setShowAvailable] = useState(false);
+    const [includeInServiceRacks, setIncludeInServiceRacks] = useState(false);
     const allBlocks = useMemo(() => {
         const src = Array.isArray(props.project?.blocks) ? props.project.blocks : [];
         return Array.from(
@@ -196,8 +196,8 @@ const ProjectDetailsContainer = (props: Props) => {
 
         let rows = allProjectData.filter((row) => row.block && activeBlocks.includes(row.block));
 
-        if (!showAvailable) {
-            rows = rows.filter((row) => (row.rackState || '').toUpperCase() !== 'AVAILABLE');
+        if (!includeInServiceRacks) {
+            rows = rows.filter((row) => (row.rackState || '').toUpperCase() !== 'IN-SERVICE');
         }
 
         if (hideMissingSerial) {
@@ -221,7 +221,7 @@ const ProjectDetailsContainer = (props: Props) => {
         }
 
         return rows;
-    }, [activeBlocks, allProjectData, hideMissingSerial, searchText, showAvailable]);
+    }, [activeBlocks, allProjectData, hideMissingSerial, searchText, includeInServiceRacks]);
 
     const baseDataProvider = useMemo(
         () => new ArrayDataProvider(filteredRows, { keyAttributes: "_key" }),
@@ -236,7 +236,7 @@ const ProjectDetailsContainer = (props: Props) => {
     // Reset paging when filters change or page size changes
     useEffect(() => {
         (pagingDataProvider as any).setPage(0, { pageSize });
-    }, [pagingDataProvider, pageSize, searchText, hideMissingSerial, activeBlocks, showAvailable]);
+    }, [pagingDataProvider, pageSize, searchText, hideMissingSerial, activeBlocks, includeInServiceRacks]);
 
     // This resets the selectedRowKeySet to empty, so that same row selection triggers onSelectionChangedHandler
     const [selectedRowKeySet, setSelectedRowKeySet] = useState<KeySetImpl<any>>(new KeySetImpl<any>());
@@ -286,8 +286,8 @@ const ProjectDetailsContainer = (props: Props) => {
                 <label style={{display:'flex', alignItems : 'center', gap: '8px' }}>
                     <input
                         type="checkbox"
-                        checked={showAvailable}
-                        onChange={(e: any) => setShowAvailable((e.target as HTMLInputElement).checked)}
+                        checked={includeInServiceRacks}
+                        onChange={(e: any) => setIncludeInServiceRacks((e.target as HTMLInputElement).checked)}
                     />
                     Include in-service racks
                 </label>
