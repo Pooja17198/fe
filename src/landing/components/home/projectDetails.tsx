@@ -10,6 +10,7 @@ import "ojs/ojpagingcontrol";
 
 const RACK_COLUMNS = [
     { headerText: "Rack Location", field: "rackLocation", id: "rackLocation", resizable: "enabled" as const, sortable: 'enabled' as const },
+    { headerText: "Platform", field: "platformName", id: "platformName", resizable: "enabled" as const, sortable: 'enabled' as const },
     { headerText: "Block", field: "block", id: "block", resizable: "enabled" as const, sortable: 'enabled' as const },
     { headerText: "Rack Serial Number", field: "rackSerialNumber", id: "rackSerialNumber", resizable: "enabled" as const, sortable: 'enabled' as const },
     { headerText: "Issue(s) Type", field: "ticketType", id: "ticketType", resizable: "enabled" as const, sortable: 'enabled' as const },
@@ -273,7 +274,7 @@ const ProjectDetailsContainer = (props: Props) => {
                     <input
                         type="text"
                         value={searchText}
-                        placeholder="Search rack location / block / serial / type / ticket"
+                        placeholder="Search rack location / platform / block / serial / type / ticket"
                         onInput={(e: any) =>
                             setSearchText((e.target as HTMLInputElement).value)
                         }
