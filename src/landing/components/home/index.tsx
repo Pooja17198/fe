@@ -1,8 +1,9 @@
 import { h } from "preact";
 import ProjectTableContainer from "./projectTable";
 import MutableArrayDataProvider = require("ojs/ojmutablearraydataprovider");
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 import ProjectDetailsContainer from "./projectDetails";
+import { ProjectLoadMeasurement } from "./types";
 import "ojs/ojprogress-circle";
 
 
@@ -97,10 +98,13 @@ const HomeContainer = (props: Props) => {
     const [selectedProject, setSelectedProject] = useState(
         INIT_SELECTEDPROJECT
     );
+    const [projectLoadMeasurement, setProjectLoadMeasurement] = useState<ProjectLoadMeasurement | null>(null);
+    const projectMeasurementIdRef = useRef(0);
 
     // Reset selectedProject to initial state whenever region changes
     useEffect(() => {
         setSelectedProject(INIT_SELECTEDPROJECT);
+        setProjectLoadMeasurement(null);
     }, [props.region]);
 
     const showProjectDetails = () => {
@@ -109,10 +113,17 @@ const HomeContainer = (props: Props) => {
 
     const projectChangedHandler = (value: ProjectMetadata) => {
         setSelectedProject(value);
+        const measurementId = ++projectMeasurementIdRef.current;
+        setProjectLoadMeasurement({
+            measurementId,
+            projectId: value.projectId,
+            startedAt: Date.now(),
+        });
     };
 
     const rackSelectedHandler = (value: any) => {
         let info = {
+            project: selectedProject?.projectId,
             building: value.building,
             block: value.block,
             rack: value.rackLocation,
@@ -137,7 +148,12 @@ const HomeContainer = (props: Props) => {
                 : <ProjectTableContainer data={projectListProvider} onProjectChanged={projectChangedHandler} />
             }
             {showProjectDetails() && (
-                <ProjectDetailsContainer project={selectedProject} onRackChanged={rackSelectedHandler} region={props.region}/>
+                <ProjectDetailsContainer
+                    project={selectedProject}
+                    onRackChanged={rackSelectedHandler}
+                    region={props.region}
+                    projectLoadMeasurement={projectLoadMeasurement}
+                />
             )}
             {!showProjectDetails() && (
                 <div id="parentContainer2" class="oj-flex oj-flex-item oj-md-8 oj-sm-12">

@@ -16,6 +16,7 @@ import {
 import { LVV_API, POLLING } from "../constants";
 import { fetchWithRetry, createCsrfHeaders } from "../api";
 import { anyJobInProgress, parseContentDispositionFilename } from "../utils";
+import { emitMetric, TELEMETRY_METRICS } from "../../telemetry/api";
 
 type UseRackValidationResult = {
     // state
@@ -49,6 +50,13 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
     const previousStatusesRef = useRef<Map<string, string>>(new Map());
     const currentRackKeyRef = useRef<string>("");
     const pageAbortRef = useRef<AbortController | null>(null);
+    const validationMeasurementRef = useRef<null | {
+        measurementId: number;
+        startedAt: number;
+        selectedDeviceCount: number;
+        rackKey: string;
+    }>(null);
+    const emittedValidationMeasurementRef = useRef<number | null>(null);
 
     // core state
     const [deviceStatuses, setDeviceStatuses] = useState<DeviceStatus[]>([]);
@@ -59,6 +67,12 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
     const [isValidating, setIsValidating] = useState(false);
     const [jobErrorDetails, setJobErrorDetails] = useState<JobErrorDetails>(null);
     const [isDownloading, setIsDownloading] = useState(false);
+    const [completedValidationMeasurement, setCompletedValidationMeasurement] = useState<null | {
+        measurementId: number;
+        startedAt: number;
+        selectedDeviceCount: number;
+        rackKey: string;
+    }>(null);
 
     // derived
     const resolveFeatureEnabled = props.resolveEnabled !== false; // default to enabled if undefined
@@ -108,6 +122,8 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
         }
         currentRackKeyRef.current = nextKey;
         pageAbortRef.current = new AbortController();
+        validationMeasurementRef.current = null;
+        setCompletedValidationMeasurement(null);
     }, [rackContextReady, props.region, props.rack_serial, props.rack]);
 
     // reset status tracking map on rack context change
@@ -129,8 +145,43 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
                 pageAbortRef.current.abort();
                 // Keep the aborted controller so in-flight loops can detect aborted === true
             }
+            validationMeasurementRef.current = null;
         };
     },[]);
+
+    useEffect(() => {
+        if (isValidating) return;
+        if (jobErrorDetails) return;
+        if (!completedValidationMeasurement) return;
+        if (completedValidationMeasurement.rackKey !== currentRackKeyRef.current) return;
+        if (emittedValidationMeasurementRef.current === completedValidationMeasurement.measurementId) return;
+
+        const raf = requestAnimationFrame(() => {
+            void emitMetric(TELEMETRY_METRICS.VALIDATION_RESULT_DISPLAY_LATENCY, Date.now() - completedValidationMeasurement.startedAt, {
+                region: props.region,
+                building: props.building,
+                block: props.block,
+                project: props.project,
+                rackNumber: props.rack,
+                rackSerial: props.rack_serial,
+                selectedDeviceCount: completedValidationMeasurement.selectedDeviceCount,
+            }).catch(() => undefined);
+            emittedValidationMeasurementRef.current = completedValidationMeasurement.measurementId;
+        });
+
+        return () => cancelAnimationFrame(raf);
+    }, [
+        isValidating,
+        jobErrorDetails,
+        completedValidationMeasurement,
+        validationFailuresByDevice,
+        props.region,
+        props.building,
+        props.block,
+        props.project,
+        props.rack,
+        props.rack_serial,
+    ]);
 
     const fetchDeviceValidationStatuses = useCallback(async (): Promise<boolean> => {
         setDevicesLoading(true);
@@ -170,10 +221,10 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
         return false;
     }, [props.region, props.rack, props.building, props.rack_serial]);
 
-    const fetchValidationFailures = useCallback(async () => {
+    const fetchValidationFailures = useCallback(async (): Promise<boolean> => {
         try {
             if (!props.rack_serial || !props.region) {
-                return;
+                return false;
             }
             const url = new URL(`${LVV_API}/cablingValidation`);
             url.searchParams.set("regionName", props.region);
@@ -184,13 +235,15 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
                 signal: pageAbortRef.current?.signal as AbortSignal | undefined,
             });
             if (!resp.ok) {
-                return;
+                return false;
             }
             const data: unknown = await resp.json();
             const normalized = normalizeValidationFailuresPayload(data, props.rack_serial);
             setValidationFailuresByDevice(normalized);
+            return true;
         } catch (e: any) {
-            if (e?.name === "AbortError") return;
+            if (e?.name === "AbortError") return false;
+            return false;
         }
     }, [props.region, props.rack_serial]);
 
@@ -203,7 +256,7 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
         const expectedKey = `${props.region}|${props.rack_serial}|${props.rack}`;
         const startSignal = pageAbortRef.current?.signal as AbortSignal | undefined;
 
-        (async () => {
+        void (async () => {
             const inProgress = await fetchDeviceValidationStatuses();
 
             const sameContext = currentRackKeyRef.current === expectedKey;
@@ -218,7 +271,15 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
                     await fetchValidationFailures();
                 }
             }
-        })();
+        })().catch((e: any) => {
+            if (e?.name === "AbortError") {
+                return;
+            }
+            setJobErrorDetails({
+                message: e?.message ? e.message : "An unknown error occurred during validation polling.",
+            });
+            setIsValidating(false);
+        });
     }, [rackContextReady, fetchDeviceValidationStatuses, fetchValidationFailures, props.region, props.rack_serial, props.rack]);
 
     // POST to start validation job
@@ -288,7 +349,7 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
 
     // poll validation job and keep UI state in sync
     const pollValidationJob = useCallback(
-        async (headers: Headers) => {
+        async (headers: Headers): Promise<boolean> => {
             const previousStatuses = previousStatusesRef.current || new Map();
             const expectedKey = currentRackKeyRef.current;
             const startSignal = pageAbortRef.current?.signal as AbortSignal | undefined;
@@ -311,7 +372,7 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
                 } catch (e: any) {
                     if (e?.name === "AbortError") {
                         //If we navigate back to home page, this stops the polling if teh request is in-flight
-                        break;
+                        return false;
                     }
                     throw e;
                 }
@@ -393,8 +454,7 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
                         // This avoids stale/empty UI when returning to the page and the previous
                         // status map has been reset.
                         if (!inProgress) {
-                            await fetchValidationFailures();
-                            return;
+                            return await fetchValidationFailures();
                         }
                     } else {
                         setIsValidating(false);
@@ -423,22 +483,35 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
                             setIsValidating(false);
                         }
                     }
-                    break;
+                    return false;
                 }
 
                 if (attempt < POLLING.MAX_ATTEMPTS - 1) {
                     await new Promise((res) => setTimeout(res, POLLING.INTERVAL_MS));
                     // If we are waiting for the next poll, and navigate to home page, this stops the polling once the timeout completes
                     if (startSignal?.aborted) {
-                        break;
+                        return false;
                     }
                 }
             }
+
+            return false;
         },
         [props.region, props.rack_serial, props.rack, fetchValidationFailures]
     );
 
     const validate = useCallback(async () => {
+        const selectedDeviceCount = selectedLinkKeys.size > 0
+            ? Array.from(selectedLinkKeys).filter((key) => eligibleDeviceNameSet.has(selectedKeyToDeviceName(key))).length
+            : eligibleDeviceNames.length;
+        const measurement = {
+            measurementId: Date.now() + Math.floor(Math.random() * 1000),
+            startedAt: Date.now(),
+            selectedDeviceCount,
+            rackKey: currentRackKeyRef.current,
+        };
+        validationMeasurementRef.current = measurement;
+        setCompletedValidationMeasurement(null);
         setIsValidating(true);
         setJobErrorDetails(null);
         if (!pageAbortRef.current) {
@@ -450,28 +523,34 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
         try {
             const startResult = await startValidationJob();
             if (startResult && (startResult as any).error) {
+                validationMeasurementRef.current = null;
                 errorOccurred = true;
                 setJobErrorDetails((startResult as any).error);
                 setIsValidating(false);
                 return;
             }
-            await pollValidationJob(headers);
+            const completed = await pollValidationJob(headers);
+            if (
+                completed &&
+                validationMeasurementRef.current &&
+                validationMeasurementRef.current.rackKey === currentRackKeyRef.current
+            ) {
+                setCompletedValidationMeasurement(validationMeasurementRef.current);
+            }
         } catch (e: any) {
             if (e?.name === "AbortError") {
+                validationMeasurementRef.current = null;
                 setIsValidating(false);
                 return;
             }
+            validationMeasurementRef.current = null;
             errorOccurred = true;
             setJobErrorDetails({
                 message: e?.message ? e.message : "An unknown error occurred during validation.",
             });
             setIsValidating(false);
-        } finally {
-            if (!errorOccurred) {
-                await fetchValidationFailures();
-            }
         }
-    }, [startValidationJob, pollValidationJob, fetchValidationFailures]);
+    }, [startValidationJob, pollValidationJob, fetchValidationFailures, selectedLinkKeys, eligibleDeviceNameSet, eligibleDeviceNames]);
 
     const resolve = useCallback(async (): Promise<{ ok: true } | { ok: false; message: string }> => {
         if (!resolveAllowed) {

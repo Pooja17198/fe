@@ -34,6 +34,7 @@ type RackMetadata = {
   building: string;
   block: string;
   rack: string;
+  project?: string;
   ticket: string;
   rackSerialNumber?: string;
   resolveEnabled?: boolean;
@@ -41,7 +42,7 @@ type RackMetadata = {
 }
 
 function decodeRackUrlContext(): Partial<RackMetadata> {
-  // URL format: /rack/{rackSerialNumber}?region=...&building=...&block=...&rack=...&ticket=...&resolveEnabled=...&resolveDisabledReason=...
+  // URL format: /rack/{rackSerialNumber}?region=...&project=...&building=...&block=...&rack=...&ticket=...&resolveEnabled=...&resolveDisabledReason=...
   const match = window.location.pathname.match(/^\/rack\/([^/]+)\/?$/);
   if (!match) return {};
   const [, id] = match;
@@ -50,6 +51,7 @@ function decodeRackUrlContext(): Partial<RackMetadata> {
   const building = params.get("building") ? decodeURIComponent(params.get("building") as string) : "";
   const block = params.get("block") ? decodeURIComponent(params.get("block") as string) : "";
   const rack = params.get("rack") ? decodeURIComponent(params.get("rack") as string) : "";
+  const project = params.get("project") ? decodeURIComponent(params.get("project") as string) : "";
   const ticketParam = params.get("ticket");
   const ticket = ticketParam && ticketParam.trim() !== "" ? decodeURIComponent(ticketParam) : undefined;
 
@@ -57,6 +59,7 @@ function decodeRackUrlContext(): Partial<RackMetadata> {
   // If ticket is absent: use resolveEnabled/resolveDisabledReason from URL, and treat ticket as null/undefined
   const result: Partial<RackMetadata> = {
     rackSerialNumber: decodeURIComponent(id),
+    project,
     building,
     block,
     rack,
@@ -84,6 +87,7 @@ const Content = (props: Props) => {
   const [selectedRack, setSelectedRack] = useState(INIT_DEFAULT)
   const [selectedBuilding, setSelectedBuilding] = useState(INIT_DEFAULT)
   const [selectedBlock, setSelectedBlock] = useState(INIT_DEFAULT)
+  const [selectedProject, setSelectedProject] = useState(INIT_DEFAULT)
   const [selectedRackSerialNumber, setSelectedRackSerialNumber] = useState(INIT_DEFAULT)
   const [selectedVendor, setSelectedVendor] = useState(INIT_DEFAULT);
   const [selectedResolveEnabled, setSelectedResolveEnabled] = useState<boolean>(false);
@@ -113,6 +117,7 @@ const Content = (props: Props) => {
     if (ctx.building) setSelectedBuilding(ctx.building);
     if (ctx.block) setSelectedBlock(ctx.block);
     if (ctx.rack) setSelectedRack(ctx.rack);
+    if (ctx.project) setSelectedProject(ctx.project);
     if (typeof ctx.ticket === "string") setSelectedTicket(ctx.ticket);
     if (typeof ctx.resolveEnabled === "boolean") setSelectedResolveEnabled(Boolean(ctx.resolveEnabled));
     if (typeof ctx.resolveDisabledReason === "string") setSelectedResolveDisabledReason(String(ctx.resolveDisabledReason || ""));
@@ -126,6 +131,7 @@ const Content = (props: Props) => {
     setSelectedRack(value.rack);
     setSelectedBuilding(value.building);
     setSelectedBlock(value.block);
+    setSelectedProject(value.project);
     setSelectedTicket(value.ticket);
     setSelectedResolveEnabled(value.resolveEnabled !== false);
     setSelectedResolveDisabledReason(String(value.resolveDisabledReason || ""));
@@ -151,6 +157,7 @@ const Content = (props: Props) => {
       const hasTicket = String(selectedTicket || "").trim() !== "";
       const queryObj: Record<string, string> = {
         region: String(props.region || ""),
+        project: String(selectedProject || ""),
         building: String(selectedBuilding || ""),
         block: String(selectedBlock || ""),
         rack: String(selectedRack || ""),
@@ -183,6 +190,7 @@ const Content = (props: Props) => {
                 building={selectedBuilding}
                 block={selectedBlock}
                 rack={selectedRack}
+                project={selectedProject}
                 ticket={selectedTicket}
                 rack_serial={selectedRackSerialNumber}
                 resolveEnabled={selectedResolveEnabled}
