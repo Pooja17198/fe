@@ -7,6 +7,8 @@ import { TableIntrinsicProps, ojTable } from "ojs/ojtable";
 import { KeySetImpl } from "ojs/ojkeyset";
 import "ojs/ojprogress-circle";
 import "ojs/ojpagingcontrol";
+import { ProjectLoadMeasurement } from "./types";
+import { emitMetric, TELEMETRY_METRICS } from "../telemetry/api";
 
 const RACK_COLUMNS = [
     { headerText: "Rack Location", field: "rackLocation", id: "rackLocation", resizable: "enabled" as const, sortable: 'enabled' as const },
@@ -29,6 +31,7 @@ type Props = {
     project: Project;
     onRackChanged: (value: any) => void;
     region: string;
+    projectLoadMeasurement?: ProjectLoadMeasurement | null;
 };
 
 const INIT_SELECTION_MODE: TableIntrinsicProps['selectionMode'] = {
@@ -95,6 +98,13 @@ const ProjectDetailsContainer = (props: Props) => {
     const [pageSize, setPageSize] = useState<number>(25);
     const requestSeqRef = useRef(0);
     const [includeInServiceRacks, setIncludeInServiceRacks] = useState(false);
+    const [loadedMeasurement, setLoadedMeasurement] = useState<null | {
+        measurementId: number;
+        startedAt: number;
+        rackCount: number;
+        projectId: string;
+    }>(null);
+    const emittedProjectMeasurementRef = useRef<number | null>(null);
     const allBlocks = useMemo(() => {
         const src = Array.isArray(props.project?.blocks) ? props.project.blocks : [];
         return Array.from(
@@ -124,6 +134,7 @@ const ProjectDetailsContainer = (props: Props) => {
     useEffect(() => {
         const ac = new AbortController();
         const fetchId = ++requestSeqRef.current;
+        setLoadedMeasurement(null);
 
         const fetchAllData = async () => {
             setAllProjectData([]); // clear previous
@@ -166,6 +177,17 @@ const ProjectDetailsContainer = (props: Props) => {
                 }));
                 if (fetchId === requestSeqRef.current) {
                     setAllProjectData(normalized);
+                    if (
+                        props.projectLoadMeasurement &&
+                        props.projectLoadMeasurement.projectId === props.project.projectId
+                    ) {
+                        setLoadedMeasurement({
+                            measurementId: props.projectLoadMeasurement.measurementId,
+                            startedAt: props.projectLoadMeasurement.startedAt,
+                            rackCount: rows.length,
+                            projectId: props.project.projectId,
+                        });
+                    }
                 }
             } catch (e) {
                 if ((e as any)?.name === 'AbortError') {
@@ -188,7 +210,42 @@ const ProjectDetailsContainer = (props: Props) => {
         fetchAllData();
 
         return () => ac.abort(); // cancel any in-flight request when selection changes/unmounts
-    }, [props.project, props.region]);
+    }, [props.project, props.region, props.projectLoadMeasurement]);
+
+    useEffect(() => {
+        if (loading || loadError || !loadedMeasurement) {
+            return;
+        }
+        if (props.project.projectId !== loadedMeasurement.projectId) {
+            return;
+        }
+        if (emittedProjectMeasurementRef.current === loadedMeasurement.measurementId) {
+            return;
+        }
+
+        const raf = requestAnimationFrame(() => {
+            const blockCount = Array.from(
+                new Set(
+                    (Array.isArray(props.project?.blocks) ? props.project.blocks : [])
+                        .map((b) => (b == null ? '' : String(b)))
+                        .map((b) => b.trim())
+                        .filter((b) => b.length > 0)
+                )
+            ).length;
+
+            void emitMetric(TELEMETRY_METRICS.PROJECT_DETAILS_TABLE_LOAD_LATENCY, Date.now() - loadedMeasurement.startedAt, {
+                region: props.region,
+                building: props.project.building,
+                blockCount,
+                project: props.project.projectId,
+                rackCount: loadedMeasurement.rackCount,
+            }).catch(() => undefined);
+
+            emittedProjectMeasurementRef.current = loadedMeasurement.measurementId;
+        });
+
+        return () => cancelAnimationFrame(raf);
+    }, [loading, loadError, loadedMeasurement, props.project, props.region]);
 
     const filteredRows = useMemo((): ProjectRackRow[] => {
         if (activeBlocks.length === 0) {

@@ -129,6 +129,7 @@ export type RackProps = {
   building: string;
   block: string;
   rack: string;
+  project?: string;
   ticket: string;
   rack_serial: string;
   region: string;
