@@ -121,7 +121,8 @@ const Rack = (props: RackProps) => {
   return (
       <div class="rack-page">
         <div class="rack-title-box">
-          <span role="img" className="oj-icon rack-img-icon" title="Rack Image" alt="Rack Image"></span>
+          {/* <span role="img" className="oj-icon rack-img-icon" title="Rack Image" alt="Rack Image"></span> */}
+          <span role="img" className="oj-icon rack-img-icon" title="Rack Image" ></span>
           <h2 class="rack-title-headline">
             <span className="rack-title-key">Building:</span>
             <span className="rack-title-value">{props.building}</span>
@@ -162,7 +163,8 @@ const Rack = (props: RackProps) => {
           <div className="device-accordion-toolbar">
             {/*Title*/}
             <h3 className="device-accordion-summary-title">
-              <span role="img" className="oj-icon validation-summary-icon" title="Validation Summary Image" alt="Validation Summary Image"></span>
+              {/* <span role="img" className="oj-icon validation-summary-icon" title="Validation Summary Image" alt="Validation Summary Image"></span> */}
+              <span role="img" className="oj-icon validation-summary-icon" title="Validation Summary Image"></span>
               Validation Summary
             </h3>
 

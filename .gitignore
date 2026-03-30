@@ -45,3 +45,4 @@ hybrid/plugins/*
 Thumbs.db
 
 .oca/
+/build

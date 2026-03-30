@@ -2,70 +2,66 @@
  Copyright (c) 2015, 2024, Oracle and/or its affiliates.
  Licensed under The Universal Permissive License (UPL), Version 1.0
  as shown at https://oss.oracle.com/licenses/upl/
-
  */
-
 'use strict';
-const replaceInFile = require('replace-in-file');
+
 const path = require('path');
 const fs = require('fs');
-const WEB_ROOT = path.join(__dirname, '../..', 'web');
-console.log(WEB_ROOT);
 
-function replaceTextInFile({paths, from, to,}) {
-    const replaceOptions = {
-        files: [...paths],
-        from: from,
-        to: to,
-        countMatches: true,
-    };
-    const replaceResults = replaceInFile.sync(replaceOptions);
-    if(replaceResults.length !== 1) {
-        throw new Error('Failed to get file for replace')
-    } else {
-        console.log('Completed' + replaceResults.length);
+const WEB_ROOT = path.join(__dirname, '../..', 'web');
+const INDEX_HTML = path.join(WEB_ROOT, 'index.html');
+const LANDING_ROOT = path.join(WEB_ROOT, 'landing');
+
+function ensureDir(dir) {
+    if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
     }
 }
 
-async function replaceSrcInIndexHtml() {
-    // replace if any src with double quotes
-
-        replaceTextInFile({
-            paths: [path.join(WEB_ROOT, 'index.html')],
-            from: "<script type='text/javascript' src='./bundle.js'></script>",
-            to: "<script type='text/javascript' src='./landing/bundle.js'></script>",
-        });
-
+function copyDirIfExists(src, dest) {
+    if (!fs.existsSync(src)) {
+        console.log(`[after_build] skip copy; missing: ${src}`);
+        return;
+    }
+    ensureDir(dest);
+    // Node 18+ supports cpSync
+    fs.cpSync(src, dest, { recursive: true, force: true });
+    console.log(`[after_build] copied ${src} -> ${dest}`);
 }
 
-async function moveBundleToIndexHtml() {
-    const sourceFilePath = path.join(WEB_ROOT, './bundle.js');
-    const destinationFilePath = path.join(WEB_ROOT, './landing/bundle.js');
+function rewriteIndexPaths() {
+    if (!fs.existsSync(INDEX_HTML)) {
+        throw new Error(`index.html not found: ${INDEX_HTML}`);
+    }
 
-    // Use fs.copyFile to copy the file
-    fs.rename(sourceFilePath, destinationFilePath, (err) => {
-        if (err) {
-            console.error('Error copying file:', err);
-        } else {
-            console.log('File copied successfully!');
-        }
-    });
+    let html = fs.readFileSync(INDEX_HTML, 'utf-8');
+
+    html = html
+        .replace(/(src|href)=["']\.?\/js\//g, '$1="./landing/js/')
+        .replace(/(src|href)=["']js\//g, '$1="landing/js/')
+        .replace(/(src|href)=["']\.?\/styles\//g, '$1="./landing/styles/')
+        .replace(/(src|href)=["']styles\//g, '$1="landing/styles/');
+
+    fs.writeFileSync(INDEX_HTML, html, 'utf-8');
+    console.log('[after_build] index.html asset paths rewritten');
 }
 
-module.exports = function(configObj) {
-    return new Promise(async (resolve, reject) => {
+module.exports = function (configObj) {
+    return new Promise((resolve, reject) => {
         try {
-            console.log("Running after_build hook.");
-            const fileContents = fs.readFileSync(path.join(WEB_ROOT, 'index.html'), "utf-8");
+            console.log(`[after_build] WEB_ROOT=${WEB_ROOT}`);
 
-            // Check if the searchString exists in the file contents
-            if (fileContents.includes("<script type='text/javascript' src='./bundle.js'>")) {
-                await replaceSrcInIndexHtml();
-                await moveBundleToIndexHtml();
-            }
+            ensureDir(LANDING_ROOT);
+
+            copyDirIfExists(path.join(WEB_ROOT, 'js'), path.join(LANDING_ROOT, 'js'));
+            copyDirIfExists(path.join(WEB_ROOT, 'styles'), path.join(LANDING_ROOT, 'styles'));
+
+            rewriteIndexPaths();
+
             resolve(configObj);
-        } catch(e) {
-            console.log(`\t[after_build]: ${e}`)
+        } catch (e) {
+            console.log(`\t[after_build]: ${e}`);
+            reject(e);
         }
     });
 };

@@ -1,0 +1,1103 @@
+swagger: '2.0'
+x-oracle-package: com.oracle.ide.lvvservice
+info:
+  title: Low Voltage Vendor API
+
+  description: Low Voltage Vendor API.
+  version: "20251211"
+# the domain of the service
+host: 127.0.0.1
+# array of all schemes that your API supports
+schemes:
+  - https
+# will be prefixed to all paths. Make sure to update the path in resource files and audit config in api base.conf after modifying the basePath.
+basePath: /idelvv
+produces:
+  - application/json
+
+# Enable SDK Retries by default
+# Details: https://confluence.oci.oraclecorp.com/display/DEX/API+Consistency+Guidelines#APIConsistencyGuidelines-DefaultRetriesintheSDKs
+x-obmcs-client-retries-enabled: true
+
+# please refer to https://confluence.oci.oraclecorp.com/pages/viewpage.action?pageId=12205175#SwaggerExtensions(x*fields)-x-obmcs-issue-routing-table for details.
+x-obmcs-issue-routing-table:
+  default:
+    phonebookId: infrastructuredeliveryengineering
+    email: oci_ide_ww_admin_grp@oracle.com
+    jiraProject: BESA
+    opsJiraProject: IDES
+    # For engagements related to relevant API calls on github, this user shall be tagged to respond. Note that
+    # this list should contain at least 2 items (PM and Dev Manager). The github users should be added the Oracle
+    # organization in github. For details please check - https://confluence.oraclecorp.com/confluence/display/OGHO/Preparing+Your+GitHub+Account+for+OGHO.
+    githubUsers:
+      - githubUser1
+      - githubUser2
+
+x-obmcs-endpoint-template: 'https://infradeliveryengineering.{region}.oci.{secondLevelDomain}'
+
+# This flag is required for services which have asynchronous operations. It indicates whether or not your service is using the shared Work Requests service.
+# The Work Requests service does not yet support overlay services.
+# For details, refer to https://confluence.oci.oraclecorp.com/x/57cuBQ and https://confluence.oci.oraclecorp.com/x/57cuBQ.
+x-obmcs-use-shared-work-requests-service: false
+
+# =============================================================================
+# Anchors used to reference common headers, properties, ...etc...
+# =============================================================================
+x-anchors:
+  x-headers:
+    etag: &ref-etag
+      description: |
+        For optimistic concurrency control. See `if-match`.
+      type: string
+    opc-next-page: &ref-opc-next-page
+      description: |
+        For pagination of a list of items. When paging through a list, if this header appears in the response,
+        then a partial list might have been returned. Include this value as the `page` parameter for the
+        subsequent GET request to get the next batch of items.
+      type: string
+    opc-work-request-id: &ref-opc-work-request-id
+      description: |
+        Unique Oracle-assigned identifier for the asynchronous request. You can use this to query status of the asynchronous operation.
+      type: string
+    opc-request-id: &ref-opc-request-id
+      description: |
+        Unique Oracle-assigned identifier for the request. If you need to contact
+        Oracle about a particular request, please provide the request ID.
+      type: string
+    retry-after: &ref-retry-after
+      type: integer
+      description: A decimal number representing the number of seconds the client should wait before polling this endpoint again.
+    x-canary-request: &ref-x-canary-request
+      description: |
+        Unique Oracle-assigned identifier for the request. If you need to contact
+        Oracle about a particular request, please provide the request ID.
+      type: string
+
+  x-properties:
+    definedTags: &ref-definedTags
+      type: object
+      additionalProperties:
+        type: object
+        additionalProperties:
+          type: object
+      description: |
+        Defined tags for this resource. Each key is predefined and scoped to a namespace.
+        Example: `{"foo-namespace": {"bar-key": "value"}}`
+
+    freeformTags: &ref-freeformTags
+      type: object
+      additionalProperties:
+        type: string
+      description: |
+        Simple key-value pair that is applied without any predefined name, type or scope. Exists for cross-compatibility only.
+        Example: `{"bar-key": "value"}`
+
+    systemTags: &ref-systemTags
+      type: object
+      additionalProperties:
+        type: object
+        additionalProperties:
+          type: object
+      description: |
+        System tags for this resource. Each key is predefined and scoped to a namespace.
+        Example: `{"orcl-cloud": {"free-tier-retained": "true"}}`
+
+#==========[ Paths ]====================================================================================================
+paths:
+  /version:
+    get:
+      tags: ['Version']
+      summary: Get the version
+      description: Get the version
+      operationId: getVersion
+      produces:
+        - application/json
+      responses:
+        200:
+          description: Version of the app
+          schema:
+            $ref: '#/definitions/Version'
+
+  /namespace:
+    get:
+      tags: ['Namespace']
+      summary: List of namespaces
+      description: List of available namespaces
+      operationId: listNamespaces
+      produces:
+        - application/json
+      responses:
+        200:
+          description: List of regions
+          schema:
+            $ref: '#/definitions/NamespaceCollection'
+    post:
+      tags: ['Namespace']
+      summary: Create a namespace
+      description: Create a new namespace. The namespace ID is generated by the system.
+      operationId: createNamespace
+      consumes:
+        - application/json
+      produces:
+        - application/json
+      parameters:
+        - in: body
+          name: NamespaceCreateRequest
+          required: true
+          description: tbd
+          schema:
+            $ref: '#/definitions/NamespaceCreateRequest'
+      responses:
+        201:
+          description: Namespace created successfully
+          schema:
+            $ref: '#/definitions/Namespace'
+        400:
+          description: Invalid request
+        409:
+          description: Namespace already exists
+
+  /namespace/{id}:
+    patch:
+      tags: ['Namespace']
+      summary: Patch a namespace
+      description: Partially update a namespace by ID
+      operationId: updateNamespace
+      consumes:
+        - application/json
+      produces:
+        - application/json
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Namespace identifier
+          schema:
+            type: string
+        - in: body
+          name: NamespacePatchRequest
+          required: true
+          description: tbd
+          schema:
+            $ref: '#/definitions/NamespacePatchRequest'
+      responses:
+        201:
+          description: Namespace updated successfully
+          schema:
+            $ref: '#/definitions/Namespace'
+        400:
+          description: Invalid request
+        404:
+          description: Namespace not found
+    delete:
+      tags: ['Namespace']
+      summary: Delete a namespace
+      description: Mark a namespace as deleted
+      operationId: deleteNamespace
+      produces:
+        - application/json
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        204:
+          description: Namespace marked as deleted
+          schema:
+            $ref: '#/definitions/Namespace'
+
+  /namespacemapping:
+    get:
+      tags: ['NamespaceMapping']
+      summary: List of namespace mappings
+      description: List of available namespace mappings
+      operationId: listNamespaceMappings
+      produces:
+        - application/json
+      responses:
+        200:
+          description: List of regions
+          schema:
+            $ref: '#/definitions/NamespaceMappingCollection'
+    post:
+      tags: ['NamespaceMapping']
+      summary: Create a namespace mapping
+      description: Create a new namespace mapping. The namespace mapping ID is generated by the system.
+      operationId: createNamespaceMapping
+      consumes:
+        - application/json
+      produces:
+        - application/json
+      parameters:
+        - in: body
+          name: NamespaceCreateRequest
+          required: true
+          description: tbd
+          schema:
+            $ref: '#/definitions/NamespaceMappingCreateRequest'
+      responses:
+        201:
+          description: Namespace created successfully
+          schema:
+            $ref: '#/definitions/NamespaceMapping'
+        400:
+          description: Invalid request
+        409:
+          description: Namespace already exists
+
+  /namespacemapping/{id}:
+    patch:
+      tags: ['NamespaceMapping']
+      summary: Patch a namespace
+      description: Partially update a namespace by ID
+      operationId: updateNamespaceMapping
+      consumes:
+        - application/json
+      produces:
+        - application/json
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Namespace identifier
+          schema:
+            type: string
+        - in: body
+          name: NamespacePatchRequest
+          required: true
+          description: tbd
+          schema:
+            $ref: '#/definitions/NamespaceMappingPatchRequest'
+      responses:
+        201:
+          description: Namespace updated successfully
+          schema:
+            $ref: '#/definitions/NamespaceMapping'
+        400:
+          description: Invalid request
+        404:
+          description: Namespace not found
+    delete:
+      tags: ['NamespaceMapping']
+      summary: Delete a namespace mapping
+      description: Mark a namespace mapping as deleted
+      operationId: deleteNamespaceMapping
+      produces:
+        - application/json
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        204:
+          description: Namespace mapping marked as deleted
+          schema:
+            $ref: '#/definitions/NamespaceMapping'
+
+  /roommetadata:
+    get:
+      tags: ['RoomMetadata']
+      summary: Get room metadata
+      description: Gets room metadata
+      operationId: getRoomMetadata
+      produces:
+        - application/json
+      responses:
+        200:
+          description: Room metadata info
+          schema:
+            $ref: '#/definitions/RoomMetadataCollection'
+
+  /roommetadata/layout/{room_name}:
+    get:
+      tags: [ 'RoomMetadataLayout' ]
+      summary: Gets the layout of a room
+      description: Gets the layout of a room
+      operationId: getRoomMetadataLayout
+      produces:
+        - application/json
+      parameters:
+        - name: room_name
+          in: path
+          required: true
+          description: Room name identifier
+          schema:
+            type: string
+      responses:
+        200:
+          description: Room Layout
+          schema:
+            $ref: '#/definitions/RoomLayout'
+
+  /materials:
+    get:
+      tags: ['material']
+      operationId: ListMaterials
+      summary: Gets a list of Materials.
+      description: |
+        Gets a list of Materials. Either `roomName` or `bomId` is required.
+      parameters:
+        - $ref: '#/parameters/RoomNameQueryParam'
+        - $ref: '#/parameters/BomIdQueryParam'
+        - $ref: '#/parameters/PaginationLimitQueryParam'
+        - $ref: '#/parameters/PaginationTokenQueryParam'
+        - $ref: '#/parameters/SortOrderQueryParam'
+        - $ref: '#/parameters/SortByQueryParam'
+        - $ref: '#/parameters/RequestIdHeader'
+      x-related-resource: '#/definitions/MaterialCollection'
+      responses:
+        200:
+          description: A page of Materials Summary objects.
+          schema:
+            $ref: '#/definitions/MaterialCollection'
+          headers:
+            opc-request-id: *ref-opc-request-id
+            opc-next-page: *ref-opc-next-page
+        400:
+          $ref: '#/responses/400'
+        401:
+          $ref: '#/responses/401'
+        404:
+          $ref: '#/responses/404'
+        429:
+          $ref: '#/responses/429'
+        500:
+          $ref: '#/responses/500'
+        default:
+          $ref: '#/responses/DefaultError'
+
+  /physicalconnections:
+    get:
+      tags: ['physicalConnection']
+      operationId: ListPhysicalConnections
+      summary: Gets a list of Physical Connections. Either `roomName` or `bomId` is required.
+      description: |
+        Gets a list of Physical Connections.
+      parameters:
+        - $ref: '#/parameters/RoomNameQueryParam'
+        - $ref: '#/parameters/BomIdQueryParam'
+        - $ref: '#/parameters/PaginationLimitQueryParam'
+        - $ref: '#/parameters/PaginationTokenQueryParam'
+        - $ref: '#/parameters/SortOrderQueryParam'
+        - $ref: '#/parameters/SortByQueryParam'
+        - $ref: '#/parameters/RequestIdHeader'
+      x-related-resource: '#/definitions/PhysicalConnectionCollection'
+      responses:
+        200:
+          description: A page of physical connections summary objects.
+          schema:
+            $ref: '#/definitions/PhysicalConnectionCollection'
+          headers:
+            opc-request-id: *ref-opc-request-id
+            opc-next-page: *ref-opc-next-page
+        400:
+          $ref: '#/responses/400'
+        401:
+          $ref: '#/responses/401'
+        404:
+          $ref: '#/responses/404'
+        429:
+          $ref: '#/responses/429'
+        500:
+          $ref: '#/responses/500'
+        default:
+          $ref: '#/responses/DefaultError'
+
+  /physicalconnections/image:
+    get:
+      tags: ['physicalConnection']
+      operationId: getPhysicalConnectionImage
+      summary: Get physical connection image by room and rack pair.
+      parameters:
+        - $ref: '#/parameters/RoomNameQueryParam'
+        - $ref: '#/parameters/SourceRackNumberQueryParam'
+        - $ref: '#/parameters/DestinationRackNumberQueryParam'
+        - $ref: '#/parameters/RequestIdHeader'
+      responses:
+        200:
+          description: Image for the physical connection.
+          schema:
+            $ref: '#/definitions/PhysicalConnectionImageResponse'
+          headers:
+            opc-request-id: *ref-opc-request-id
+        404:
+          $ref: '#/responses/404'
+        default:
+          $ref: '#/responses/DefaultError'
+
+  /buildartifacts/{room_name}:
+    get:
+      tags: ['BuildArtifacts']
+      summary: List build artifact files for a room
+      operationId: listBuildArtifacts
+      description: Returns a list of build artifact files available for the specified room.
+      parameters:
+        - name: room_name
+          in: path
+          required: true
+          description: Name of the room
+          schema:
+            type: string
+      responses:
+        '200':
+          description: A list of build artifact files
+          schema:
+            $ref: '#/definitions/BuildArtifactCollection'
+        '404':
+          description: Room not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/definitions/Error'
+
+  /buildartifacts/{room_name}/file:
+    get:
+      tags: ['BuildArtifacts']
+      summary: Download a build artifact file
+      operationId: downloadBuildArtifact
+      description: Downloads the binary content of a specific build artifact file for the specified room.
+      parameters:
+        - name: room_name
+          in: path
+          required: true
+          description: Name of the room
+          schema:
+            type: string
+        - name: file_path
+          in: query
+          required: true
+          description: Path of the file
+          schema:
+            type: string
+      responses:
+        200:
+          description: File PAR
+          schema:
+            $ref: '#/definitions/ParResponseObject'
+        '404':
+          description: Room or file not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/definitions/Error'
+
+
+
+#==========[ Definitions ]================================================================================================
+definitions:
+  Version:
+    type: Object
+    properties:
+      version:
+        type: string
+        description: Version of the app
+
+  Namespace:
+    type: object
+    properties:
+      id:
+        type: string
+        description: Unique identifier of the namespace
+      name:
+        type: string
+        nullable: true
+        description: Name of the namespace
+      compartmentId:
+        type: string
+        nullable: true
+        description: Compartment identifier
+      status:
+        type: string
+        nullable: true
+        description: Current status of the namespace
+
+  NamespaceCollection:
+    type: object
+    description: A list of namespaces
+    properties:
+      items:
+        type: array
+        description: A list of namespaces
+        items:
+          $ref: '#/definitions/Namespace'
+    required:
+      - items
+
+  NamespacePatchRequest:
+    type: object
+    description: Fields allowed to be patched on a namespace
+    properties:
+      name:
+        type: string
+        nullable: true
+        description: Name of the namespace
+      compartmentId:
+        type: string
+        nullable: true
+        description: Compartment identifier
+      status:
+        type: string
+        nullable: true
+        description: Current status of the namespace
+
+  NamespaceCreateRequest:
+    type: object
+    description: Fields required to create a namespace
+    properties:
+      name:
+        type: string
+        nullable: true
+        description: Name of the namespace
+      compartmentId:
+        type: string
+        nullable: true
+        description: Compartment identifier
+      status:
+        type: string
+        nullable: true
+        description: Initial status of the namespace
+    required:
+      - name
+
+  Error:
+    description: Error information.
+    required:
+      - code
+      - message
+    properties:
+      code:
+        description: A short error code that defines the error, meant for programmatic parsing.
+        type: string
+      message:
+        description: A human-readable error message.
+        type: string
+
+  NamespaceMapping:
+    type: object
+    properties:
+      id:
+        type: string
+        description: Unique identifier of the namespace
+      namespaceId:
+        type: string
+        description: Mapping to the namespaceId
+      realmName:
+        type: string
+        nullable: true
+        description: Name of the realm
+      regionName:
+        type: string
+        nullable: true
+        description: Name of the region
+      buildingName:
+        type: string
+        nullable: true
+        description: Name of the Building
+      roomName:
+        type: string
+        nullable: true
+        description: room name
+
+  NamespaceMappingCollection:
+    type: object
+    description: A list of namespace mappings
+    properties:
+      items:
+        type: array
+        description: A list of namespaces mappings
+        items:
+          $ref: '#/definitions/NamespaceMapping'
+    required:
+      - items
+
+  NamespaceMappingPatchRequest:
+    type: object
+    description: Fields allowed to be patched on a namespace mapping
+    properties:
+      namespaceId:
+        type: string
+        description: Mapping to the namespaceId
+      realmName:
+        type: string
+        nullable: true
+        description: Name of the realm
+      regionName:
+        type: string
+        nullable: true
+        description: Name of the region
+      buildingName:
+        type: string
+        nullable: true
+        description: Name of the Building
+      roomName:
+        type: string
+        nullable: true
+        description: room name
+
+  NamespaceMappingCreateRequest:
+    type: object
+    description: Fields required to create a namespace mapping
+    properties:
+      namespaceId:
+        type: string
+        description: Mapping to the namespaceId
+      realmName:
+        type: string
+        nullable: true
+        description: Name of the realm
+      regionName:
+        type: string
+        nullable: true
+        description: Name of the region
+      buildingName:
+        type: string
+        nullable: true
+        description: Name of the Building
+      roomName:
+        type: string
+        nullable: true
+        description: room name
+    required:
+      - namespaceId
+      - realmName
+      - regionName
+      - buildingName
+      - roomName
+
+  RoomMetadataCollection:
+    properties:
+      items:
+        type: array
+        description: Room metadata list
+        items:
+          $ref: '#/definitions/RoomMetadata'
+
+  RoomMetadata:
+    type: object
+    properties:
+      regionDisplayName:
+        type: string
+        description: Region display Name
+      availabilityDomainCanonicalShortCode:
+        type: string
+        description: AD short code
+      buildingCanonicalName:
+        type: string
+        description: Building name
+      roomCanonicalName:
+        type: string
+        description: Room name
+
+  RoomLayout:
+    type: object
+    properties:
+      roomCanonicalName:
+        type: string
+        description: Room name
+      layout:
+        type: object
+        description: Layout of the room
+
+  MaterialCatalog:
+    type: object
+    description: Material catalog
+    properties:
+      partName:
+        type: string
+        description: Catalog part name
+      partDescription:
+        type: string
+        description: Catalog part description
+      oracleMarketingPartNumber:
+        type: string
+        description: Oracle marketing part number for catalog
+      oracleManufacturingPartNumber:
+        type: string
+        description: Oracle manufacturing part number for catalog
+      vendorPartNumber:
+        type: string
+        description: Catalog vendor part number
+      partBundleSize:
+        type: string
+        description: Catalog part name
+      length:
+        type: string
+        description: Length of the cable
+      lengthUnit:
+        type: string
+        description: Units for length M or FT
+
+  MaterialSummary:
+    type: object
+    description: Material Summary
+    properties:
+      id:
+        type: string
+        description: Material Id
+      compartmentId:
+        type: string
+        description: Material compartment ID
+      bomId:
+        type: integer
+        description: BOM Id
+      catalog:
+        $ref: "#/definitions/MaterialCatalog"
+      count:
+        type: integer
+        description: Material count
+      orderCategory:
+        type: string
+        enum:
+          - ACTUAL
+          - SPARE
+        description: Material order category
+      reconciliationAvenue:
+        type: string
+        enum:
+          - FORECASTING_FABRIC
+          - WAREHOUSE_INVENTORY
+          - DCO_APPROVED
+          - FALLBACK
+        description: Material reconciliation avenue
+      createdBy:
+        type: string
+        description: Material was created by
+      updatedBy:
+        type: string
+        description: Material was updated by
+      timeCreated:
+        type: string
+        format: date-time
+        description: |
+          The date and time the Material was created, in the format defined by
+          [RFC 3339](https://tools.ietf.org/html/rfc3339).
+      timeUpdated:
+        type: string
+        format: date-time
+        description: |
+          The date and time the Material was updated, in the format defined by
+          [RFC 3339](https://tools.ietf.org/html/rfc3339).
+
+  MaterialCollection:
+    type: object
+    description: Results of a Materials search. Contains a list of MaterialSummary.
+    required:
+      - items
+    properties:
+      roomName:
+        type: string
+        description: Room name
+      type:
+        type: string
+        description: Type of BOM
+        default: Material
+      items:
+        description: List of MaterialSummary.
+        type: array
+        items:
+          $ref: "#/definitions/MaterialSummary"
+
+  Polyline:
+    type: object
+    description: Physical connection path polyline
+    required:
+      - pointX
+      - pointY
+    properties:
+      pointX:
+        type: number
+        format: float
+        description: Polyline x axis
+      pointY:
+        type: number
+        format: float
+        description: Polyline y axis
+
+  PhysicalConnectionSummary:
+    type: object
+    description: Physical connection Summary
+    required:
+      - path
+    properties:
+      id:
+        type: string
+        description: Physical connection Id
+      compartmentId:
+        type: string
+        description: Physical connection compartment ID
+      bomId:
+        type: integer
+        description: BOM Id
+      sourceRackNumber:
+        type: string
+        description: Physical connection source rack number
+      destinationRackNumber:
+        type: string
+        description: Physical connection destination rack number
+      cableTypeId:
+        type: integer
+        description: Physical connection cable type ID
+      cableType:
+        type: string
+        description: Physical connection cable type
+      routeType:
+        type: string
+        enum:
+          - A
+          - SINGLE
+        description: Physical connection route type
+      pathType:
+        type: string
+        description: Physical connection path type
+      connectionCount:
+        type: integer
+        description: Physical connection count
+      logicalConnectionId:
+        type: integer
+        description: Logical connection ID for the physical connection
+      path:
+        type: array
+        description: Physical connection cable path polyline
+        items:
+          $ref: '#/definitions/Polyline'
+      image:
+        type: string
+        description: Base64 encoded content of physical connection image
+      createdBy:
+        type: string
+        description: Physical connection was created by
+      updatedBy:
+        type: string
+        description: Physical connection was updated by
+      timeCreated:
+        type: string
+        format: date-time
+        description: |
+          The date and time the Physical connection was created, in the format defined by
+          [RFC 3339](https://tools.ietf.org/html/rfc3339).
+      timeUpdated:
+        type: string
+        format: date-time
+        description: |
+          The date and time the Physical connection was updated, in the format defined by
+          [RFC 3339](https://tools.ietf.org/html/rfc3339).
+
+  PhysicalConnectionCollection:
+    type: object
+    description: Results of a Physical connections search. Contains a list of PhysicalConnectionSummary.
+    required:
+      - items
+    properties:
+      roomName:
+        type: string
+        description: Room name
+      type:
+        type: string
+        description: Type of BOM
+        default: PhysicalConnection
+      items:
+        description: List of PhysicalConnectionSummary.
+        type: array
+        items:
+          $ref: "#/definitions/PhysicalConnectionSummary"
+
+  PhysicalConnectionImageResponse:
+    type: object
+    description: Image response for a physical connection.
+    required:
+      - image
+    properties:
+      image:
+        type: string
+        description: Base64 encoded image for the physical connection
+        nullable: true
+      materials:
+        type: array
+
+  FileMetadata:
+    type: object
+    properties:
+      name:
+        type: string
+        example: build-output.zip
+      sizeBytes:
+        type: integer
+        format: int64
+        example: 52428800
+      createdAt:
+        type: string
+        format: date-time
+        example: 2026-03-12T10:30:00Z
+    required:
+      - name
+      - sizeBytes
+      - createdAt
+
+  BuildArtifactCollection:
+    type: object
+    properties:
+      room_name:
+        type: string
+        example: alpha-room
+      items:
+        type: array
+        items:
+          $ref: '#/definitions/FileMetadata'
+    required:
+      - room_name
+      - items
+
+  ParResponseObject:
+    type: object
+    properties:
+      par:
+        type: string
+        example: "us.objectstorage/jcbakjwfbew"
+
+#==========[ Parameters ]================================================================================================
+parameters:
+  RoomNameQueryParam:
+    in: query
+    name: roomName
+    description: Room name for filtering
+    required: false
+    type: string
+
+  BomIdQueryParam:
+    in: query
+    name: bomId
+    description: BOM ID for filtering
+    required: false
+    type: integer
+    format: int32
+
+  PaginationLimitQueryParam:
+    in: query
+    name: limit
+    description: Max items per page
+    required: false
+    type: integer
+    format: int32
+    minimum: 1
+    maximum: 100
+    default: 10
+
+  PaginationTokenQueryParam:
+    in: query
+    name: page
+    description: Pagination token
+    required: false
+    type: string
+
+  SortOrderQueryParam:
+    in: query
+    name: sortOrder
+    description: Sort order
+    required: false
+    type: string
+    enum:
+      - ASC
+      - DESC
+    default: ASC
+
+  SortByQueryParam:
+    in: query
+    name: sortBy
+    description: Sort field
+    required: false
+    type: string
+    enum:
+      - id
+      - name
+    default: id
+
+  RequestIdHeader:
+    in: header
+    name: opc-request-id
+    description: Request ID for idempotency
+    required: false
+    type: string
+  RoomNameQueryParam:
+    in: query
+    name: roomName
+    required: true
+    type: string
+    description: Room name for filtering
+
+  SourceRackNumberQueryParam:
+    in: query
+    name: sourceRackNumber
+    required: true
+    type: string
+    description: Source rack number
+
+  DestinationRackNumberQueryParam:
+    in: query
+    name: destinationRackNumber
+    required: true
+    type: string
+    description: Destination rack number
+
+#==========[ Responses ]================================================================================================
+responses:
+# This is being included in the 'responses:' section.
+# For that reason, it is important that responses are indented exactly two spaces.
+# To maintain consistency across services, do not change the descriptions.
+  400:
+    description: Bad Request
+    headers:
+      opc-request-id: *ref-opc-request-id
+    schema:
+      $ref: '#/definitions/Error'
+  401:
+    description: Unauthorized
+    headers:
+      opc-request-id: *ref-opc-request-id
+    schema:
+      $ref: '#/definitions/Error'
+  404:
+    description: Not Found
+    headers:
+      opc-request-id: *ref-opc-request-id
+    schema:
+      $ref: '#/definitions/Error'
+  405:
+    description: Method Not Allowed
+    headers:
+      opc-request-id: *ref-opc-request-id
+    schema:
+      $ref: '#/definitions/Error'
+  409:
+    description: Conflict
+    headers:
+      opc-request-id: *ref-opc-request-id
+    schema:
+      $ref: '#/definitions/Error'
+  412:
+    description: Precondition Failed
+    headers:
+      opc-request-id: *ref-opc-request-id
+    schema:
+      $ref: '#/definitions/Error'
+  429:
+    description: Too Many Requests
+    headers:
+      opc-request-id: *ref-opc-request-id
+    schema:
+      $ref: '#/definitions/Error'
+  500:
+    description: Internal Server Error
+    headers:
+      opc-request-id: *ref-opc-request-id
+    schema:
+      $ref: '#/definitions/Error'
+  default:
+    description: Unknown Error
+    headers:
+      opc-request-id: *ref-opc-request-id
+    schema:
+      $ref: '#/definitions/Error'

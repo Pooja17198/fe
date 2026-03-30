@@ -6,7 +6,6 @@
  * @ignore
  */
 import { registerCustomElement } from "ojs/ojvcomponent";
-import { h } from "preact";
 import { useEffect, useState, useRef } from "preact/hooks";
 
 import Context = require("ojs/ojcontext");
@@ -33,6 +32,12 @@ const routeArray: Array<any> = [
     path: "home",
     detail: {
       label: "Home"
+    },
+  },
+  {
+    path: "cabling",
+    detail: {
+      label: "Cabling"
     },
   }
 ]
@@ -177,7 +182,9 @@ export const App = registerCustomElement("app-root", (props: Props) => {
           userLogin={props.userLogin}
           vendorName={selectedVendor}
           regionValue={selectedRegion}
+          page={routePath}
           onRegionChanged={regionChangedHandler}
+          onPageChanged={pageChangeHandler}
         />
         <Content 
           page={routePath}

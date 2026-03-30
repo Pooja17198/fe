@@ -453,6 +453,20 @@
         "path": "libs/chai/chai.js",
         "cdnPath": "chai/chai-4.3.10.min"
       }
+    },
+    "d3": {
+      "cdn": "3rdparty",
+      "cwd": "node_modules/d3/dist",
+      "debug": {
+        "src": "d3.js",
+        "path": "libs/d3/d3.js",
+        "cdnPath": "d3/d3-7.9.0"
+      },
+      "release": {
+        "src": "d3.min.js",
+        "path": "libs/d3/d3.min.js",
+        "cdnPath": "d3/d3-7.9.0.min"
+      }
     }
   }
 }

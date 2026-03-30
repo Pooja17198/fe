@@ -27,8 +27,8 @@
       "oj-c/*": [
         "./node_modules/@oracle/oraclejet-core-pack/oj-c/types/*"
       ],
-      "preact": [
-        "./node_modules/preact"
+      "preact/*": [
+        "./node_modules/preact/*"
       ],
       "home/*": [
         "./src/components/home-container/*"
@@ -38,7 +38,9 @@
     "noEmitOnError": true,
     "experimentalDecorators": true,
     "skipLibCheck": true,
-    "removeComments": true
+    "removeComments": true,
+    "resolveJsonModule": true,
+    "esModuleInterop": true
   },
   "include": [
     "./src/**/*"

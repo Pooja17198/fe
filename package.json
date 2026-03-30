@@ -3,31 +3,68 @@
   "version": "1.0.0",
   "description": "An Oracle JavaScript Extension Toolkit(JET) web app",
   "author": "Network Automation opc_nw_automation_dev_us_grp@oracle.com ",
-  "script": {},
+  "scripts": {
+    "codegen:clients": "./build_clients.sh"
+  },
   "config": {
     "registry": "https://artifactory.oci.oraclecorp.com/api/npm/global-release-npm"
   },
   "dependencies": {
-    "@oracle/ojet-cli": "~16.0.0",
-    "@oracle/oraclejet": "~16.0.0",
-    "@oracle/oraclejet-audit": "^16.1.2",
-    "@oracle/oraclejet-core-pack": "~16.0.0",
-    "@oracle/oraclejet-webdriver": "^16.0.5",
+    "@ehrc/preact-hooks": "^3.0.0",
+    "@oracle/ojet-cli": "~19.0.0",
+    "@oracle/oraclejet": "~19.0.0",
+    "@oracle/oraclejet-audit": "^19.0.0",
+    "@oracle/oraclejet-core-pack": "~19.0.0",
+    "@oracle/oraclejet-preact": "~19.0.0",
+    "d3": "^7.9.0",
+    "jquery": "3.7.1",
+    "preact": "10.26.10",
     "replace-in-file": "^7.2.0"
   },
   "devDependencies": {
+    "@types/d3": "^7.4.0",
+    "@oracle/ojet-cli": "~19.0.0",
+    "@prefresh/babel-plugin": "0.5.2",
+    "@prefresh/webpack": "4.0.6",
+    "@types/node": "18.16.3",
     "chai": "^4.3.10",
+    "clean-webpack-plugin": "4.0.0",
+    "compression-webpack-plugin": "11.1.0",
+    "copy-webpack-plugin": "13.0.1",
+    "css-fix-url-loader": "1.0.2",
+    "css-loader": "7.1.2",
     "express": "^4.17.21",
     "extract-zip": "^1.7.0",
     "fs-extra": "^8.1.0",
-    "glob": "7.2.0",
+    "glob": "10.4.5",
+    "html-inline-css-webpack-plugin": "^1.11.1",
+    "html-replace-webpack-plugin": "2.6.0",
+    "html-webpack-plugin": "5.6.5",
+    "inline-chunk-html-plugin": "^1.1.1",
+    "mini-css-extract-plugin": "2.9.4",
+    "noop-loader": "1.0.0",
+    "raw-loader": "4.0.2",
+    "sass": "1.94.1",
+    "sass-loader": "16.0.6",
+    "savant-client-generator": "^1.9.0",
+    "style-loader": "4.0.0",
     "tiny-lr": "2.0.0",
-    "typescript": "5.3.2",
+    "ts-loader": "8.4.0",
+    "typescript": "5.8.3",
     "underscore": "^1.10.2",
+    "webpack": "5.76.0",
+    "webpack-dev-server": "5.2.2",
+    "webpack-merge": "6.0.1",
     "yargs-parser": "13.1.2"
   },
   "engines": {
-    "node": ">=12.21.0"
+    "node": ">=16.0.0"
   },
-  "private": false
+  "private": false,
+  "overrides": {
+    "@types/minimatch": "5.1.2",
+    "@ehrc/preact-hooks": {
+        "preact": "10.26.10"
+    }  }
+
 }

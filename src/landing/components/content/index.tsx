@@ -13,10 +13,10 @@ import "ojs/ojbutton";
 import Rack from "../rack/index";
 import Context = require("ojs/ojcontext");
 import HomeContainer from "../home/index";
-import { CInputTextElement } from "oj-c/input-text";
 //For the transpiled javascript to load the element's module, import as below
 import "oj-c/input-text";
 import "ojs/ojformlayout";
+import Cabling from "../cabling/index";
 
 
 type Props = {
@@ -174,8 +174,13 @@ const Content = (props: Props) => {
   }, [rackReady, rackSNVersion]);
 
   const isRack = Boolean(props.page?.includes("rack"));
+  const isCabling = Boolean(props.page?.includes("cabling"));
   return (
     <div class="oj-web-applayout-max-width oj-web-applayout-content">
+      {isCabling ? (
+        <Cabling />
+      ) : (
+        <>
       <div style={{ display: isRack ? 'none' : 'block' }}>
         <div>
           <HomeContainer onRackChanged={rackChangedHandler} vendor={selectedVendor} region={props.region} />
@@ -201,6 +206,8 @@ const Content = (props: Props) => {
             <div style={{ padding: '16px' }}>Loading rack context…</div>
           )}
         </>
+      )}
+      </>
       )}
     </div>
   )

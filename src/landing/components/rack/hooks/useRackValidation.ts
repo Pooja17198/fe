@@ -148,7 +148,7 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
             }
             validationMeasurementRef.current = null;
         };
-    },[]);
+    }, []);
 
     useEffect(() => {
         if (isValidating) return;

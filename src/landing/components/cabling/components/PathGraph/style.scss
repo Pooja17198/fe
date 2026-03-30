@@ -1,0 +1,198 @@
+$height: 900px;
+
+div > .svg-container {
+  overflow: hidden;
+  position: relative;
+  min-height: $height;
+}
+  
+.control-buttons {
+    position: absolute;
+    right: 0px;
+    top: 0px;
+    z-index: 1;
+    margin: 10px;
+}
+
+.material-panel{
+  width: 400px;
+}
+
+.svg-viewport {
+  height: $height;
+  border: 1px solid black;
+  overflow: hidden;
+  display: flex;
+  position: relative;
+
+  .visualizer {
+    width: calc(100% - 300px);
+    min-width: 1600px;
+    height: $height;
+  }
+  .visulization-button {
+    position: absolute;
+    bottom: 0px;
+    z-index: 1;
+    display: flex;
+
+    .button-last {
+      display: flex;
+      justify-content: center;
+    }
+  }
+
+  .visulization-legend {
+    position: absolute;
+    right: 0px;
+    bottom: 0px;
+    z-index: 1;
+
+    .legend-item {
+      display: flex;
+      justify-content: start;
+      align-items: center;
+      position: relative;
+
+      .legend-color-block {
+        width: 1em;
+        height: 1em;
+        border: black 1px solid;
+        margin-right: 1px;
+      }
+
+      .legend-color-background {
+        width: 100%;
+        position: absolute;
+        height: 100%;
+        opacity: 0.3;
+      }
+
+      .legend-color-text {
+        background: unset;
+      }
+    }
+  }
+
+  .filter-panel {
+    height: $height;
+    width: 300px;
+    margin: 0;
+    background-color: white;
+    z-index: 1;
+
+    .filter-panel-left {
+      width: 300px;
+      height: $height;
+      position: absolute;
+      > div {
+        height: auto;
+      }
+    }
+    .filter-panel-right {
+      width: 300px;
+      height: $height;
+      left: 300px;
+      transition: all linear 0.1s;
+      opacity: 1;
+      position: relative;
+      background-color: white;
+      &.is-collapsed {
+        left: 0px;
+      }
+      .list-controls {
+        height: 60px;
+        border-right: 1px solid #dddddd;
+        border-bottom: 1px solid #dddddd;
+        display: flex;
+        background-color: white;
+      }
+      .list {
+        height: calc($height - 60px);
+        overflow-y: scroll;
+        overflow-x: auto;
+      }
+
+      .clear-hightlight {
+        vertical-align: baseline;
+      }
+    }
+
+    .highlighted {
+      background: lightgrey;
+    }
+
+    .expand-single-row {
+      display: flex;
+      flex-flow: row-reverse;
+    }
+
+    .expand-single {
+      width: 90%;
+      position: relative;
+      right: 0;
+      float: right;
+    }
+  }
+}
+
+.flex-group {
+  display: flex;
+  column-gap: 10px;
+}
+
+.revert-dialog-button {
+  @extend flex-group !optional;
+  height: fit-content;
+  align-self: center;
+}
+
+.NORMAL {
+  color: #999999;
+  background-color: #999999;
+}
+
+.JOIN {
+  color: #ff8800;
+  background-color: #ff8800;
+}
+
+.RACK {
+  color: #00bbbb;
+  background-color: #00bbbb;
+}
+
+.AVENUE {
+  color: #00ff00;
+  background-color: #00ff00;
+}
+
+.AVENUE_SPLICE {
+  color: #999999;
+  background-color: #ffff00;
+}
+
+.STREET {
+  color: #0000ff;
+  background-color: #0000ff;
+}
+
+.STREET_LOW_POP {
+  color: #22aaff;
+  background-color: #22aaff;
+}
+
+.BRIDGE {
+  color: #ff0000;
+  background-color: #ff0000;
+}
+
+.PATH_AVOID {
+  color: #4444ff;
+  background-color: #4444ff;
+}
+
+.DISALLOW {
+  color: #ff00ff;
+  background-color: #ff00ff;
+}

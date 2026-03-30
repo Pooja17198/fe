@@ -12,16 +12,21 @@ import "ojs/ojtoolbar";
 import "ojs/ojmenu";
 import "ojs/ojbutton";
 import "ojs/ojselectcombobox";
+import "ojs/ojnavigationlist";
+import { ojTabBar } from "ojs/ojnavigationlist"; // eslint-disable-line no-duplicate-imports
+import MutableArrayDataProvider = require("ojs/ojmutablearraydataprovider");
 
 type Props = Readonly<{
   appName: string,
   userLogin: string,
   vendorName: string,
   regionValue?: string,
+  page: string,
   onRegionChanged?: (region: string) => void
+  onPageChanged: (value: any) => void;
 }>;
 
-export function Header({ appName, userLogin, vendorName, regionValue, onRegionChanged }: Props) {
+export function Header({ appName, userLogin, vendorName, regionValue, page, onRegionChanged, onPageChanged }: Props) {
   const mediaQueryRef = useRef<MediaQueryList>(window.matchMedia(ResponsiveUtils.getFrameworkQuery("sm-only")!));
 
   const [isSmallWidth, setIsSmallWidth] = useState(mediaQueryRef.current.matches);
@@ -112,6 +117,49 @@ export function Header({ appName, userLogin, vendorName, regionValue, onRegionCh
     }
   }
 
+  type Tab = {
+    path: string;
+    label: string;
+  };
+
+  const tabs: Tab[] = [
+    { path: "cabling", label: "Cabling and Materials" },
+    { path: "home", label: "Rack Validation" },
+  ];
+  const isCabling = Boolean(page?.includes("cabling"));
+  const [activeTab, setActiveTab] = useState<string>(tabs[0].path);
+
+  const tabItemTemplate = (item: ojTabBar.ItemContext<Tab["path"], Tab>) => (
+    <li>
+      <a href="#">
+        {item.data.label}
+      </a>
+    </li>
+  );
+
+  const loadTabContent = (event: ojTabBar.selectionChanged<Tab["path"], Tab>) => {
+    if (event.detail.value === "home") {
+      onPageChanged({ path: "home" });
+      setActiveTab(tabs[1].path);
+    } else {
+      onPageChanged({ path: "cabling"});
+      setActiveTab(tabs[0].path)
+    }
+  }
+
+  useEffect(() => {
+    if (page === "cabling") {
+      setActiveTab(tabs[0].path);
+    } else {
+      setActiveTab(tabs[1].path);
+    }
+  }, [page]);
+
+  const tabbarDP = new MutableArrayDataProvider<Tab["path"], Tab>(
+    tabs.slice(0),
+    { keyAttributes: "path" }
+  );
+
   // TODO: Add a Home Button
   // Log regions data for debugging just before rendering
   console.log('regions', regions);
@@ -123,7 +171,8 @@ export function Header({ appName, userLogin, vendorName, regionValue, onRegionCh
               role="img"
               class="oj-icon demo-oracle-icon"
               title="Oracle Logo"
-              alt="Oracle Logo">
+              // alt="Oracle Logo"
+              >
           </span>
             <h1
                 class="oj-sm-only-hide oj-web-applayout-header-title"
@@ -131,8 +180,17 @@ export function Header({ appName, userLogin, vendorName, regionValue, onRegionCh
               {appName} Vendor Name: {vendorName}
             </h1>
           </div>
+        <oj-tab-bar
+          class="lvv-tabbar oj-sm-margin-8x-end"
+          edge="top"
+          data={tabbarDP}
+          selection={activeTab}
+          onselectionChanged={loadTabContent}
+        >
+          <template slot="itemTemplate" render={tabItemTemplate}></template>
+        </oj-tab-bar>
           <div class="oj-flex-bar-end">
-            {regions.length > 0 && (
+            {regions.length > 0 && !isCabling &&(
                 <oj-combobox-one
                     ref={regionRef}
                     value={regionValue}
