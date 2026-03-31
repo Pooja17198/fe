@@ -14,7 +14,6 @@ interface RegionADSiteSelectorsProps {
 }
 
 const emptyDP = new ArrayDataProvider([], { keyAttributes: "value" });
-const supportedBuildingSet = new Set(['fbb1', 'fbb15', 'iad65', 'phx23', 'iad100', 'aga5']);
   
 const RegionADSiteSelectors = ({
   rooms,
@@ -22,19 +21,8 @@ const RegionADSiteSelectors = ({
   selectedRoom,
   setSelectedRoom,
 }: RegionADSiteSelectorsProps) => {
-  const { data: adrBuildingDataUnfiltered, isFetching: adsLoading } =
+  const { data: adrBuildingData, isFetching: adsLoading } =
     useRoomMetadata();
-  
-  const [adrBuildingData, setAdrBuildingData] = useState<AdrBuilding[]>([]);
-
-  useEffect(() => {
-    if (adrBuildingDataUnfiltered) {
-      const filteredData = adrBuildingDataUnfiltered.filter((room: AdrBuilding) =>
-        supportedBuildingSet.has(room.buildingCanonicalName)
-      );
-      setAdrBuildingData(filteredData);
-    }
-  }, [adrBuildingDataUnfiltered]);
 
   const [regionsInfo, setRegionsInfo] =
     useState<ArrayDataProvider<any, any>>(emptyDP);
