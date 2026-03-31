@@ -33,7 +33,6 @@ const Rack = (props: RackProps) => {
     resolveTooltip,
     validate,
     resolve,
-    downloadCsv,
     downloadExcel,
   } = useRackValidation(props);
 
@@ -207,14 +206,6 @@ const Rack = (props: RackProps) => {
                 onojAction={handleResolve}
                 disabled={isValidating || !resolveAllowed}
                 title={isValidating ? "" : resolveTooltip}
-            ></oj-c-button>
-            <oj-c-button
-                chroming="callToAction"
-                size="sm"
-                label="Download CSV"
-                onojAction={downloadCsv}
-                style="margin-left: 8px;"
-                disabled={isValidating || isDownloading || totalFailureRows === 0}
             ></oj-c-button>
             <oj-c-button
                 chroming="callToAction"
