@@ -48,6 +48,7 @@ type UseRackValidationResult = {
     validate: () => Promise<void>;
     resolve: () => Promise<{ ok: true } | { ok: false; message: string }>;
     downloadCsv: () => Promise<void>;
+    downloadExcel: () => Promise<void>;
 };
 
 export function useRackValidation(props: RackProps): UseRackValidationResult {
@@ -712,14 +713,21 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
         }
     }, [resolveAllowed, resolveTooltip, props.ticket, props.region, props.onPageChanged]);
 
-    const downloadCsv = useCallback(async () => {
+    const downloadValidationResults = useCallback(async (format: "csv" | "xlsx") => {
         setIsDownloading(true);
         try {
             const url = new URL(`${LVV_API}/downloadCablingValidationResults`);
             url.searchParams.set("rackSerialNumber", props.rack_serial);
             url.searchParams.set("regionName", props.region);
+            url.searchParams.set("format", format);
+
             const headers = new Headers();
-            headers.append("Accept", "text/csv");
+            headers.append(
+                "Accept",
+                format === "csv"
+                    ? "text/csv"
+                    : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            );
 
             const resp = await fetchWithRetry(url.href, {
                 method: "GET",
@@ -732,7 +740,10 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
 
             const blob = await resp.blob();
             const cd = resp.headers.get("content-disposition") || "";
-            const filename = parseContentDispositionFilename(cd, `cabling_validation_${props.rack_serial}.csv`);
+            const filename = parseContentDispositionFilename(
+                cd,
+                `cabling_validation_${props.rack_serial}.${format}`
+            );
 
             const objectUrl = URL.createObjectURL(blob);
             const a = document.createElement("a");
@@ -744,11 +755,19 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
             URL.revokeObjectURL(objectUrl);
         } catch (e: any) {
             const message = e?.message ? e.message : "Unknown error";
-            alert(`Download failed: ${message}`);
+            alert(`Download ${format.toUpperCase()} failed: ${message}`);
         } finally {
             setIsDownloading(false);
         }
     }, [props.rack_serial, props.region]);
+
+    const downloadCsv = useCallback(() => {
+        return downloadValidationResults("csv");
+    }, [downloadValidationResults]);
+
+    const downloadExcel = useCallback(() => {
+        return downloadValidationResults("xlsx");
+    }, [downloadValidationResults]);
 
     const summaryStats = useMemo(() => {
         const values = Object.values(validationFailuresByDevice);
@@ -783,6 +802,7 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
         validate,
         resolve,
         downloadCsv,
+        downloadExcel,
     };
 }
 
