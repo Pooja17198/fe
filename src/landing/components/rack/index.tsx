@@ -4,12 +4,23 @@ import DeviceAccordion from "./DeviceAccordion";
 import { useRackValidation } from "./hooks/useRackValidation";
 import { RackProps } from "./types";
 import { isGpuComputeDevice } from "./utils";
+import { useBuildingBadLinks } from "../network-monitoring/useBuildingBadLinks";
+import { BadLinksBanner } from "../network-monitoring/BadLinksBanner";
+import { ENABLE_NETWORK_MONITORING } from "../../config/featureFlags";
 
 const Rack = (props: RackProps) => {
   const isFirstRender = useRef(true);
   const [hideUnsupported, setHideUnsupported] = useState(true);
   const [externalExpandedKeys, setExternalExpandedKeys] = useState<Set<string>>(new Set());
   const [externalExpandedKeysNonce, setExternalExpandedKeysNonce] = useState(0);
+
+  const networkMonitoringEnabled = ENABLE_NETWORK_MONITORING;
+
+  // Network monitoring (building-scoped):
+  // - Fetches bad links only for the CURRENT rack's building.
+  // - Polling is fully gated by feature flag.
+  // - Banner is rendered below and hidden if list is empty.
+  const badLinks = useBuildingBadLinks(props.building, props.region, networkMonitoringEnabled);
 
   const {
     deviceStatuses,
@@ -145,6 +156,10 @@ const Rack = (props: RackProps) => {
             <span className="rack-title-value">{props.rack_serial}</span>
           </h2>
         </div>
+
+        {networkMonitoringEnabled && (
+            <BadLinksBanner building={props.building} badLinks={badLinks} />
+        )}
 
         {isValidating && (
             <div className="alert alert-warning" aria-live="polite" role="status">

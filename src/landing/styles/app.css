@@ -778,3 +778,24 @@
     min-width: 320px;
     display: block;
 }
+
+
+
+/* Network monitoring banner responsiveness */
+.bad-links-details .table-wrap {
+    overflow-x: auto;               /* Ensure horizontal scroll when content exceeds viewport */
+    -webkit-overflow-scrolling: touch;
+    max-width: 100%;
+}
+
+.badlinks-table {
+    min-width: 560px;               /* Force horizontal scroll on narrow screens rather than wrapping */
+}
+
+@media (max-width: 420px) {
+    .badlinks-table th,
+    .badlinks-table td {
+        padding: 6px 8px;           /* Slightly tighter spacing for small screens */
+        font-size: 13px;
+    }
+}
