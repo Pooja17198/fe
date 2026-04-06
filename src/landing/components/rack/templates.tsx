@@ -52,3 +52,19 @@ export const psuStatusTemplate = (hasFailure: boolean) => {
     </span>
   );
 };
+
+export const patchPanelMatrixTemplate = (context: any) => {
+  const row = (context?.item && context.item.data) || {};
+  const value = row.patchPanelMatrix || "Not Available";
+  return <div class="patch-panel-matrix-cell">{value}</div>;
+};
+
+export const errorMessageClampTemplate = (context: any) => {
+  const row = (context?.item && context.item.data) || {};
+  const value = `${row.errorMessage ?? ""}`.trim() || "Not Available";
+  return (
+    <div class="fec-ber-error-clamp" title={value}>
+      {value}
+    </div>
+  );
+};

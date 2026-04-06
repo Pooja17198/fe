@@ -14,6 +14,7 @@ const Rack = (props: RackProps) => {
     deviceStatuses,
     devicesLoading,
     validationFailuresByDevice,
+    patchPanelByDevicePort,
     totalFailureRows,
     totalLinkFailureRows,
     powerFailureDevices,
@@ -226,6 +227,7 @@ const Rack = (props: RackProps) => {
               rack_serial={props.rack_serial}
               region={props.region}
               validationFailuresByDevice={validationFailuresByDevice}
+              patchPanelByDevicePort={patchPanelByDevicePort}
               totalFailureRows={totalFailureRows}
               totalLinkFailureRows={totalLinkFailureRows}
               powerFailureDevices={powerFailureDevices}

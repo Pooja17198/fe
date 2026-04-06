@@ -9,11 +9,13 @@ import {
     LldpFailureRow,
     OpticFailureRow,
     PowerFailureRow,
+    PatchPanelByDevicePort,
+    PatchPanelRow,
     RackProps,
     ValidationFailure,
     ValidationFailuresByDevice,
 } from "../types";
-import { LVV_API, POLLING } from "../constants";
+import { IDE_API, LVV_API, POLLING } from "../constants";
 import { fetchWithRetry, createCsrfHeaders } from "../api";
 import { anyJobInProgress, parseContentDispositionFilename } from "../utils";
 import { emitMetric, TELEMETRY_METRICS } from "../../telemetry/api";
@@ -23,6 +25,7 @@ type UseRackValidationResult = {
     deviceStatuses: DeviceStatus[];
     devicesLoading: boolean;
     validationFailuresByDevice: ValidationFailuresByDevice;
+    patchPanelByDevicePort: PatchPanelByDevicePort;
     totalFailureRows: number;
     totalLinkFailureRows: number;
     powerFailureDevices: number;
@@ -50,6 +53,7 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
     const previousStatusesRef = useRef<Map<string, string>>(new Map());
     const currentRackKeyRef = useRef<string>("");
     const pageAbortRef = useRef<AbortController | null>(null);
+    const ideRackRowsCacheRef = useRef<Map<string, PatchPanelRow[]>>(new Map());
     const validationMeasurementRef = useRef<null | {
         measurementId: number;
         startedAt: number;
@@ -63,6 +67,7 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
     const [devicesLoading, setDevicesLoading] = useState<boolean>(false);
     const [validationFailuresByDevice, setValidationFailuresByDevice] =
         useState<ValidationFailuresByDevice>({});
+    const [patchPanelByDevicePort, setPatchPanelByDevicePort] = useState<PatchPanelByDevicePort>({});
     const [selectedLinkKeys, setSelectedLinkKeys] = useState<Set<string>>(new Set());
     const [isValidating, setIsValidating] = useState(false);
     const [jobErrorDetails, setJobErrorDetails] = useState<JobErrorDetails>(null);
@@ -130,7 +135,9 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
     useEffect(() => {
         if (!rackContextReady) return;
         previousStatusesRef.current = new Map();
-    }, [rackContextReady]);
+        ideRackRowsCacheRef.current = new Map();
+        setPatchPanelByDevicePort({});
+    }, [rackContextReady, props.region, props.rack_serial, props.rack, props.building]);
 
     // clear job error banner on rack context changes
     useEffect(() => {
@@ -222,30 +229,65 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
     }, [props.region, props.rack, props.building, props.rack_serial]);
 
     const fetchValidationFailures = useCallback(async (): Promise<boolean> => {
-        try {
-            if (!props.rack_serial || !props.region) {
-                return false;
-            }
-            const url = new URL(`${LVV_API}/cablingValidation`);
-            url.searchParams.set("regionName", props.region);
-            url.searchParams.set("rackSerialNumber", props.rack_serial);
+      try {
+        if (!props.rack_serial || !props.region) return false;
 
-            const resp = await fetchWithRetry(url.href, {
-                method: "GET",
-                signal: pageAbortRef.current?.signal as AbortSignal | undefined,
-            });
-            if (!resp.ok) {
-                return false;
-            }
-            const data: unknown = await resp.json();
-            const normalized = normalizeValidationFailuresPayload(data, props.rack_serial);
-            setValidationFailuresByDevice(normalized);
-            return true;
-        } catch (e: any) {
-            if (e?.name === "AbortError") return false;
-            return false;
+        const url = new URL(`${LVV_API}/cablingValidation`);
+        url.searchParams.set("regionName", props.region);
+        url.searchParams.set("rackSerialNumber", props.rack_serial);
+
+        const resp = await fetchWithRetry(url.href, {
+          method: "GET",
+          signal: pageAbortRef.current?.signal as AbortSignal | undefined,
+        });
+        if (!resp.ok) return false;
+
+        const data: unknown = await resp.json();
+        const normalized = normalizeValidationFailuresPayload(data, props.rack_serial);
+        setValidationFailuresByDevice(normalized);
+
+        const errorDeviceNames = new Set(
+          Object.entries(normalized)
+            .filter(([, device]) => (device?.counts?.overallTotal || 0) > 0)
+            .map(([deviceName]) => normalizeDeviceKey(deviceName))
+        );
+
+        if (errorDeviceNames.size === 0) {
+          setPatchPanelByDevicePort({});
+          return true; // validation call succeeded
         }
-    }, [props.region, props.rack_serial]);
+
+        // IDE fetch is non-blocking for the main validation response.
+        try {
+          const rackCacheKey = `${props.region}|${props.rack_serial}|${props.rack}|${props.building}`;
+          let rackRows = ideRackRowsCacheRef.current.get(rackCacheKey);
+
+          if (!rackRows) {
+            rackRows = await fetchIdePhysicalCutsheetRowsByRack(
+              props.building,
+              props.rack,
+              pageAbortRef.current?.signal as AbortSignal | undefined
+            );
+            ideRackRowsCacheRef.current.set(rackCacheKey, rackRows);
+          }
+
+          const indexedRows = filterPatchPanelForErrorDevicePorts(rackRows, errorDeviceNames);
+          setPatchPanelByDevicePort(indexedRows);
+        } catch (ideError: any) {
+          if (ideError?.name !== "AbortError") {
+            console.warn("[RackValidation] IDE physicalcutsheets frontend call failed", {
+              message: ideError?.message || String(ideError),
+            });
+          }
+          // Do NOT fail fetchValidationFailures because IDE is auxiliary.
+        }
+
+        return true;
+      } catch (e: any) {
+        if (e?.name === "AbortError") return false;
+        return false; // this is validation API failure path
+      }
+    }, [props.region, props.rack_serial, props.rack, props.building]);
 
     // initial/sequential load: devices then failures
     // Avoid "cancelled" flag; snapshot rack key and controller at effect start
@@ -381,16 +423,15 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
                     const data: unknown = await statusResp.json();
                     const polledStatuses = normalizeDeviceStatusesPayload(data);
 
-                    let shouldFetchFailures = false;
-
-                    for (const device of polledStatuses) {
-                        const prevStatus = previousStatuses.get(device.deviceName);
-                        // Fetch validation failures if a device's job has just completed
-                        if (!shouldFetchFailures && prevStatus !== "COMPLETED" && device.jobStatus === "COMPLETED" ) {
+                     let shouldFetchFailures = false;
+                     for (const device of polledStatuses) {
+                         const prevStatus = previousStatuses.get(device.deviceName);
+                         // Fetch validation failures if a device's job has just completed
+                         if (!shouldFetchFailures && prevStatus !== "COMPLETED" && device.jobStatus === "COMPLETED" ) {
                             shouldFetchFailures = true;
                             break;
-                        }
-                    }
+                         }
+                     }
 
                     // update map for next poll
                     polledStatuses.forEach((device) => {
@@ -459,9 +500,8 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
                     } else {
                         setIsValidating(false);
                     }
-
                     if (shouldFetchFailures) {
-                        await fetchValidationFailures();
+                      await fetchValidationFailures();
                     }
                 } else {
                     let errMsg = statusResp.statusText;
@@ -501,6 +541,7 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
     );
 
     const validate = useCallback(async () => {
+        setPatchPanelByDevicePort({});
         const selectedDeviceCount = selectedLinkKeys.size > 0
             ? Array.from(selectedLinkKeys).filter((key) => eligibleDeviceNameSet.has(selectedKeyToDeviceName(key))).length
             : eligibleDeviceNames.length;
@@ -518,13 +559,11 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
             pageAbortRef.current = new AbortController();
         }
         const headers = createCsrfHeaders();
-        let errorOccurred = false;
 
         try {
             const startResult = await startValidationJob();
             if (startResult && (startResult as any).error) {
                 validationMeasurementRef.current = null;
-                errorOccurred = true;
                 setJobErrorDetails((startResult as any).error);
                 setIsValidating(false);
                 return;
@@ -544,7 +583,6 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
                 return;
             }
             validationMeasurementRef.current = null;
-            errorOccurred = true;
             setJobErrorDetails({
                 message: e?.message ? e.message : "An unknown error occurred during validation.",
             });
@@ -636,6 +674,7 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
         deviceStatuses,
         devicesLoading,
         validationFailuresByDevice,
+        patchPanelByDevicePort,
         totalFailureRows: summaryStats.totalFailureRows,
         totalLinkFailureRows: summaryStats.totalLinkFailureRows,
         powerFailureDevices: summaryStats.powerFailureDevices,
@@ -1127,4 +1166,124 @@ function normalizeValidationFailuresPayload(
     });
 
     return byDevice;
+}
+
+function normalizeDeviceKey(value: string | null | undefined): string {
+    return String(value || "").trim().toLowerCase();
+}
+
+function normalizeDevicePortKey(
+    deviceName: string | null | undefined,
+    devicePort: string | null | undefined
+): string {
+    return `${normalizeDeviceKey(deviceName)}|${normalizeDeviceKey(devicePort)}`;
+}
+
+function normalizeIdeCutsheetRows(payload: unknown): PatchPanelRow[] {
+    if (Array.isArray(payload)) {
+        return payload.filter((item) => asRecord(item) !== null) as PatchPanelRow[];
+    }
+
+    const payloadRecord = asRecord(payload);
+    if (!payloadRecord) {
+        return [];
+    }
+
+    const items = payloadRecord["items"];
+    if (Array.isArray(items)) {
+        return items.filter((item) => asRecord(item) !== null) as PatchPanelRow[];
+    }
+
+    return [];
+}
+
+function toRawJsonString(value: unknown): string {
+    try {
+        return JSON.stringify(value, null, 2);
+    } catch {
+        return String(value);
+    }
+}
+
+function isLookupPortValue(value: string | null | undefined): boolean {
+    const normalized = normalizeDeviceKey(value);
+    return (
+        normalized !== "" &&
+        normalized !== "unknown" &&
+        normalized !== "n/a" &&
+        normalized !== "na" &&
+        normalized !== "-"
+    );
+}
+
+async function fetchIdePhysicalCutsheetRowsByRack(
+    buildingName: string | undefined,
+    rackNumber: string | undefined,
+    signal?: AbortSignal
+): Promise<PatchPanelRow[]> {
+    const allRows: PatchPanelRow[] = [];
+    let nextPage: string | null = null;
+
+    do {
+        const ideUrl = new URL(`${IDE_API}/physicalcutsheets`);
+        if (buildingName && buildingName.trim() !== "") {
+            ideUrl.searchParams.set("buildingName", buildingName);
+        }
+        if (rackNumber && rackNumber.trim() !== "") {
+            ideUrl.searchParams.set("rackNumber", rackNumber);
+        }
+        if (nextPage) {
+            ideUrl.searchParams.set("page", nextPage);
+        }
+
+        const response = await fetchWithRetry(ideUrl.href, {
+            method: "GET",
+            signal,
+        });
+        if (!response.ok) {
+            throw new Error(`IDE query failed (${response.status} ${response.statusText})`);
+        }
+
+        let payload: unknown;
+        try {
+            payload = await response.json();
+        } catch {
+            payload = [];
+        }
+        allRows.push(...normalizeIdeCutsheetRows(payload));
+        nextPage = response.headers.get("opc-next-page");
+    } while (nextPage);
+
+    return allRows;
+}
+
+function filterPatchPanelForErrorDevicePorts(
+    rows: PatchPanelRow[],
+    errorDeviceNames: Set<string>
+): PatchPanelByDevicePort {
+    const byDevicePort: PatchPanelByDevicePort = {};
+
+    rows.forEach((row) => {
+        const deviceKey = normalizeDeviceKey(row.deviceName);
+        if (!deviceKey || !errorDeviceNames.has(deviceKey)) {
+            return;
+        }
+
+        const addRowForKey = (key: string) => {
+            if (!byDevicePort[key]) {
+                byDevicePort[key] = [];
+            }
+            byDevicePort[key].push({
+                ...row,
+                rawJson: toRawJsonString(row),
+            });
+        };
+
+        if (isLookupPortValue(row.devicePort)) {
+            const devicePortKey = normalizeDevicePortKey(row.deviceName, row.devicePort);
+            addRowForKey(devicePortKey);
+        }
+    });
+
+    return byDevicePort;
 }

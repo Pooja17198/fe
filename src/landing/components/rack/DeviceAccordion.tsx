@@ -6,7 +6,13 @@ import "ojs/ojtable";
 import "oj-c/button";
 import ArrayDataProvider = require("ojs/ojarraydataprovider");
 
-import { DeviceStatus, DeviceValidationFailures, ValidationFailuresByDevice } from "./types";
+import {
+  DeviceStatus,
+  DeviceValidationFailures,
+  PatchPanelByDevicePort,
+  PatchPanelRow,
+  ValidationFailuresByDevice,
+} from "./types";
 import { VALIDATION_TABLE_ACCESSIBILITY } from "./constants";
 import {
   FAN_FAILURE_COLUMNS,
@@ -15,7 +21,7 @@ import {
   LLDP_FAILURE_COLUMNS,
   OPTIC_FAILURE_COLUMNS,
 } from "./columns";
-import { booleanStatusTemplate, lldpStatusTemplate, psuStatusTemplate } from "./templates";
+import { booleanStatusTemplate, errorMessageClampTemplate, lldpStatusTemplate, patchPanelMatrixTemplate, psuStatusTemplate } from "./templates";
 import { formatStatusLabel, getStatusClass, isDeviceStatusCompleted } from "./utils";
 
 type ValidationAgeColor = "green" | "orange" | "red";
@@ -82,6 +88,7 @@ type Props = {
   rack_serial: string;
   region: string;
   validationFailuresByDevice: ValidationFailuresByDevice;
+  patchPanelByDevicePort: PatchPanelByDevicePort;
   totalFailureRows: number;
   totalLinkFailureRows: number;
   powerFailureDevices: number;
@@ -93,6 +100,14 @@ type Props = {
   externalExpandedKeys?: Set<string>;
   externalExpandedKeysNonce?: number;
 };
+
+function normalizeDeviceName(value: string | undefined | null): string {
+  return String(value || "").trim().toLowerCase();
+}
+
+function toDevicePortKey(deviceName: string | undefined | null, devicePort: string | undefined | null): string {
+  return `${normalizeDeviceName(deviceName)}|${normalizeDeviceName(devicePort)}`;
+}
 
 type TestSectionConfig = {
   id: "lldp" | "optics" | "interfaces" | "fecBer" | "fans";
@@ -175,6 +190,42 @@ function getRowsForSection(
     default:
       return [];
   }
+}
+
+function renderPatchPanelValue(rows: PatchPanelRow[]): string {
+  if (!rows.length) return "Not Available";
+
+  return rows
+    .map((row, idx) => {
+      const easyMark = Array.isArray(row.easyMark) ? row.easyMark : [];
+      if (easyMark.length > 0) {
+        const lines = easyMark.map((v) => `• ${v}`);
+        return rows.length > 1
+          ? `Entry ${idx + 1}\n${lines.join("\n")}`
+          : lines.join("\n");
+      }
+      return JSON.stringify(row, null, 2);
+    })
+    .join("\n\n");
+}
+
+function addPatchPanelToSectionRows(sectionId: TestSectionConfig["id"], rows: any[], patchPanelByDevicePort: PatchPanelByDevicePort): any[] {
+  if (sectionId === "fans") {
+    return rows;
+  }
+
+  return rows.map((row) => {
+    const deviceName =
+      sectionId === "lldp" ? row.deviceAName : row.deviceName;
+    const devicePort =
+      sectionId === "lldp" ? row.deviceAPort : row.devicePort;
+    const key = toDevicePortKey(deviceName, devicePort);
+    const patchPanelRows = patchPanelByDevicePort[key] || [];
+    return {
+      ...row,
+      patchPanelMatrix: renderPatchPanelValue(patchPanelRows),
+    };
+  });
 }
 
 function getPsuStatusLabel(jobStatus: string, hasPsuFailure: boolean): "UP" | "DOWN" | "-" {
@@ -602,7 +653,11 @@ const DeviceAccordion = (props: Props) => {
                             <div style={{ padding: "8px 24px", background: "#fff" }}>
                               <oj-accordion id={`testAccordion-${idx}`} multiple={true}>
                                 {TEST_SECTIONS.map((section) => {
-                                  const sectionRows = getRowsForSection(deviceFailures, section.id);
+                                  const sectionRows = addPatchPanelToSectionRows(
+                                    section.id,
+                                    getRowsForSection(deviceFailures, section.id),
+                                    props.patchPanelByDevicePort
+                                  );
                                   if (!sectionRows.length) return null;
                                   const sectionColumns = getSectionColumns(section, sectionRows);
                                   const sectionDataProvider = new ArrayDataProvider(sectionRows, {
@@ -637,6 +692,8 @@ const DeviceAccordion = (props: Props) => {
                                             >
                                               <template slot="lldpStatusTemplate" render={lldpStatusTemplate} />
                                               <template slot="booleanStatusTemplate" render={booleanStatusTemplate} />
+                                              <template slot="patchPanelMatrixTemplate" render={patchPanelMatrixTemplate} />
+                                              <template slot="errorMessageClampTemplate" render={errorMessageClampTemplate} />
                                             </oj-table>
                                           </div>
                                         </div>

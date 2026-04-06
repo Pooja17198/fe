@@ -50,6 +50,12 @@ export const LLDP_FAILURE_COLUMNS: any[] = [
     template: "lldpStatusTemplate",
     ...DEFAULT_COLUMN_SETTINGS,
   },
+  {
+    headerText: "Patch Panel Matrix",
+    field: "patchPanelMatrix",
+    id: "patchPanelMatrix",
+    ...DEFAULT_COLUMN_SETTINGS,
+  },
 ];
 
 export const OPTIC_FAILURE_COLUMNS: any[] = [
@@ -57,12 +63,24 @@ export const OPTIC_FAILURE_COLUMNS: any[] = [
   { headerText: "Device Port", field: "devicePort", id: "devicePort", ...DEFAULT_COLUMN_SETTINGS },
   { headerText: "Tx Power", field: "txPower", id: "txPower", ...DEFAULT_COLUMN_SETTINGS },
   { headerText: "Rx Power", field: "rxPower", id: "rxPower", ...DEFAULT_COLUMN_SETTINGS },
+  {
+    headerText: "Patch Panel Matrix",
+    field: "patchPanelMatrix",
+    id: "patchPanelMatrix",
+    ...DEFAULT_COLUMN_SETTINGS,
+  },
 ];
 
 export const INTERFACE_FAILURE_COLUMNS: any[] = [
   { headerText: "Device Name", field: "deviceName", id: "deviceName", ...DEFAULT_COLUMN_SETTINGS },
   { headerText: "Device Port", field: "devicePort", id: "devicePort", ...DEFAULT_COLUMN_SETTINGS },
   { headerText: "Issue", field: "issue", id: "issue", ...DEFAULT_COLUMN_SETTINGS },
+  {
+    headerText: "Patch Panel Matrix",
+    field: "patchPanelMatrix",
+    id: "patchPanelMatrix",
+    ...DEFAULT_COLUMN_SETTINGS,
+  },
 ];
 
 export const FEC_BER_FAILURE_COLUMNS: any[] = [
@@ -93,6 +111,13 @@ export const FEC_BER_FAILURE_COLUMNS: any[] = [
     headerText: "Error Message",
     field: "errorMessage",
     id: "errorMessage",
+    template: "errorMessageClampTemplate",
+    ...DEFAULT_COLUMN_SETTINGS,
+  },
+  {
+    headerText: "Patch Panel Matrix",
+    field: "patchPanelMatrix",
+    id: "patchPanelMatrix",
     ...DEFAULT_COLUMN_SETTINGS,
   },
 ];

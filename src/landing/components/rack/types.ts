@@ -51,6 +51,7 @@ export interface LldpFailureRow {
   expectedDeviceBName: string;
   expectedDeviceBPort: string;
   linkStatus: string;
+  patchPanelMatrix?: string;
 }
 
 export interface OpticFailureRow {
@@ -59,6 +60,7 @@ export interface OpticFailureRow {
   devicePort: string;
   txPower: string;
   rxPower: string;
+  patchPanelMatrix?: string;
 }
 
 export interface InterfaceFailureRow {
@@ -66,6 +68,7 @@ export interface InterfaceFailureRow {
   deviceName: string;
   devicePort: string;
   issue: string;
+  patchPanelMatrix?: string;
 }
 
 export interface FecBerFailureRow {
@@ -78,6 +81,7 @@ export interface FecBerFailureRow {
   remoteDevice: string;
   remoteInterface: string;
   errorMessage: string;
+  patchPanelMatrix?: string;
 }
 
 export interface FanFailureRow {
@@ -119,6 +123,17 @@ export interface DeviceValidationFailures {
 }
 
 export type ValidationFailuresByDevice = Record<string, DeviceValidationFailures>;
+
+export type PatchPanelRow = {
+  deviceName?: string;
+  devicePort?: string;
+  buildingName?: string;
+  rackNumber?: string;
+  easyMark?: string[];
+  [key: string]: unknown;
+};
+
+export type PatchPanelByDevicePort = Record<string, PatchPanelRow[]>;
 
 export type JobErrorDetails = { code?: number; message?: string } | null;
 
