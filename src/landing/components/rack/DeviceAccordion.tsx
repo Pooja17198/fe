@@ -17,13 +17,15 @@ import { VALIDATION_TABLE_ACCESSIBILITY } from "./constants";
 import {
   FAN_FAILURE_COLUMNS,
   FEC_BER_FAILURE_COLUMNS,
+  GPU_COMPUTE_INTERFACE_FAILURE_COLUMNS,
+  GPU_COMPUTE_LLDP_FAILURE_COLUMNS,
+  GPU_COMPUTE_OPTIC_FAILURE_COLUMNS,
   INTERFACE_FAILURE_COLUMNS,
   LLDP_FAILURE_COLUMNS,
   OPTIC_FAILURE_COLUMNS,
 } from "./columns";
 import { booleanStatusTemplate, errorMessageClampTemplate, lldpStatusTemplate, patchPanelMatrixTemplate, psuStatusTemplate } from "./templates";
-import { formatStatusLabel, getStatusClass, isDeviceStatusCompleted } from "./utils";
-
+import { formatStatusLabel, getStatusClass, isDeviceStatusCompleted, isGpuComputeDevice } from "./utils";
 type ValidationAgeColor = "green" | "orange" | "red";
 
 const VALIDATION_AGE_THRESHOLDS_MS = {
@@ -86,6 +88,7 @@ type Props = {
   block: string;
   rack: string;
   rack_serial: string;
+  isGpuRack?: boolean;
   region: string;
   validationFailuresByDevice: ValidationFailuresByDevice;
   patchPanelByDevicePort: PatchPanelByDevicePort;
@@ -148,15 +151,35 @@ const EMPTY_DEVICE_FAILURES: DeviceValidationFailures = {
 };
 
 
-function getSectionColumns(section: TestSectionConfig, sectionRows: any[]): any[] {
-  if (section.id !== "fecBer") {
-    return [...section.columns];
-  }
-
+function getSectionColumns(
+  section: TestSectionConfig,
+  sectionRows: any[],
+  isGpuCompute: boolean,
+): any[] {
   const hasErrorMessage = sectionRows.some((row) => {
     const errorMessage = row?.errorMessage;
     return typeof errorMessage === "string" && errorMessage.trim() !== "";
   });
+
+  if (isGpuCompute && section.id === "lldp") {
+    return hasErrorMessage
+      ? [...GPU_COMPUTE_LLDP_FAILURE_COLUMNS]
+      : GPU_COMPUTE_LLDP_FAILURE_COLUMNS.filter((column) => column.id !== "errorMessage");
+  }
+
+  if (isGpuCompute && section.id === "optics") {
+    return hasErrorMessage
+      ? [...GPU_COMPUTE_OPTIC_FAILURE_COLUMNS]
+      : GPU_COMPUTE_OPTIC_FAILURE_COLUMNS.filter((column) => column.id !== "errorMessage");
+  }
+
+  if (isGpuCompute && section.id === "interfaces") {
+    return [...GPU_COMPUTE_INTERFACE_FAILURE_COLUMNS];
+  }
+
+  if (section.id !== "fecBer") {
+    return [...section.columns];
+  }
 
   if (hasErrorMessage) {
     return [...section.columns];
@@ -216,9 +239,13 @@ function addPatchPanelToSectionRows(sectionId: TestSectionConfig["id"], rows: an
 
   return rows.map((row) => {
     const deviceName =
-      sectionId === "lldp" ? row.deviceAName : row.deviceName;
+      sectionId === "lldp"
+        ? row.deviceAName
+        : (row.sourceDeviceName ?? row.deviceName);
     const devicePort =
-      sectionId === "lldp" ? row.deviceAPort : row.devicePort;
+      sectionId === "lldp"
+        ? row.deviceAPort
+        : (row.sourceDevicePort ?? row.devicePort);
     const key = toDevicePortKey(deviceName, devicePort);
     const patchPanelRows = patchPanelByDevicePort[key] || [];
     return {
@@ -411,21 +438,35 @@ const DeviceAccordion = (props: Props) => {
   const summaryCounts = useMemo(() => {
     const values = Object.values(filteredFailuresByDevice);
     const linkFailures = values.reduce((sum, item) => sum + item.counts.nonPowerTotal, 0);
-    const powerFailures = values.filter((item) => item.hasPsuFailure).length;
+    const powerFailures = values.filter(
+        (item) => !isGpuComputeDevice(item.deviceName, props.isGpuRack) && item.hasPsuFailure
+    ).length;
     return { linkFailures, powerFailures };
-  }, [filteredFailuresByDevice]);
+  }, [filteredFailuresByDevice, props.isGpuRack]);
 
-  const renderErrorCount = (deviceFailures: DeviceValidationFailures) => {
-    const chips = [
-      { label: "LLDP", count: deviceFailures.counts.lldp },
-      { label: "OPT", count: deviceFailures.counts.optics },
-      { label: "INT", count: deviceFailures.counts.interfaces },
-      { label: "FEC", count: deviceFailures.counts.fecBer },
-      { label: "FAN", count: deviceFailures.counts.fans },
-    ].filter((entry) => entry.count > 0);
+  const renderErrorCount = (device: DeviceStatus, deviceFailures: DeviceValidationFailures) => {
+    const isGpuCompute = isGpuComputeDevice(device.deviceName, props.isGpuRack);
+    const chips = isGpuCompute
+        ? [
+          { label: "LLDP", count: deviceFailures.counts.lldp },
+          { label: "OPT", count: deviceFailures.counts.optics },
+          { label: "INT", count: deviceFailures.counts.interfaces },
+          { label: "FEC", count: deviceFailures.counts.fecBer },
+        ].filter((entry) => entry.count > 0)
+        : [
+          { label: "LLDP", count: deviceFailures.counts.lldp },
+          { label: "OPT", count: deviceFailures.counts.optics },
+          { label: "INT", count: deviceFailures.counts.interfaces },
+          { label: "FEC", count: deviceFailures.counts.fecBer },
+          { label: "FAN", count: deviceFailures.counts.fans },
+        ].filter((entry) => entry.count > 0);
 
     if (chips.length === 0) {
-      const zeroClass = `device-accordion-failure-count ${deviceFailures.hasPsuFailure ? "danger" : "success"}`;
+      const zeroClass = `device-accordion-failure-count ${
+          !isGpuCompute && deviceFailures.hasPsuFailure
+              ? "danger"
+              : "success"
+      }`;
       return <span className={zeroClass}>0</span>;
     }
 
@@ -578,8 +619,11 @@ const DeviceAccordion = (props: Props) => {
                 {sortedDevices.map((device, idx) => {
                   const deviceFailures =
                       filteredFailuresByDevice[device.deviceName] || buildDeviceFailuresFallback(device.deviceName);
+                  const isGpuCompute = isGpuComputeDevice(device.deviceName, props.isGpuRack);
                   const hasDeviceFailures = deviceFailures.counts.nonPowerTotal > 0;
-                  const psuStatus = getPsuStatusLabel(device.jobStatus, deviceFailures.hasPsuFailure);
+                  const psuStatus = isGpuCompute
+                      ? "-"
+                      : getPsuStatusLabel(device.jobStatus, deviceFailures.hasPsuFailure);
                   const isExpanded = expandedKeys.has(device._key);
                   const isValidationEligible = props.eligibleDeviceNames.has(device.deviceName);
                   const statusToRender = isValidationEligible ? device.jobStatus : "NOT_ELIGIBLE";
@@ -623,7 +667,7 @@ const DeviceAccordion = (props: Props) => {
                         {typeof device.elevation === "number" ? device.elevation : "-"}
                       </span>
 
-                            <span className="device-col errors">{renderErrorCount(deviceFailures)}</span>
+                            <span className="device-col errors">{renderErrorCount(device, deviceFailures)}</span>
 
                             {/* PSU status */}
                             <span className="device-col psu-status">
@@ -652,14 +696,17 @@ const DeviceAccordion = (props: Props) => {
                         {hasDeviceFailures ? (
                             <div style={{ padding: "8px 24px", background: "#fff" }}>
                               <oj-accordion id={`testAccordion-${idx}`} multiple={true}>
-                                {TEST_SECTIONS.map((section) => {
+                                {(isGpuCompute
+                                    ? TEST_SECTIONS.filter((section) => section.id !== "fans")
+                                    : TEST_SECTIONS
+                                ).map((section) => {
                                   const sectionRows = addPatchPanelToSectionRows(
                                     section.id,
                                     getRowsForSection(deviceFailures, section.id),
                                     props.patchPanelByDevicePort
                                   );
                                   if (!sectionRows.length) return null;
-                                  const sectionColumns = getSectionColumns(section, sectionRows);
+                                  const sectionColumns = getSectionColumns(section, sectionRows, isGpuCompute);
                                   const sectionDataProvider = new ArrayDataProvider(sectionRows, {
                                     keyAttributes: "_key",
                                   });

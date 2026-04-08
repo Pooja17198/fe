@@ -58,6 +58,47 @@ export const LLDP_FAILURE_COLUMNS: any[] = [
   },
 ];
 
+export const GPU_COMPUTE_LLDP_FAILURE_COLUMNS: any[] = [
+  { headerText: "Device A Name", field: "deviceAName", id: "deviceAName", ...DEFAULT_COLUMN_SETTINGS },
+  { headerText: "Device A Port", field: "deviceAPort", id: "deviceAPort", ...DEFAULT_COLUMN_SETTINGS },
+  {
+    headerText: "Current Device B Name",
+    field: "currentDeviceBName",
+    id: "currentDeviceBName",
+    ...DEFAULT_COLUMN_SETTINGS,
+  },
+  {
+    headerText: "Current Device B Port",
+    field: "currentDeviceBPort",
+    id: "currentDeviceBPort",
+    ...DEFAULT_COLUMN_SETTINGS,
+  },
+  {
+    headerText: "Expected Device B Name",
+    field: "expectedDeviceBName",
+    id: "expectedDeviceBName",
+    ...DEFAULT_COLUMN_SETTINGS,
+  },
+  {
+    headerText: "Expected Device B Port",
+    field: "expectedDeviceBPort",
+    id: "expectedDeviceBPort",
+    ...DEFAULT_COLUMN_SETTINGS,
+  },
+  {
+    headerText: "Error Message",
+    field: "errorMessage",
+    id: "errorMessage",
+    ...DEFAULT_COLUMN_SETTINGS,
+  },
+  {
+    headerText: "Patch Panel Matrix",
+    field: "patchPanelMatrix",
+    id: "patchPanelMatrix",
+    ...DEFAULT_COLUMN_SETTINGS,
+  },
+];
+
 export const OPTIC_FAILURE_COLUMNS: any[] = [
   { headerText: "Device Name", field: "deviceName", id: "deviceName", ...DEFAULT_COLUMN_SETTINGS },
   { headerText: "Device Port", field: "devicePort", id: "devicePort", ...DEFAULT_COLUMN_SETTINGS },
@@ -71,9 +112,38 @@ export const OPTIC_FAILURE_COLUMNS: any[] = [
   },
 ];
 
+export const GPU_COMPUTE_OPTIC_FAILURE_COLUMNS: any[] = [
+  { headerText: "Source Device Name", field: "sourceDeviceName", id: "sourceDeviceName", ...DEFAULT_COLUMN_SETTINGS },
+  { headerText: "Source Device Port", field: "sourceDevicePort", id: "sourceDevicePort", ...DEFAULT_COLUMN_SETTINGS },
+  { headerText: "Remote Device Name", field: "remoteDeviceName", id: "remoteDeviceName", ...DEFAULT_COLUMN_SETTINGS },
+  { headerText: "Remote Device Port", field: "remoteDevicePort", id: "remoteDevicePort", ...DEFAULT_COLUMN_SETTINGS },
+  { headerText: "RX Power", field: "rxPower", id: "rxPower", ...DEFAULT_COLUMN_SETTINGS },
+  { headerText: "Error Message", field: "errorMessage", id: "errorMessage", ...DEFAULT_COLUMN_SETTINGS },
+  {
+    headerText: "Patch Panel Matrix",
+    field: "patchPanelMatrix",
+    id: "patchPanelMatrix",
+    ...DEFAULT_COLUMN_SETTINGS,
+  },
+];
+
 export const INTERFACE_FAILURE_COLUMNS: any[] = [
   { headerText: "Device Name", field: "deviceName", id: "deviceName", ...DEFAULT_COLUMN_SETTINGS },
   { headerText: "Device Port", field: "devicePort", id: "devicePort", ...DEFAULT_COLUMN_SETTINGS },
+  { headerText: "Issue", field: "issue", id: "issue", ...DEFAULT_COLUMN_SETTINGS },
+  {
+    headerText: "Patch Panel Matrix",
+    field: "patchPanelMatrix",
+    id: "patchPanelMatrix",
+    ...DEFAULT_COLUMN_SETTINGS,
+  },
+];
+
+export const GPU_COMPUTE_INTERFACE_FAILURE_COLUMNS: any[] = [
+  { headerText: "Source Device Name", field: "sourceDeviceName", id: "sourceDeviceName", ...DEFAULT_COLUMN_SETTINGS },
+  { headerText: "Source Device Port", field: "sourceDevicePort", id: "sourceDevicePort", ...DEFAULT_COLUMN_SETTINGS },
+  { headerText: "Remote Device Name", field: "remoteDeviceName", id: "remoteDeviceName", ...DEFAULT_COLUMN_SETTINGS },
+  { headerText: "Remote Device Port", field: "remoteDevicePort", id: "remoteDevicePort", ...DEFAULT_COLUMN_SETTINGS },
   { headerText: "Issue", field: "issue", id: "issue", ...DEFAULT_COLUMN_SETTINGS },
   {
     headerText: "Patch Panel Matrix",

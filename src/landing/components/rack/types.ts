@@ -52,6 +52,7 @@ export interface LldpFailureRow {
   expectedDeviceBPort: string;
   linkStatus: string;
   patchPanelMatrix?: string;
+  errorMessage?: string;
 }
 
 export interface OpticFailureRow {
@@ -60,7 +61,12 @@ export interface OpticFailureRow {
   devicePort: string;
   txPower: string;
   rxPower: string;
+  errorMessage?: string;
   patchPanelMatrix?: string;
+  sourceDeviceName?: string;
+  sourceDevicePort?: string;
+  remoteDeviceName?: string;
+  remoteDevicePort?: string;
 }
 
 export interface InterfaceFailureRow {
@@ -69,6 +75,10 @@ export interface InterfaceFailureRow {
   devicePort: string;
   issue: string;
   patchPanelMatrix?: string;
+  sourceDeviceName?: string;
+  sourceDevicePort?: string;
+  remoteDeviceName?: string;
+  remoteDevicePort?: string;
 }
 
 export interface FecBerFailureRow {
@@ -147,6 +157,7 @@ export type RackProps = {
   project?: string;
   ticket: string;
   rack_serial: string;
+  isGpuRack?: boolean;
   region: string;
   resolveEnabled?: boolean;
   resolveDisabledReason?: string;

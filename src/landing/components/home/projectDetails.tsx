@@ -15,6 +15,7 @@ const RACK_COLUMNS = [
     { headerText: "Platform", field: "platformName", id: "platformName", resizable: "enabled" as const, sortable: 'enabled' as const },
     { headerText: "Block", field: "block", id: "block", resizable: "enabled" as const, sortable: 'enabled' as const },
     { headerText: "Rack Serial Number", field: "rackSerialNumber", id: "rackSerialNumber", resizable: "enabled" as const, sortable: 'enabled' as const },
+    { headerText: "GPU Rack", field: "gpuRackLabel", id: "gpuRackLabel", resizable: "enabled" as const, sortable: 'enabled' as const },
     { headerText: "Issue(s) Type", field: "ticketType", id: "ticketType", resizable: "enabled" as const, sortable: 'enabled' as const },
     { headerText: "Ticket", field: "ticketId", id: "ticketId", resizable: "enabled" as const, sortable: 'enabled' as const },
     { headerText: "Rack State", field: "rackState", id: "rackState", resizable: "enabled" as const, sortable: 'enabled' as const }
@@ -50,6 +51,8 @@ interface ProjectRackRow {
     block: string;
     rackLocation: string;
     rackSerialNumber: string;
+    isGpuRack?: boolean;
+    gpuRackLabel?: string;
     ticketType?: string;
     ticketId?: string;
     resolveEnabled?: boolean;
@@ -98,6 +101,7 @@ const ProjectDetailsContainer = (props: Props) => {
     const [pageSize, setPageSize] = useState<number>(25);
     const requestSeqRef = useRef(0);
     const [includeInServiceRacks, setIncludeInServiceRacks] = useState(false);
+    const [showOnlyGpuRacks, setShowOnlyGpuRacks] = useState(false);
     const [loadedMeasurement, setLoadedMeasurement] = useState<null | {
         measurementId: number;
         startedAt: number;
@@ -121,6 +125,11 @@ const ProjectDetailsContainer = (props: Props) => {
     useEffect(() => {
         setActiveBlocks(allBlocks);
     }, [allBlocks, props.region]);
+
+    // Clear the GPU-only filter when the selected project changes.
+    useEffect(() => {
+        setShowOnlyGpuRacks(false);
+    }, [props.project?.projectId]);
 
     // Select All checkbox
     const allSelected = allBlocks.length > 0 && activeBlocks.length === allBlocks.length;
@@ -173,6 +182,7 @@ const ProjectDetailsContainer = (props: Props) => {
                 const rows: ProjectRackRow[] = await rackResp.json();
                 const normalized: ProjectRackRow[] = (rows || []).map((r, idx) => ({
                     ...r,
+                    gpuRackLabel: r.isGpuRack ? "Yes" : "No",
                     _key: `${r.block ?? ''}|${r.rackLocation ?? ''}`
                 }));
                 if (fetchId === requestSeqRef.current) {
@@ -258,6 +268,10 @@ const ProjectDetailsContainer = (props: Props) => {
             rows = rows.filter((row) => (row.rackState || '').toUpperCase() !== 'IN-SERVICE');
         }
 
+        if (showOnlyGpuRacks) {
+            rows = rows.filter((row) => row.isGpuRack);
+        }
+
         if (hideMissingSerial) {
             rows = rows.filter((row) => row.rackSerialNumber && row.rackSerialNumber.trim() !== "");
         }
@@ -269,6 +283,7 @@ const ProjectDetailsContainer = (props: Props) => {
                     row.rackLocation,
                     row.block,
                     row.rackSerialNumber,
+                    row.gpuRackLabel || "",
                     row.ticketType || "",
                     row.ticketId || "",
                     row.rackState || "",
@@ -279,7 +294,7 @@ const ProjectDetailsContainer = (props: Props) => {
         }
 
         return rows;
-    }, [activeBlocks, allProjectData, hideMissingSerial, searchText, includeInServiceRacks]);
+    }, [activeBlocks, allProjectData, hideMissingSerial, searchText, includeInServiceRacks, showOnlyGpuRacks]);
 
     const baseDataProvider = useMemo(
         () => new ArrayDataProvider(filteredRows, { keyAttributes: "_key" }),
@@ -294,7 +309,7 @@ const ProjectDetailsContainer = (props: Props) => {
     // Reset paging when filters change or page size changes
     useEffect(() => {
         (pagingDataProvider as any).setPage(0, { pageSize });
-    }, [pagingDataProvider, pageSize, searchText, hideMissingSerial, activeBlocks, includeInServiceRacks]);
+    }, [pagingDataProvider, pageSize, searchText, hideMissingSerial, activeBlocks, includeInServiceRacks, showOnlyGpuRacks]);
 
     // This resets the selectedRowKeySet to empty, so that same row selection triggers onSelectionChangedHandler
     const [selectedRowKeySet, setSelectedRowKeySet] = useState<KeySetImpl<any>>(new KeySetImpl<any>());
@@ -339,8 +354,8 @@ const ProjectDetailsContainer = (props: Props) => {
                     />
                 </label>
             </div>
-            {/* ROW 2: Hide missing serial + Block filters */}
-            <div style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: '16px', alignItems: 'center', marginBottom: '12px' }}>
+            {/* ROW 2: Include in-service filter */}
+            <div style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: '16px', alignItems: 'center', marginBottom: '8px' }}>
                 <label style={{display:'flex', alignItems : 'center', gap: '8px' }}>
                     <input
                         type="checkbox"
@@ -349,6 +364,22 @@ const ProjectDetailsContainer = (props: Props) => {
                     />
                     Include in-service racks
                 </label>
+            </div>
+            {/* ROW 3: GPU filter */}
+            <div style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: '16px', alignItems: 'center', marginBottom: '8px' }}>
+                <label style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    <input
+                        type="checkbox"
+                        checked={showOnlyGpuRacks}
+                        onChange={(e: any) =>
+                            setShowOnlyGpuRacks((e.target as HTMLInputElement).checked)
+                        }
+                    />
+                    GPU racks
+                </label>
+            </div>
+            {/* ROW 4: Block filters */}
+            <div style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: '16px', alignItems: 'center', marginBottom: '8px' }}>
                 <div>
                     <span style={{fontWeight: 600}}>Filter by block:</span>
                     {/*checkbox: Select All */}
@@ -386,7 +417,7 @@ const ProjectDetailsContainer = (props: Props) => {
                     })}
                 </div>
             </div>
-            {/* ROW 3: Page size */}
+            {/* ROW 5: Page size */}
             <div style={{marginBottom: '12px'}}>
                 <label style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
                     <span style={{fontWeight: 600}}>Page size:</span>

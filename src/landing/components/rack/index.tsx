@@ -3,6 +3,7 @@ import "oj-c/button";
 import DeviceAccordion from "./DeviceAccordion";
 import { useRackValidation } from "./hooks/useRackValidation";
 import { RackProps } from "./types";
+import { isGpuComputeDevice } from "./utils";
 
 const Rack = (props: RackProps) => {
   const isFirstRender = useRef(true);
@@ -95,6 +96,14 @@ const Rack = (props: RackProps) => {
               const hasVisibleLldp = hideUnsupported
                   ? device.tests.lldp.some((row) => String(row.linkStatus).toUpperCase() !== "UNSUPPORTED")
                   : device.tests.lldp.length > 0;
+              if (isGpuComputeDevice(device.deviceName, props.isGpuRack)) {
+                return (
+                    hasVisibleLldp ||
+                    device.tests.optics.length > 0 ||
+                    device.tests.interfaces.length > 0 ||
+                    device.tests.fecBer.length > 0
+                );
+              }
               return (
                   hasVisibleLldp ||
                   device.tests.optics.length > 0 ||
@@ -111,7 +120,7 @@ const Rack = (props: RackProps) => {
         .map((d) => d._key);
     setExternalExpandedKeys(new Set(keys));
     setExternalExpandedKeysNonce((n) => n + 1);
-  }, [hideUnsupported, validationFailuresByDevice, deviceStatuses]);
+  }, [hideUnsupported, validationFailuresByDevice, deviceStatuses, props.isGpuRack]);
 
   const handleCollapseAll = useCallback(() => {
     setExternalExpandedKeys(new Set());
@@ -225,6 +234,7 @@ const Rack = (props: RackProps) => {
               block={props.block}
               rack={props.rack}
               rack_serial={props.rack_serial}
+              isGpuRack={props.isGpuRack}
               region={props.region}
               validationFailuresByDevice={validationFailuresByDevice}
               patchPanelByDevicePort={patchPanelByDevicePort}

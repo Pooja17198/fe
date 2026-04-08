@@ -17,7 +17,7 @@ import {
 } from "../types";
 import { IDE_API, LVV_API, POLLING } from "../constants";
 import { fetchWithRetry, createCsrfHeaders } from "../api";
-import { anyJobInProgress, parseContentDispositionFilename } from "../utils";
+import { anyJobInProgress, isGpuComputeDevice, parseContentDispositionFilename } from "../utils";
 import { emitMetric, TELEMETRY_METRICS } from "../../telemetry/api";
 
 type UseRackValidationResult = {
@@ -327,11 +327,6 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
     // POST to start validation job
     const startValidationJob = useCallback(async () => {
         const headers = createCsrfHeaders();
-        const url = new URL(`${LVV_API}/cablingValidation`);
-        url.searchParams.set("regionName", props.region);
-        url.searchParams.set("rackNumber", props.rack);
-        url.searchParams.set("rackSerialNumber", props.rack_serial);
-        url.searchParams.set("buildingName", props.building);
 
         if (eligibleDeviceNames.length === 0) {
             return {
@@ -343,6 +338,7 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
             };
         }
 
+        const isSelectedValidation = selectedLinkKeys.size > 0;
         const requestedDeviceNames = new Set<string>();
         if (selectedLinkKeys.size > 0) {
             Array.from(selectedLinkKeys).forEach((key) => {
@@ -355,32 +351,96 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
         if (requestedDeviceNames.size === 0) {
             eligibleDeviceNames.forEach((name) => requestedDeviceNames.add(name));
         }
-        requestedDeviceNames.forEach((name) => url.searchParams.append("deviceNames", name));
 
-        const resp = await fetchWithRetry(url.href, {
-            method: "POST",
-            headers,
-            signal: pageAbortRef.current?.signal as AbortSignal | undefined,
-        });
-        if (!resp.ok) {
-            let errMsg = resp.statusText;
-            try {
-                const contentType = resp.headers.get("content-type") || "";
-                let errorJsonOrText: any = null;
-                if (contentType.includes("application/json")) {
-                    errorJsonOrText = await resp.json();
-                    errMsg = (errorJsonOrText && errorJsonOrText.message) || JSON.stringify(errorJsonOrText) || resp.statusText;
-                } else {
-                    errorJsonOrText = await resp.text();
-                    if (errorJsonOrText) errMsg = errorJsonOrText;
-                }
-            } catch {
-                // ignore parse error
+        const buildValidationUrl = (
+            deviceNames?: Iterable<string>,
+            isGpuHostRequest: boolean = false,
+            validateWholeGpuRack: boolean = false
+        ): URL => {
+            const requestUrl = new URL(`${LVV_API}/cablingValidation`);
+            requestUrl.searchParams.set("regionName", props.region);
+            requestUrl.searchParams.set("rackNumber", props.rack);
+            requestUrl.searchParams.set("rackSerialNumber", props.rack_serial);
+            requestUrl.searchParams.set("buildingName", props.building);
+            if (isGpuHostRequest) {
+                requestUrl.searchParams.set("isGPURack", "true");
             }
-            return {error: {code: resp.status, message: errMsg}};
+            if (validateWholeGpuRack) {
+                requestUrl.searchParams.set("validateWholeGPURack", "true");
+            }
+            if (deviceNames) {
+                for (const deviceName of deviceNames) {
+                    requestUrl.searchParams.append("deviceNames", deviceName);
+                }
+            }
+            return requestUrl;
+        };
+
+        const runValidationRequest = async (requestUrl: URL) => {
+            const resp = await fetchWithRetry(requestUrl.href, {
+                method: "POST",
+                headers,
+                signal: pageAbortRef.current?.signal as AbortSignal | undefined,
+            });
+            if (!resp.ok) {
+                let errMsg = resp.statusText;
+                try {
+                    const contentType = resp.headers.get("content-type") || "";
+                    if (contentType.includes("application/json")) {
+                        const errorJson = await resp.json();
+                        errMsg = (errorJson && errorJson.message) || JSON.stringify(errorJson) || resp.statusText;
+                    } else {
+                        const errorText = await resp.text();
+                        if (errorText) errMsg = errorText;
+                    }
+                } catch {
+                    // ignore parse error
+                }
+                return {error: {code: resp.status, message: errMsg}};
+            }
+            return null;
+        };
+
+        if (props.isGpuRack === true) {
+            const isGpuHostDevice = (deviceName: string): boolean =>
+                isGpuComputeDevice(deviceName, props.isGpuRack);
+
+            const utilityDeviceNames = Array.from(requestedDeviceNames).filter(
+                (deviceName) => !isGpuHostDevice(deviceName)
+            );
+            const eligibleGpuHostDeviceNames = eligibleDeviceNames.filter((deviceName) =>
+                isGpuHostDevice(deviceName)
+            );
+            const gpuHostDeviceNames = Array.from(requestedDeviceNames).filter((deviceName) =>
+                isGpuHostDevice(deviceName)
+            );
+
+            const shouldRunGpuHostFlow = gpuHostDeviceNames.length > 0;
+            const isWholeGpuRackValidation =
+                eligibleGpuHostDeviceNames.length > 0 &&
+                eligibleGpuHostDeviceNames.every((deviceName) => requestedDeviceNames.has(deviceName));
+
+            const requestUrls: URL[] = [];
+            if (utilityDeviceNames.length > 0) {
+                requestUrls.push(buildValidationUrl(utilityDeviceNames));
+            }
+            if (shouldRunGpuHostFlow) {
+                requestUrls.push(buildValidationUrl(gpuHostDeviceNames, true, isWholeGpuRackValidation));
+            }
+
+            const results = await Promise.all(requestUrls.map((requestUrl) => runValidationRequest(requestUrl)));
+            const firstFailure = results.find((result) => result && (result as any).error);
+            if (firstFailure) {
+                return firstFailure;
+            }
+            return;
         }
+
+        const defaultValidationUrl = buildValidationUrl(requestedDeviceNames);
+        return await runValidationRequest(defaultValidationUrl) || undefined;
     }, [
         props.building,
+        props.isGpuRack,
         selectedLinkKeys,
         props.rack,
         props.region,
@@ -997,6 +1057,7 @@ function mapLldpRow(raw: unknown, deviceName: string, idx: number): LldpFailureR
         expectedDeviceBName: pick(row, ["Expected Device B Name", "deviceBNameExpected"]),
         expectedDeviceBPort: pick(row, ["Expected Device B Port", "deviceBPortExpected"]),
         linkStatus: pick(row, ["LLDP Status", "Link Status", "lldpStatus", "linkStatus"]),
+        errorMessage: textOrEmpty(row["Error Message"] ?? row["errorMessage"]),
     };
 }
 
@@ -1008,6 +1069,11 @@ function mapOpticRow(raw: unknown, deviceName: string, idx: number): OpticFailur
         devicePort: pick(row, ["Device Port", "devicePort", "Device A Port", "deviceAPort"]),
         txPower: pick(row, ["Tx Power", "TX Power", "txPower"]),
         rxPower: pick(row, ["Rx Power", "RX Power", "rxPower"]),
+        sourceDeviceName: pick(row, ["Source Device Name", "sourceDeviceName"], deviceName),
+        sourceDevicePort: pick(row, ["Source Device Port", "sourceDevicePort"]),
+        remoteDeviceName: pick(row, ["Remote Device Name", "remoteDeviceName"]),
+        remoteDevicePort: pick(row, ["Remote Device Port", "remoteDevicePort"]),
+        errorMessage: textOrEmpty(row["Error Message"] ?? row["errorMessage"]),
     };
 }
 
@@ -1018,6 +1084,10 @@ function mapInterfaceRow(raw: unknown, deviceName: string, idx: number): Interfa
         deviceName: pick(row, ["Device Name", "deviceName"], deviceName),
         devicePort: pick(row, ["Device Port", "devicePort"]),
         issue: pick(row, ["Issue", "issue"]),
+        sourceDeviceName: pick(row, ["Source Device Name", "sourceDeviceName"], deviceName),
+        sourceDevicePort: pick(row, ["Source Device Port", "sourceDevicePort"]),
+        remoteDeviceName: pick(row, ["Remote Device Name", "remoteDeviceName"]),
+        remoteDevicePort: pick(row, ["Remote Device Port", "remoteDevicePort"]),
     };
 }
 
@@ -1078,6 +1148,7 @@ function normalizeLegacyValidationRows(rows: ValidationFailure[]): ValidationFai
             expectedDeviceBName: text(row.deviceBNameExpected),
             expectedDeviceBPort: text(row.deviceBPortExpected),
             linkStatus: text(row.lldpStatus || row.linkStatus),
+            errorMessage: "",
         });
 
         const hasOptics = textOrEmpty(row.txPower) !== "" || textOrEmpty(row.rxPower) !== "";
