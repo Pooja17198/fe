@@ -148,7 +148,7 @@ export type PatchPanelRow = {
   [key: string]: unknown;
 };
 
-export type PatchPanelRackRows = PatchPanelRow[]
+export type PatchPanelRackRows = PatchPanelRow[];
 
 export type JobErrorDetails = { code?: number; message?: string } | null;
 
