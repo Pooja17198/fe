@@ -146,9 +146,9 @@ type TestSectionConfig = {
 };
 
 const TEST_SECTIONS: TestSectionConfig[] = [
+  { id: "interfaces", title: "Interface Errors", columns: INTERFACE_FAILURE_COLUMNS },
   { id: "lldp", title: "LLDP Errors", columns: LLDP_FAILURE_COLUMNS },
   { id: "optics", title: "Optic Errors", columns: OPTIC_FAILURE_COLUMNS },
-  { id: "interfaces", title: "Interface Errors", columns: INTERFACE_FAILURE_COLUMNS },
   { id: "fecBer", title: "FEC_BER Errors", columns: FEC_BER_FAILURE_COLUMNS },
   { id: "fans", title: "Fan Errors", columns: FAN_FAILURE_COLUMNS },
 ];
@@ -497,15 +497,15 @@ const DeviceAccordion = (props: Props) => {
     const isGpuCompute = isGpuComputeDevice(device.deviceName, props.isGpuRack);
     const chips = isGpuCompute
         ? [
+          { label: "INT", count: deviceFailures.counts.interfaces },
           { label: "LLDP", count: deviceFailures.counts.lldp },
           { label: "OPT", count: deviceFailures.counts.optics },
-          { label: "INT", count: deviceFailures.counts.interfaces },
           { label: "FEC", count: deviceFailures.counts.fecBer },
         ].filter((entry) => entry.count > 0)
         : [
+          { label: "INT", count: deviceFailures.counts.interfaces },
           { label: "LLDP", count: deviceFailures.counts.lldp },
           { label: "OPT", count: deviceFailures.counts.optics },
-          { label: "INT", count: deviceFailures.counts.interfaces },
           { label: "FEC", count: deviceFailures.counts.fecBer },
           { label: "FAN", count: deviceFailures.counts.fans },
         ].filter((entry) => entry.count > 0);
