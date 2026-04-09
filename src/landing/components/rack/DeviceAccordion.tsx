@@ -24,7 +24,14 @@ import {
   LLDP_FAILURE_COLUMNS,
   OPTIC_FAILURE_COLUMNS,
 } from "./columns";
-import { booleanStatusTemplate, errorMessageClampTemplate, lldpStatusTemplate, patchPanelMatrixTemplate, psuStatusTemplate } from "./templates";
+import {
+  booleanStatusTemplate,
+  errorMessageClampTemplate,
+  gpuMultilineErrorMessageTemplate,
+  lldpStatusTemplate,
+  patchPanelMatrixTemplate,
+  psuStatusTemplate,
+} from "./templates";
 import { formatStatusLabel, getStatusClass, isDeviceStatusCompleted, isGpuComputeDevice } from "./utils";
 type ValidationAgeColor = "green" | "orange" | "red";
 
@@ -782,6 +789,7 @@ const DeviceAccordion = (props: Props) => {
                                               <template slot="lldpStatusTemplate" render={lldpStatusTemplate} />
                                               <template slot="booleanStatusTemplate" render={booleanStatusTemplate} />
                                               <template slot="patchPanelMatrixTemplate" render={patchPanelMatrixTemplate} />
+                                              <template slot="gpuMultilineErrorMessageTemplate" render={gpuMultilineErrorMessageTemplate} />
                                               <template slot="errorMessageClampTemplate" render={errorMessageClampTemplate} />
                                             </oj-table>
                                           </div>

@@ -55,8 +55,17 @@ export const psuStatusTemplate = (hasFailure: boolean) => {
 
 export const patchPanelMatrixTemplate = (context: any) => {
   const row = (context?.item && context.item.data) || {};
-  const value = row.patchPanelMatrix || "Not Available";
+  const rawValue = `${row.patchPanelMatrix ?? ""}`.trim();
+  const value = rawValue
+    ? rawValue.split("•").map((part) => part.trim()).filter(Boolean).join("\n")
+    : "Not Available";
   return <div class="patch-panel-matrix-cell">{value}</div>;
+};
+
+export const gpuMultilineErrorMessageTemplate = (context: any) => {
+  const row = (context?.item && context.item.data) || {};
+  const value = `${row.errorMessage ?? ""}`.trim().replace(/\\n/g, "\n") || "Not Available";
+  return <div class="gpu-multiline-error-message-cell">{value}</div>;
 };
 
 export const errorMessageClampTemplate = (context: any) => {

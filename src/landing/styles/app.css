@@ -679,6 +679,12 @@
   word-break: break-word;
 }
 
+.gpu-multiline-error-message-cell {
+  white-space: pre-wrap;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
 .fec-ber-error-clamp {
   display: -webkit-box;
   -webkit-line-clamp: 3;
