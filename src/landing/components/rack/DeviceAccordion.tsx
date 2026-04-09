@@ -9,7 +9,7 @@ import ArrayDataProvider = require("ojs/ojarraydataprovider");
 import {
   DeviceStatus,
   DeviceValidationFailures,
-  PatchPanelByDevicePort,
+  PatchPanelRackRows,
   PatchPanelRow,
   ValidationFailuresByDevice,
 } from "./types";
@@ -102,7 +102,7 @@ type Props = {
   isGpuRack?: boolean;
   region: string;
   validationFailuresByDevice: ValidationFailuresByDevice;
-  patchPanelByDevicePort: PatchPanelByDevicePort;
+  patchPanelRackRows: PatchPanelRackRows;
   totalFailureRows: number;
   totalLinkFailureRows: number;
   powerFailureDevices: number;
@@ -144,6 +144,8 @@ function getLookupValue(
 function toDevicePortKey(deviceName: string | undefined | null, devicePort: string | undefined | null): string {
   return `${normalizeDeviceName(deviceName)}|${normalizeDeviceName(devicePort)}`;
 }
+
+type PatchPanelLookupMap = Record<string, PatchPanelRow[]>;
 
 type TestSectionConfig = {
   id: "lldp" | "optics" | "interfaces" | "fecBer" | "fans";
@@ -268,7 +270,7 @@ function renderPatchPanelValue(rows: PatchPanelRow[]): string {
 function addPatchPanelToSectionRows(
   sectionId: TestSectionConfig["id"],
   rows: any[],
-  patchPanelByDevicePort: PatchPanelByDevicePort
+  patchPanelByDevicePort: PatchPanelLookupMap
 ): any[] {
   if (sectionId === "fans") return rows;
 
@@ -285,7 +287,7 @@ function addPatchPanelToSectionRows(
       if (hasUsablePrimary) {
         const primaryKey = toDevicePortKey(primaryName, primaryPort);
         patchPanelRows = patchPanelByDevicePort[primaryKey] ?? [];
- 
+
         if (patchPanelRows.length === 0) {
           const expectedName = getLookupValue(row.expectedDeviceBName);
           const expectedPort = getLookupValue(row.expectedDeviceBPort);
@@ -376,6 +378,15 @@ const DeviceAccordion = (props: Props) => {
 
     return filtered;
   }, [props.validationFailuresByDevice, props.hideUnsupported]);
+
+ const patchPanelByDevicePort = useMemo(() => {
+   return props.patchPanelRackRows.reduce((acc, panelRow) => {
+     const key = toDevicePortKey(panelRow.deviceName, panelRow.devicePort);
+     if (!acc[key]) acc[key] = [];
+     acc[key].push(panelRow);
+     return acc;
+   }, {} as PatchPanelLookupMap);
+ }, [props.patchPanelRackRows]);
 
   const selectTemplate = (context: any, disabled: boolean = false, disabledReason: string = "") => {
     const row = (context?.item && context.item.data) || {};
@@ -766,7 +777,7 @@ const DeviceAccordion = (props: Props) => {
                                   const sectionRows = addPatchPanelToSectionRows(
                                     section.id,
                                     getRowsForSection(deviceFailures, section.id),
-                                    props.patchPanelByDevicePort
+                                    patchPanelByDevicePort
                                   );
                                   if (!sectionRows.length) return null;
                                   const sectionColumns = getSectionColumns(section, sectionRows, isGpuCompute);

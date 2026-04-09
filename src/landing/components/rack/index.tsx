@@ -15,7 +15,7 @@ const Rack = (props: RackProps) => {
     deviceStatuses,
     devicesLoading,
     validationFailuresByDevice,
-    patchPanelByDevicePort,
+    patchPanelRackRows,
     totalFailureRows,
     totalLinkFailureRows,
     powerFailureDevices,
@@ -241,7 +241,7 @@ const Rack = (props: RackProps) => {
               isGpuRack={props.isGpuRack}
               region={props.region}
               validationFailuresByDevice={validationFailuresByDevice}
-              patchPanelByDevicePort={patchPanelByDevicePort}
+              patchPanelRackRows={patchPanelRackRows}
               totalFailureRows={totalFailureRows}
               totalLinkFailureRows={totalLinkFailureRows}
               powerFailureDevices={powerFailureDevices}
