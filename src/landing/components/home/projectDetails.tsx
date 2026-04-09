@@ -18,7 +18,8 @@ const RACK_COLUMNS = [
     { headerText: "GPU Rack", field: "gpuRackLabel", id: "gpuRackLabel", resizable: "enabled" as const, sortable: 'enabled' as const },
     { headerText: "Issue(s) Type", field: "ticketType", id: "ticketType", resizable: "enabled" as const, sortable: 'enabled' as const },
     { headerText: "Ticket", field: "ticketId", id: "ticketId", resizable: "enabled" as const, sortable: 'enabled' as const },
-    { headerText: "Rack State", field: "rackState", id: "rackState", resizable: "enabled" as const, sortable: 'enabled' as const }
+    { headerText: "Rack State", field: "rackState", id: "rackState", resizable: "enabled" as const, sortable: 'enabled' as const },
+    { headerText: "Validation Status", field: "_validationStatus", id: "validationStatus", resizable: "enabled" as const, template: "validationStatusTemplate" }
 ];
 
 type Project = {
@@ -61,6 +62,28 @@ interface ProjectRackRow {
     platformName?: string;
 }
 
+type RackValidationSummary = {
+    isValidated: boolean;
+    cableFailures: number;
+    opticsFailures: number;
+    deviceFailures: number;
+};
+
+type RackStatusToken = {
+    className: string;
+    label: string;
+    title: string;
+};
+
+type JsonRecord = Record<string, unknown>;
+
+const NOT_VALIDATED_SUMMARY: RackValidationSummary = {
+    isValidated: false,
+    cableFailures: 0,
+    opticsFailures: 0,
+    deviceFailures: 0,
+};
+
 async function fetchWithRetry(url: string, options: any = {}, maxAttempts: number = 3, delayMs: number = 1000): Promise<Response> {
     const signal: AbortSignal | undefined = options?.signal;
     let lastError;
@@ -89,17 +112,236 @@ async function fetchWithRetry(url: string, options: any = {}, maxAttempts: numbe
     throw lastError;
 }
 
+function asRecord(value: unknown): JsonRecord | null {
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+        return value as JsonRecord;
+    }
+    return null;
+}
+
+function asArray(value: unknown): unknown[] {
+    return Array.isArray(value) ? value : [];
+}
+
+function summarizeLegacyValidationRows(rows: unknown[]): RackValidationSummary {
+    if (rows.length === 0) {
+        return NOT_VALIDATED_SUMMARY;
+    }
+
+    let cableFailures = 0;
+    let opticsFailures = 0;
+    let deviceFailures = 0;
+
+    rows.forEach((rawRow) => {
+        const row = asRecord(rawRow);
+        if (!row) {
+            return;
+        }
+
+        const linkStatus = String(row["lldpStatus"] ?? row["linkStatus"] ?? "")
+            .trim()
+            .toUpperCase();
+        if (linkStatus !== "" && linkStatus !== "PASS" && linkStatus !== "UNSUPPORTED") {
+            cableFailures += 1;
+        }
+
+        const hasOptics =
+            String(row["txPower"] ?? "").trim() !== "" || String(row["rxPower"] ?? "").trim() !== "";
+        if (hasOptics) {
+            opticsFailures += 1;
+        }
+
+        const psuFailure = String(row["psuFailure"] ?? "").trim().toLowerCase();
+        if (psuFailure !== "" && psuFailure !== "null" && psuFailure !== "pass") {
+            deviceFailures += 1;
+        }
+    });
+
+    return {
+        isValidated: true,
+        cableFailures,
+        opticsFailures,
+        deviceFailures,
+    };
+}
+
+function summarizeValidationPayload(payload: unknown, rackSerial: string): RackValidationSummary {
+    if (Array.isArray(payload)) {
+        return summarizeLegacyValidationRows(payload);
+    }
+
+    const payloadRecord = asRecord(payload);
+    if (!payloadRecord) {
+        return NOT_VALIDATED_SUMMARY;
+    }
+
+    let rackNode: unknown = payloadRecord[rackSerial];
+    if (!rackNode) {
+        const keys = Object.keys(payloadRecord);
+        if (keys.length === 1) {
+            rackNode = payloadRecord[keys[0]];
+        }
+    }
+
+    const rackRecord = asRecord(rackNode);
+    if (!rackRecord) {
+        return NOT_VALIDATED_SUMMARY;
+    }
+
+    const deviceResults = Object.values(rackRecord)
+        .map((value) => asRecord(value))
+        .filter((value): value is JsonRecord => value !== null);
+
+    if (deviceResults.length === 0) {
+        return NOT_VALIDATED_SUMMARY;
+    }
+
+    const cableFailures = deviceResults.reduce((sum, result) => {
+        return (
+            sum +
+            asArray(result["LLDP Errors"]).length +
+            asArray(result["Interface Errors"]).length
+        );
+    }, 0);
+
+    const opticsFailures = deviceResults.reduce((sum, result) => {
+        return (
+            sum +
+            asArray(result["Optic Errors"]).length +
+            asArray(result["FEC_BER Errors"]).length
+        );
+    }, 0);
+
+    const deviceFailures = deviceResults.reduce((sum, result) => {
+        return (
+            sum +
+            asArray(result["Power Errors"]).length +
+            asArray(result["Fan Errors"]).length
+        );
+    }, 0);
+
+    return {
+        isValidated: true,
+        cableFailures,
+        opticsFailures,
+        deviceFailures,
+    };
+}
+
+function buildRackStatusTokens(summary: RackValidationSummary): RackStatusToken[] {
+    if (!summary.isValidated) {
+        return [
+            {
+                className: "rack-status-chip pending",
+                label: "UNVAL",
+                title: "Validation has not been triggered or has no results yet",
+            }
+        ];
+    }
+
+    if (
+        summary.cableFailures === 0 &&
+        summary.opticsFailures === 0 &&
+        summary.deviceFailures === 0
+    ) {
+        return [
+            {
+                className: "rack-status-chip success",
+                label: "CLEAN",
+                title: "Validated with no failures",
+            }
+        ];
+    }
+
+    const tokens: RackStatusToken[] = [];
+
+    if (summary.cableFailures > 0) {
+        tokens.push({
+            className: "rack-status-chip cable-failure",
+            label: `CABLE:${summary.cableFailures}`,
+            title: `${summary.cableFailures} cable validation failure${summary.cableFailures === 1 ? "" : "s"}`,
+        });
+    }
+
+    if (summary.opticsFailures > 0) {
+        tokens.push({
+            className: "rack-status-chip optics-failure",
+            label: `OPTICS:${summary.opticsFailures}`,
+            title: `${summary.opticsFailures} optics validation failure${summary.opticsFailures === 1 ? "" : "s"}`,
+        });
+    }
+
+    if (summary.deviceFailures > 0) {
+        tokens.push({
+            className: "rack-status-chip device-failure",
+            label: `DEVICE:${summary.deviceFailures}`,
+            title: `${summary.deviceFailures} device validation failure${summary.deviceFailures === 1 ? "" : "s"}`,
+        });
+    }
+
+    return tokens;
+}
+
+function renderRackStatus(summary: RackValidationSummary | undefined) {
+    if (!summary) {
+        return <span class="rack-status-text muted">Loading...</span>;
+    }
+
+    return (
+        <span class="rack-status-cell">
+            {buildRackStatusTokens(summary).map((token) => (
+                <span key={token.label} class={token.className} title={token.title}>
+                    {token.label}
+                </span>
+            ))}
+        </span>
+    );
+}
+
+async function fetchRackStatusSummary(
+    row: ProjectRackRow,
+    region: string,
+    signal: AbortSignal
+): Promise<RackValidationSummary> {
+    if (!row.rackSerialNumber || !region) {
+        return NOT_VALIDATED_SUMMARY;
+    }
+
+    const validationUrl = new URL(`${API_URL}/cablingValidation`);
+    validationUrl.searchParams.set("regionName", region);
+    validationUrl.searchParams.set("rackSerialNumber", row.rackSerialNumber);
+
+    const response = await fetchWithRetry(validationUrl.href, { method: "GET", signal });
+    if (!response.ok) {
+        return NOT_VALIDATED_SUMMARY;
+    }
+
+    const body = await response.text();
+    if (!body.trim()) {
+        return NOT_VALIDATED_SUMMARY;
+    }
+
+    try {
+        const payload: unknown = JSON.parse(body);
+        return summarizeValidationPayload(payload, row.rackSerialNumber);
+    } catch {
+        return NOT_VALIDATED_SUMMARY;
+    }
+}
+
 const ProjectDetailsContainer = (props: Props) => {
 
     const [allProjectData, setAllProjectData] = useState<ProjectRackRow[]>([]);
     const [loading, setLoading] = useState(false);
     const [loadError, setLoadError] = useState<string | null>(null);
+    const [rackStatusByKey, setRackStatusByKey] = useState<Record<string, RackValidationSummary | undefined>>({});
 
     const [activeBlocks, setActiveBlocks] = useState<string[]>([]);
     const [searchText, setSearchText] = useState("");
     const [hideMissingSerial, setHideMissingSerial] = useState(false);
     const [pageSize, setPageSize] = useState<number>(25);
     const requestSeqRef = useRef(0);
+    const statusRequestSeqRef = useRef(0);
     const [includeInServiceRacks, setIncludeInServiceRacks] = useState(false);
     const [showOnlyGpuRacks, setShowOnlyGpuRacks] = useState(false);
     const [loadedMeasurement, setLoadedMeasurement] = useState<null | {
@@ -180,7 +422,7 @@ const ProjectDetailsContainer = (props: Props) => {
                 }
 
                 const rows: ProjectRackRow[] = await rackResp.json();
-                const normalized: ProjectRackRow[] = (rows || []).map((r, idx) => ({
+                const normalized: ProjectRackRow[] = (rows || []).map((r) => ({
                     ...r,
                     gpuRackLabel: r.isGpuRack ? "Yes" : "No",
                     _key: `${r.block ?? ''}|${r.rackLocation ?? ''}`
@@ -257,6 +499,56 @@ const ProjectDetailsContainer = (props: Props) => {
         return () => cancelAnimationFrame(raf);
     }, [loading, loadError, loadedMeasurement, props.project, props.region]);
 
+    useEffect(() => {
+        const ac = new AbortController();
+        const requestId = ++statusRequestSeqRef.current;
+
+        if (!props.project?.projectId || allProjectData.length === 0) {
+            setRackStatusByKey({});
+            return () => ac.abort();
+        }
+
+        const nextStatuses: Record<string, RackValidationSummary | undefined> = {};
+        allProjectData.forEach((row) => {
+            nextStatuses[row._key] = row.rackSerialNumber ? undefined : NOT_VALIDATED_SUMMARY;
+        });
+        setRackStatusByKey(nextStatuses);
+
+        const rowsToFetch = allProjectData.filter(
+            (row) => row.rackSerialNumber && row.rackSerialNumber.trim() !== ""
+        );
+
+        void Promise.all(
+            rowsToFetch.map(async (row) => {
+                try {
+                    const summary = await fetchRackStatusSummary(row, props.region, ac.signal);
+                    return [row._key, summary] as const;
+                } catch (e) {
+                    if ((e as any)?.name === 'AbortError') {
+                        return null;
+                    }
+                    return [row._key, NOT_VALIDATED_SUMMARY] as const;
+                }
+            })
+        ).then((entries) => {
+            if (ac.signal.aborted || requestId !== statusRequestSeqRef.current) {
+                return;
+            }
+
+            const resolvedStatuses = { ...nextStatuses };
+            entries.forEach((entry) => {
+                if (!entry) {
+                    return;
+                }
+                const [key, summary] = entry;
+                resolvedStatuses[key] = summary;
+            });
+            setRackStatusByKey(resolvedStatuses);
+        });
+
+        return () => ac.abort();
+    }, [allProjectData, props.project, props.region]);
+
     const filteredRows = useMemo((): ProjectRackRow[] => {
         if (activeBlocks.length === 0) {
             return [];
@@ -326,6 +618,11 @@ const ProjectDetailsContainer = (props: Props) => {
                 }
             }
         }
+    };
+
+    const validationStatusTemplate = (context: any) => {
+        const row = (context?.item && context.item.data) || {};
+        return renderRackStatus(rackStatusByKey[row._key]);
     };
 
     return (
@@ -470,6 +767,7 @@ const ProjectDetailsContainer = (props: Props) => {
                         data={pagingDataProvider as any}
                         accessibility={ACC}
                     >
+                        <template slot="validationStatusTemplate" render={validationStatusTemplate} />
                     </oj-table>
                     <div style="margin-top: 10px; display: flex; justify-content: flex-end;">
                         <oj-paging-control
