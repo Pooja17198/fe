@@ -108,6 +108,26 @@ function normalizeDeviceName(value: string | undefined | null): string {
   return String(value || "").trim().toLowerCase();
 }
 
+function isUsableLookupValue(value: string | undefined | null): boolean {
+  const normalized = normalizeDeviceName(value);
+  return !["", "unknown", "n/a", "na", "-"].includes(normalized);
+}
+
+function getLookupValue(
+  primary: string | undefined | null,
+  fallback?: string | undefined | null
+): string {
+  if (isUsableLookupValue(primary)) {
+    return String(primary ?? "").trim();
+  }
+
+  if (isUsableLookupValue(fallback)) {
+    return String(fallback ?? "").trim();
+  }
+
+  return "";
+}
+
 function toDevicePortKey(deviceName: string | undefined | null, devicePort: string | undefined | null): string {
   return `${normalizeDeviceName(deviceName)}|${normalizeDeviceName(devicePort)}`;
 }
@@ -232,22 +252,44 @@ function renderPatchPanelValue(rows: PatchPanelRow[]): string {
     .join("\n\n");
 }
 
-function addPatchPanelToSectionRows(sectionId: TestSectionConfig["id"], rows: any[], patchPanelByDevicePort: PatchPanelByDevicePort): any[] {
-  if (sectionId === "fans") {
-    return rows;
-  }
+function addPatchPanelToSectionRows(
+  sectionId: TestSectionConfig["id"],
+  rows: any[],
+  patchPanelByDevicePort: PatchPanelByDevicePort
+): any[] {
+  if (sectionId === "fans") return rows;
 
   return rows.map((row) => {
-    const deviceName =
-      sectionId === "lldp"
-        ? row.deviceAName
-        : (row.sourceDeviceName ?? row.deviceName);
-    const devicePort =
-      sectionId === "lldp"
-        ? row.deviceAPort
-        : (row.sourceDevicePort ?? row.devicePort);
-    const key = toDevicePortKey(deviceName, devicePort);
-    const patchPanelRows = patchPanelByDevicePort[key] || [];
+    let patchPanelRows: PatchPanelRow[] = [];
+
+    if (sectionId === "lldp") {
+      const primaryName = getLookupValue(row.deviceAName);
+      const primaryPort = getLookupValue(row.deviceAPort);
+
+      const hasUsablePrimary =
+        isUsableLookupValue(primaryName) && isUsableLookupValue(primaryPort);
+
+      if (hasUsablePrimary) {
+        const primaryKey = toDevicePortKey(primaryName, primaryPort);
+        patchPanelRows = patchPanelByDevicePort[primaryKey] ?? [];
+ 
+        if (patchPanelRows.length === 0) {
+          const expectedName = getLookupValue(row.expectedDeviceBName);
+          const expectedPort = getLookupValue(row.expectedDeviceBPort);
+
+          if (isUsableLookupValue(expectedName) && isUsableLookupValue(expectedPort)) {
+            const fallbackKey = toDevicePortKey(expectedName, expectedPort);
+            patchPanelRows = patchPanelByDevicePort[fallbackKey] ?? [];
+          }
+        }
+      }
+    } else {
+      const deviceName = getLookupValue(row.deviceName, row.remoteDeviceName ?? row.remoteDevice);
+      const devicePort = getLookupValue(row.devicePort, row.remoteDevicePort ?? row.remoteInterface);
+      const key = toDevicePortKey(deviceName, devicePort);
+      patchPanelRows = patchPanelByDevicePort[key] ?? [];
+    }
+
     return {
       ...row,
       patchPanelMatrix: renderPatchPanelValue(patchPanelRows),
