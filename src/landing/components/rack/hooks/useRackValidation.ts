@@ -17,7 +17,7 @@ import {
 } from "../types";
 import { IDE_API, LVV_API, POLLING } from "../constants";
 import { fetchWithRetry, createCsrfHeaders } from "../api";
-import { anyJobInProgress, isGpuComputeDevice, parseContentDispositionFilename } from "../utils";
+import { anyJobInProgress, isGpuComputeDevice, isRackValidationAllowed, parseContentDispositionFilename } from "../utils";
 import { emitMetric, TELEMETRY_METRICS } from "../../telemetry/api";
 
 type UseRackValidationResult = {
@@ -37,6 +37,8 @@ type UseRackValidationResult = {
     // derived
     eligibleDeviceNames: Set<string>;
     eligibleDeviceCount: number;
+    rackValidationAllowed: boolean;
+    rackValidationTooltip: string;
     resolveFeatureEnabled: boolean;
     resolveAllowed: boolean;
     resolveTooltip: string;
@@ -80,6 +82,10 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
     }>(null);
 
     // derived
+    const rackValidationAllowed = isRackValidationAllowed(props.isGpuRack, props.rackState);
+    const rackValidationTooltip = rackValidationAllowed
+        ? ""
+        : GPU_RACK_IN_SERVICE_ONLY_REASON;
     const resolveFeatureEnabled = props.resolveEnabled !== false; // default to enabled if undefined
     const resolveAllowed = resolveFeatureEnabled && Boolean(props.ticket);
     const resolveTooltip = !resolveFeatureEnabled
@@ -101,6 +107,9 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
     // Keep selected device keys constrained to validation-eligible devices.
     useEffect(() => {
         setSelectedLinkKeys((prev) => {
+            if (!rackValidationAllowed) {
+                return prev.size === 0 ? prev : new Set<string>();
+            }
             let changed = false;
             const next = new Set<string>();
             prev.forEach((key) => {
@@ -113,7 +122,7 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
             });
             return changed ? next : prev;
         });
-    }, [eligibleDeviceNameSet]);
+    }, [eligibleDeviceNameSet, rackValidationAllowed]);
 
     // track rack key and always abort any prior in-flight requests before creating a fresh controller
     useEffect(() => {
@@ -328,6 +337,15 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
     const startValidationJob = useCallback(async () => {
         const headers = createCsrfHeaders();
 
+        if (!rackValidationAllowed) {
+            return {
+                error: {
+                    code: 400,
+                    message: GPU_RACK_IN_SERVICE_ONLY_REASON,
+                },
+            };
+        }
+
         if (eligibleDeviceNames.length === 0) {
             return {
                 error: {
@@ -447,6 +465,7 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
         props.rack_serial,
         eligibleDeviceNames,
         eligibleDeviceNameSet,
+        rackValidationAllowed,
     ]);
 
     // poll validation job and keep UI state in sync
@@ -601,6 +620,15 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
     );
 
     const validate = useCallback(async () => {
+        if (!rackValidationAllowed) {
+            setJobErrorDetails({
+                code: 400,
+                message: GPU_RACK_IN_SERVICE_ONLY_REASON,
+            });
+            setIsValidating(false);
+            return;
+        }
+
         setPatchPanelByDevicePort({});
         const selectedDeviceCount = selectedLinkKeys.size > 0
             ? Array.from(selectedLinkKeys).filter((key) => eligibleDeviceNameSet.has(selectedKeyToDeviceName(key))).length
@@ -648,7 +676,7 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
             });
             setIsValidating(false);
         }
-    }, [startValidationJob, pollValidationJob, fetchValidationFailures, selectedLinkKeys, eligibleDeviceNameSet, eligibleDeviceNames]);
+    }, [startValidationJob, pollValidationJob, fetchValidationFailures, selectedLinkKeys, eligibleDeviceNameSet, eligibleDeviceNames, rackValidationAllowed]);
 
     const resolve = useCallback(async (): Promise<{ ok: true } | { ok: false; message: string }> => {
         if (!resolveAllowed) {
@@ -745,6 +773,8 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
 
         eligibleDeviceNames: eligibleDeviceNameSet,
         eligibleDeviceCount: eligibleDeviceNames.length,
+        rackValidationAllowed,
+        rackValidationTooltip,
         resolveFeatureEnabled,
         resolveAllowed,
         resolveTooltip,
@@ -759,6 +789,8 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
 type RowRecord = Record<string, unknown>;
 const MONITORED_DEPLOYED_ONLY_REASON =
     "Device is not in monitored and deployed state.";
+const GPU_RACK_IN_SERVICE_ONLY_REASON =
+    "Validation is allowed for GPU racks only when rack state is IN-SERVICE.";
 
 function asRecord(value: unknown): RowRecord | null {
     if (value && typeof value === "object" && !Array.isArray(value)) {

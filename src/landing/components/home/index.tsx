@@ -20,6 +20,7 @@ type RackMetadata = {
     building: string;
     block: string;
     rack: string;
+    rackState?: string;
     ticket?: string;
     rackSerialNumber?: string;
     isGpuRack?: boolean;
@@ -128,6 +129,7 @@ const HomeContainer = (props: Props) => {
             building: value.building,
             block: value.block,
             rack: value.rackLocation,
+            rackState: value.rackState,
             ticket: value.ticketId,
             rackSerialNumber: value.rackSerialNumber,
             isGpuRack: value.isGpuRack,

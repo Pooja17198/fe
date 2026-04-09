@@ -107,6 +107,8 @@ type Props = {
   loading: boolean;
   isValidating: boolean;
   hideUnsupported: boolean;
+  rackValidationAllowed: boolean;
+  rackValidationTooltip: string;
   externalExpandedKeys?: Set<string>;
   externalExpandedKeysNonce?: number;
 };
@@ -473,6 +475,9 @@ const DeviceAccordion = (props: Props) => {
   }, [someSelected, allSelected, props.selectedLinkKeys, sortedDevices]);
 
   const toggleSelectAll = (checked: boolean) => {
+    if (!props.rackValidationAllowed) {
+      return;
+    }
     props.setSelectedLinkKeys((prev) => {
       const next = new Set(prev as Set<string>);
       if (checked) {
@@ -649,9 +654,11 @@ const DeviceAccordion = (props: Props) => {
                   type="checkbox"
                   checked={allSelected}
                   onChange={(e: any) => toggleSelectAll((e.target as HTMLInputElement).checked)}
-                  disabled={eligibleDeviceKeys.size === 0}
+                  disabled={!props.rackValidationAllowed || eligibleDeviceKeys.size === 0}
                   title={
-                    eligibleDeviceKeys.size === 0
+                    !props.rackValidationAllowed
+                        ? props.rackValidationTooltip
+                        : eligibleDeviceKeys.size === 0
                         ? "No monitored and deployed devices are available for validation."
                         : ""
                   }
@@ -676,9 +683,12 @@ const DeviceAccordion = (props: Props) => {
                   const isExpanded = expandedKeys.has(device._key);
                   const isValidationEligible = props.eligibleDeviceNames.has(device.deviceName);
                   const statusToRender = isValidationEligible ? device.jobStatus : "NOT_ELIGIBLE";
+                  const rowSelectionDisabled = !props.rackValidationAllowed || !isValidationEligible;
                   const disabledReason =
-                      device.validationEligibilityReason ||
-                      "Validation is available only for monitored and deployed devices.";
+                      !props.rackValidationAllowed
+                          ? props.rackValidationTooltip
+                          : (device.validationEligibilityReason ||
+                              "Validation is available only for monitored and deployed devices.");
 
                   return (
                       <oj-collapsible
@@ -699,7 +709,7 @@ const DeviceAccordion = (props: Props) => {
                             >
                         {selectTemplate(
                             { item: { data: { _key: device._key } } },
-                            !isValidationEligible,
+                            rowSelectionDisabled,
                             disabledReason
                         )}
                       </span>

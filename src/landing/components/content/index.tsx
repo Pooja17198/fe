@@ -34,6 +34,7 @@ type RackMetadata = {
   building: string;
   block: string;
   rack: string;
+  rackState?: string;
   project?: string;
   ticket: string;
   rackSerialNumber?: string;
@@ -43,7 +44,7 @@ type RackMetadata = {
 }
 
 function decodeRackUrlContext(): Partial<RackMetadata> {
-  // URL format: /rack/{rackSerialNumber}?region=...&project=...&building=...&block=...&rack=...&ticket=...&resolveEnabled=...&resolveDisabledReason=...
+  // URL format: /rack/{rackSerialNumber}?region=...&project=...&building=...&block=...&rack=...&rackState=...&ticket=...&resolveEnabled=...&resolveDisabledReason=...
   const match = window.location.pathname.match(/^\/rack\/([^/]+)\/?$/);
   if (!match) return {};
   const [, id] = match;
@@ -52,6 +53,7 @@ function decodeRackUrlContext(): Partial<RackMetadata> {
   const building = params.get("building") ? decodeURIComponent(params.get("building") as string) : "";
   const block = params.get("block") ? decodeURIComponent(params.get("block") as string) : "";
   const rack = params.get("rack") ? decodeURIComponent(params.get("rack") as string) : "";
+  const rackState = params.get("rackState") ? decodeURIComponent(params.get("rackState") as string) : "";
   const project = params.get("project") ? decodeURIComponent(params.get("project") as string) : "";
   const isGpuRack = params.get("isGpuRack") === "true";
   const ticketParam = params.get("ticket");
@@ -65,6 +67,7 @@ function decodeRackUrlContext(): Partial<RackMetadata> {
     building,
     block,
     rack,
+    rackState,
     isGpuRack,
   };
 
@@ -88,6 +91,7 @@ const Content = (props: Props) => {
   const [selectedPage, setSelectedPage] = useState<string>("");
   const [selectedTicket, setSelectedTicket] = useState(INIT_DEFAULT)
   const [selectedRack, setSelectedRack] = useState(INIT_DEFAULT)
+  const [selectedRackState, setSelectedRackState] = useState(INIT_DEFAULT)
   const [selectedBuilding, setSelectedBuilding] = useState(INIT_DEFAULT)
   const [selectedBlock, setSelectedBlock] = useState(INIT_DEFAULT)
   const [selectedProject, setSelectedProject] = useState(INIT_DEFAULT)
@@ -121,6 +125,7 @@ const Content = (props: Props) => {
     if (ctx.building) setSelectedBuilding(ctx.building);
     if (ctx.block) setSelectedBlock(ctx.block);
     if (ctx.rack) setSelectedRack(ctx.rack);
+    if (typeof ctx.rackState === "string") setSelectedRackState(ctx.rackState);
     if (ctx.project) setSelectedProject(ctx.project);
     if (typeof ctx.isGpuRack === "boolean") setSelectedIsGpuRack(Boolean(ctx.isGpuRack));
     if (typeof ctx.ticket === "string") setSelectedTicket(ctx.ticket);
@@ -134,6 +139,7 @@ const Content = (props: Props) => {
   const rackChangedHandler = (value: any) => {
     console.log("Rack value passed is ", value);
     setSelectedRack(value.rack);
+    setSelectedRackState(String(value.rackState || ""));
     setSelectedBuilding(value.building);
     setSelectedBlock(value.block);
     setSelectedProject(value.project);
@@ -167,6 +173,7 @@ const Content = (props: Props) => {
         building: String(selectedBuilding || ""),
         block: String(selectedBlock || ""),
         rack: String(selectedRack || ""),
+        rackState: String(selectedRackState || ""),
         isGpuRack: String(Boolean(selectedIsGpuRack)),
       };
       if (hasTicket) {
@@ -202,6 +209,7 @@ const Content = (props: Props) => {
                 building={selectedBuilding}
                 block={selectedBlock}
                 rack={selectedRack}
+                rackState={selectedRackState}
                 project={selectedProject}
                 ticket={selectedTicket}
                 rack_serial={selectedRackSerialNumber}

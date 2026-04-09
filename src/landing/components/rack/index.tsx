@@ -26,6 +26,8 @@ const Rack = (props: RackProps) => {
     isDownloading,
     eligibleDeviceNames,
     eligibleDeviceCount,
+    rackValidationAllowed,
+    rackValidationTooltip,
     resolveFeatureEnabled,
     resolveAllowed,
     resolveTooltip,
@@ -186,10 +188,12 @@ const Rack = (props: RackProps) => {
                 label="Validate"
                 onojAction={validate}
                 style="margin-left: 8px; margin-right: 8px;"
-                disabled={isValidating || eligibleDeviceCount === 0}
+                disabled={isValidating || eligibleDeviceCount === 0 || !rackValidationAllowed}
                 title={
                   isValidating
                     ? ""
+                    : !rackValidationAllowed
+                    ? rackValidationTooltip
                     : eligibleDeviceCount === 0
                     ? "Validation is available only for monitored and deployed devices."
                     : ""
@@ -246,6 +250,8 @@ const Rack = (props: RackProps) => {
               loading={devicesLoading}
               isValidating={isValidating}
               hideUnsupported={hideUnsupported}
+              rackValidationAllowed={rackValidationAllowed}
+              rackValidationTooltip={rackValidationTooltip}
               externalExpandedKeys={externalExpandedKeys}
               externalExpandedKeysNonce={externalExpandedKeysNonce}
           />

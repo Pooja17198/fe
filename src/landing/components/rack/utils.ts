@@ -14,6 +14,15 @@ export function isGpuComputeDevice(
   );
 }
 
+export function isRackInService(rackState: string | null | undefined): boolean {
+  return String(rackState || "").toUpperCase() === "IN-SERVICE";
+}
+
+export function isRackValidationAllowed(isGpuRack: boolean | undefined, rackState: string | null | undefined): boolean {
+  if (!isGpuRack) return true;
+  return isRackInService(rackState);
+}
+
 export function getStatusClass(status: string): string {
   const s = (status || "").toUpperCase();
   if (s === "IN_PROGRESS") return "status-in-progress";
