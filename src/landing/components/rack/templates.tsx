@@ -62,13 +62,20 @@ export const patchPanelMatrixTemplate = (context: any) => {
   return <div class="patch-panel-matrix-cell">{value}</div>;
 };
 
-export const gpuMultilineValueTemplate = (context: any) => {
-  const row = (context?.item && context.item.data) || {};
-  const field = context?.column?.field;
-  const rawValue = field ? row[field] : "";
-  const value = `${rawValue ?? ""}`.trim().replace(/\\n/g, "\n") || "Not Available";
-  return <div class="gpu-multiline-value-cell">{value}</div>;
+const renderGpuMultilineValue = (value: unknown) => {
+  const text = `${value ?? ""}`.trim().replace(/\\n/g, "\n") || "Not Available";
+  return <div class="gpu-multiline-value-cell">{text}</div>;
 };
+
+const createGpuMultilineValueTemplate = (field: string) => (context: any) => {
+  const row = (context?.item && context.item.data) || {};
+  return renderGpuMultilineValue(row[field]);
+};
+
+export const deviceALocationTemplate = createGpuMultilineValueTemplate("deviceALocation");
+export const currentBLocationTemplate = createGpuMultilineValueTemplate("currentBLocation");
+export const expectedBLocationTemplate = createGpuMultilineValueTemplate("expectedBLocation");
+export const sourceDeviceLocationTemplate = createGpuMultilineValueTemplate("sourceDeviceLocation");
 
 export const gpuMultilineErrorMessageTemplate = (context: any) => {
   const row = (context?.item && context.item.data) || {};

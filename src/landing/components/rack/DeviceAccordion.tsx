@@ -26,12 +26,15 @@ import {
 } from "./columns";
 import {
   booleanStatusTemplate,
+  currentBLocationTemplate,
+  deviceALocationTemplate,
   errorMessageClampTemplate,
+  expectedBLocationTemplate,
   gpuMultilineErrorMessageTemplate,
-  gpuMultilineValueTemplate,
   lldpStatusTemplate,
   patchPanelMatrixTemplate,
   psuStatusTemplate,
+  sourceDeviceLocationTemplate,
 } from "./templates";
 import { formatStatusLabel, getStatusClass, isDeviceStatusCompleted, isGpuComputeDevice } from "./utils";
 type ValidationAgeColor = "green" | "orange" | "red";
@@ -800,7 +803,10 @@ const DeviceAccordion = (props: Props) => {
                                               <template slot="lldpStatusTemplate" render={lldpStatusTemplate} />
                                               <template slot="booleanStatusTemplate" render={booleanStatusTemplate} />
                                               <template slot="patchPanelMatrixTemplate" render={patchPanelMatrixTemplate} />
-                                              <template slot="gpuMultilineValueTemplate" render={gpuMultilineValueTemplate} />
+                                              <template slot="deviceALocationTemplate" render={deviceALocationTemplate} />
+                                              <template slot="currentBLocationTemplate" render={currentBLocationTemplate} />
+                                              <template slot="expectedBLocationTemplate" render={expectedBLocationTemplate} />
+                                              <template slot="sourceDeviceLocationTemplate" render={sourceDeviceLocationTemplate} />
                                               <template slot="gpuMultilineErrorMessageTemplate" render={gpuMultilineErrorMessageTemplate} />
                                               <template slot="errorMessageClampTemplate" render={errorMessageClampTemplate} />
                                             </oj-table>
