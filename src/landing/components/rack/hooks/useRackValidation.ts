@@ -9,13 +9,13 @@ import {
     LldpFailureRow,
     OpticFailureRow,
     PowerFailureRow,
-    PatchPanelByDevicePort,
+    PatchPanelRackRows,
     PatchPanelRow,
     RackProps,
     ValidationFailure,
     ValidationFailuresByDevice,
 } from "../types";
-import { IDE_API, LVV_API, POLLING } from "../constants";
+import { LVV_API, POLLING } from "../constants";
 import { fetchWithRetry, createCsrfHeaders } from "../api";
 import { anyJobInProgress, isGpuComputeDevice, isRackValidationAllowed, parseContentDispositionFilename } from "../utils";
 import { emitMetric, TELEMETRY_METRICS } from "../../telemetry/api";
@@ -25,7 +25,7 @@ type UseRackValidationResult = {
     deviceStatuses: DeviceStatus[];
     devicesLoading: boolean;
     validationFailuresByDevice: ValidationFailuresByDevice;
-    patchPanelByDevicePort: PatchPanelByDevicePort;
+    patchPanelRackRows: PatchPanelRackRows;
     totalFailureRows: number;
     totalLinkFailureRows: number;
     powerFailureDevices: number;
@@ -55,7 +55,8 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
     const previousStatusesRef = useRef<Map<string, string>>(new Map());
     const currentRackKeyRef = useRef<string>("");
     const pageAbortRef = useRef<AbortController | null>(null);
-    const ideRackRowsCacheRef = useRef<Map<string, PatchPanelRow[]>>(new Map());
+    const patchPanelRackRowsCacheRef = useRef<Map<string, PatchPanelRow[]>>(new Map());
+    const patchPanelPrefetchPromiseRef = useRef<Map<string, Promise<PatchPanelRow[]>>>(new Map());
     const validationMeasurementRef = useRef<null | {
         measurementId: number;
         startedAt: number;
@@ -69,7 +70,7 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
     const [devicesLoading, setDevicesLoading] = useState<boolean>(false);
     const [validationFailuresByDevice, setValidationFailuresByDevice] =
         useState<ValidationFailuresByDevice>({});
-    const [patchPanelByDevicePort, setPatchPanelByDevicePort] = useState<PatchPanelByDevicePort>({});
+    const [patchPanelRackRows, setPatchPanelRackRows] = useState<PatchPanelRackRows>([]);
     const [selectedLinkKeys, setSelectedLinkKeys] = useState<Set<string>>(new Set());
     const [isValidating, setIsValidating] = useState(false);
     const [jobErrorDetails, setJobErrorDetails] = useState<JobErrorDetails>(null);
@@ -144,8 +145,9 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
     useEffect(() => {
         if (!rackContextReady) return;
         previousStatusesRef.current = new Map();
-        ideRackRowsCacheRef.current = new Map();
-        setPatchPanelByDevicePort({});
+        patchPanelRackRowsCacheRef.current = new Map();
+        patchPanelPrefetchPromiseRef.current = new Map();
+        setPatchPanelRackRows([]);
     }, [rackContextReady, props.region, props.rack_serial, props.rack, props.building]);
 
     // clear job error banner on rack context changes
@@ -237,9 +239,47 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
         return false;
     }, [props.region, props.rack, props.building, props.rack_serial]);
 
+    const prefetchPatchPanelRowsForCurrentRack = useCallback(async (): Promise<PatchPanelRow[]> => {
+        if (!props.building || !props.rack || !props.rack_serial || !props.region) {
+            return [];
+        }
+
+        const rackCacheKey = `${props.region}|${props.rack_serial}|${props.rack}|${props.building}`;
+        const cachedRows = patchPanelRackRowsCacheRef.current.get(rackCacheKey);
+        if (cachedRows) {
+            return cachedRows;
+        }
+
+        const inFlightPromise = patchPanelPrefetchPromiseRef.current.get(rackCacheKey);
+        if (inFlightPromise) {
+            return await inFlightPromise;
+        }
+
+        const fetchPromise = fetchPatchPanelRowsByRack(
+            props.building,
+            props.rack,
+            props.rack_serial,
+            props.region,
+            pageAbortRef.current?.signal as AbortSignal | undefined
+        )
+            .then((rows) => {
+                patchPanelRackRowsCacheRef.current.set(rackCacheKey, rows);
+                return rows;
+            })
+            .finally(() => {
+                patchPanelPrefetchPromiseRef.current.delete(rackCacheKey);
+            });
+
+        patchPanelPrefetchPromiseRef.current.set(rackCacheKey, fetchPromise);
+        return await fetchPromise;
+    }, [props.building, props.rack, props.rack_serial, props.region]);
+
     const fetchValidationFailures = useCallback(async (): Promise<boolean> => {
       try {
         if (!props.rack_serial || !props.region) return false;
+
+        // Start patch panel request early to overlap with cabling validation parsing.
+        const patchPanelRowsPromise = prefetchPatchPanelRowsForCurrentRack();
 
         const url = new URL(`${LVV_API}/cablingValidation`);
         url.searchParams.set("regionName", props.region);
@@ -255,40 +295,27 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
         const normalized = normalizeValidationFailuresPayload(data, props.rack_serial);
         setValidationFailuresByDevice(normalized);
 
-        const errorDeviceNames = new Set(
-          Object.entries(normalized)
-            .filter(([, device]) => (device?.counts?.overallTotal || 0) > 0)
-            .map(([deviceName]) => normalizeDeviceKey(deviceName))
+        const hasErrorRows = Object.values(normalized).some(
+          (device) => (device?.counts?.overallTotal || 0) > 0
         );
 
-        if (errorDeviceNames.size === 0) {
-          setPatchPanelByDevicePort({});
+        if (!hasErrorRows) {
+          setPatchPanelRackRows([]);
+          // Ensure early-started promise doesn't produce an unhandled rejection.
+          void patchPanelRowsPromise.catch(() => undefined);
           return true; // validation call succeeded
         }
 
-        // IDE fetch is non-blocking for the main validation response.
+        // Patch panel fetch is auxiliary; keep failures response successful even if it fails.
         try {
-          const rackCacheKey = `${props.region}|${props.rack_serial}|${props.rack}|${props.building}`;
-          let rackRows = ideRackRowsCacheRef.current.get(rackCacheKey);
-
-          if (!rackRows) {
-            rackRows = await fetchIdePhysicalCutsheetRowsByRack(
-              props.building,
-              props.rack,
-              pageAbortRef.current?.signal as AbortSignal | undefined
-            );
-            ideRackRowsCacheRef.current.set(rackCacheKey, rackRows);
-          }
-
-          const indexedRows = filterPatchPanelForErrorDevicePorts(rackRows, errorDeviceNames);
-          setPatchPanelByDevicePort(indexedRows);
-        } catch (ideError: any) {
-          if (ideError?.name !== "AbortError") {
-            console.warn("[RackValidation] IDE physicalcutsheets frontend call failed", {
-              message: ideError?.message || String(ideError),
+          const rackRows = await patchPanelRowsPromise;
+          setPatchPanelRackRows(rackRows);
+        } catch (patchPanelError: any) {
+          if (patchPanelError?.name !== "AbortError") {
+            console.warn("[RackValidation] patchPanel backend call failed", {
+              message: patchPanelError?.message || String(patchPanelError),
             });
           }
-          // Do NOT fail fetchValidationFailures because IDE is auxiliary.
         }
 
         return true;
@@ -296,7 +323,7 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
         if (e?.name === "AbortError") return false;
         return false; // this is validation API failure path
       }
-    }, [props.region, props.rack_serial, props.rack, props.building]);
+    }, [props.region, props.rack_serial, prefetchPatchPanelRowsForCurrentRack]);
 
     // initial/sequential load: devices then failures
     // Avoid "cancelled" flag; snapshot rack key and controller at effect start
@@ -628,8 +655,14 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
             setIsValidating(false);
             return;
         }
-
-        setPatchPanelByDevicePort({});
+        // Prefetch patch panel rows in parallel with validation polling so matrix can render sooner.
+        void prefetchPatchPanelRowsForCurrentRack().catch((patchPanelError: any) => {
+            if (patchPanelError?.name !== "AbortError") {
+                console.warn("[RackValidation] patchPanel prefetch failed", {
+                    message: patchPanelError?.message || String(patchPanelError),
+                });
+            }
+        });
         const selectedDeviceCount = selectedLinkKeys.size > 0
             ? Array.from(selectedLinkKeys).filter((key) => eligibleDeviceNameSet.has(selectedKeyToDeviceName(key))).length
             : eligibleDeviceNames.length;
@@ -676,7 +709,16 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
             });
             setIsValidating(false);
         }
-    }, [startValidationJob, pollValidationJob, fetchValidationFailures, selectedLinkKeys, eligibleDeviceNameSet, eligibleDeviceNames, rackValidationAllowed]);
+    }, [
+        startValidationJob,
+        pollValidationJob,
+        fetchValidationFailures,
+        prefetchPatchPanelRowsForCurrentRack,
+        selectedLinkKeys,
+        eligibleDeviceNameSet,
+        eligibleDeviceNames,
+        rackValidationAllowed
+    ]);
 
     const resolve = useCallback(async (): Promise<{ ok: true } | { ok: false; message: string }> => {
         if (!resolveAllowed) {
@@ -767,7 +809,7 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
         deviceStatuses,
         devicesLoading,
         validationFailuresByDevice,
-        patchPanelByDevicePort,
+        patchPanelRackRows,
         totalFailureRows: summaryStats.totalFailureRows,
         totalLinkFailureRows: summaryStats.totalLinkFailureRows,
         powerFailureDevices: summaryStats.powerFailureDevices,
@@ -1287,17 +1329,6 @@ function normalizeValidationFailuresPayload(
     return byDevice;
 }
 
-function normalizeDeviceKey(value: string | null | undefined): string {
-    return String(value || "").trim().toLowerCase();
-}
-
-function normalizeDevicePortKey(
-    deviceName: string | null | undefined,
-    devicePort: string | null | undefined
-): string {
-    return `${normalizeDeviceKey(deviceName)}|${normalizeDeviceKey(devicePort)}`;
-}
-
 function normalizeIdeCutsheetRows(payload: unknown): PatchPanelRow[] {
     if (Array.isArray(payload)) {
         return payload.filter((item) => asRecord(item) !== null) as PatchPanelRow[];
@@ -1316,93 +1347,40 @@ function normalizeIdeCutsheetRows(payload: unknown): PatchPanelRow[] {
     return [];
 }
 
-function toRawJsonString(value: unknown): string {
-    try {
-        return JSON.stringify(value, null, 2);
-    } catch {
-        return String(value);
-    }
-}
-
-function isLookupPortValue(value: string | null | undefined): boolean {
-    const normalized = normalizeDeviceKey(value);
-    return (
-        normalized !== "" &&
-        normalized !== "unknown" &&
-        normalized !== "n/a" &&
-        normalized !== "na" &&
-        normalized !== "-"
-    );
-}
-
-async function fetchIdePhysicalCutsheetRowsByRack(
+async function fetchPatchPanelRowsByRack(
     buildingName: string | undefined,
     rackNumber: string | undefined,
+    rackSerialNumber: string | undefined,
+    regionName: string | undefined,
     signal?: AbortSignal
 ): Promise<PatchPanelRow[]> {
-    const allRows: PatchPanelRow[] = [];
-    let nextPage: string | null = null;
+    const patchPanelUrl = new URL(`${LVV_API}/patchPanel`);
+    if (buildingName && buildingName.trim() !== "") {
+        patchPanelUrl.searchParams.set("buildingName", buildingName);
+    }
+    if (rackNumber && rackNumber.trim() !== "") {
+        patchPanelUrl.searchParams.set("rackNumber", rackNumber);
+    }
+    if (rackSerialNumber && rackSerialNumber.trim() !== "") {
+        patchPanelUrl.searchParams.set("rackSerialNumber", rackSerialNumber);
+    }
+    if (regionName && regionName.trim() !== "") {
+        patchPanelUrl.searchParams.set("regionName", regionName);
+    }
 
-    do {
-        const ideUrl = new URL(`${IDE_API}/physicalcutsheets`);
-        if (buildingName && buildingName.trim() !== "") {
-            ideUrl.searchParams.set("buildingName", buildingName);
-        }
-        if (rackNumber && rackNumber.trim() !== "") {
-            ideUrl.searchParams.set("rackNumber", rackNumber);
-        }
-        if (nextPage) {
-            ideUrl.searchParams.set("page", nextPage);
-        }
-
-        const response = await fetchWithRetry(ideUrl.href, {
-            method: "GET",
-            signal,
-        });
-        if (!response.ok) {
-            throw new Error(`IDE query failed (${response.status} ${response.statusText})`);
-        }
-
-        let payload: unknown;
-        try {
-            payload = await response.json();
-        } catch {
-            payload = [];
-        }
-        allRows.push(...normalizeIdeCutsheetRows(payload));
-        nextPage = response.headers.get("opc-next-page");
-    } while (nextPage);
-
-    return allRows;
-}
-
-function filterPatchPanelForErrorDevicePorts(
-    rows: PatchPanelRow[],
-    errorDeviceNames: Set<string>
-): PatchPanelByDevicePort {
-    const byDevicePort: PatchPanelByDevicePort = {};
-
-    rows.forEach((row) => {
-        const deviceKey = normalizeDeviceKey(row.deviceName);
-        if (!deviceKey || !errorDeviceNames.has(deviceKey)) {
-            return;
-        }
-
-        const addRowForKey = (key: string) => {
-            if (!byDevicePort[key]) {
-                byDevicePort[key] = [];
-            }
-            byDevicePort[key].push({
-                ...row,
-                rawJson: toRawJsonString(row),
-            });
-        };
-
-        if (isLookupPortValue(row.devicePort)) {
-            const devicePortKey = normalizeDevicePortKey(row.deviceName, row.devicePort);
-            addRowForKey(devicePortKey);
-        }
+    const response = await fetchWithRetry(patchPanelUrl.href, {
+        method: "GET",
+        signal,
     });
+    if (!response.ok) {
+        throw new Error(`patchPanel query failed (${response.status} ${response.statusText})`);
+    }
 
-    return byDevicePort;
+    let payload: unknown;
+    try {
+        payload = await response.json();
+    } catch {
+        payload = [];
+    }
+    return normalizeIdeCutsheetRows(payload);
 }
