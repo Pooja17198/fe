@@ -145,6 +145,101 @@ function toDevicePortKey(deviceName: string | undefined | null, devicePort: stri
   return `${normalizeDeviceName(deviceName)}|${normalizeDeviceName(devicePort)}`;
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function expandGroupedPortVariants(devicePort: string | undefined | null): string[] {
+  const normalizedPort = String(devicePort || "").trim();
+  if (!normalizedPort) return [];
+
+  const groupedPortMatch = normalizedPort.match(/^(.*\[)([^\]]+)(\].*)$/);
+  if (!groupedPortMatch) {
+    return [normalizedPort];
+  }
+
+  const [, prefix, groupedSegment, suffix] = groupedPortMatch;
+  const expandedMembers = groupedSegment
+    .split("+")
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  if (expandedMembers.length === 0) {
+    return [normalizedPort];
+  }
+
+  const prefixWithoutBracket = prefix.slice(0, -1);
+  const suffixWithoutBracket = suffix.startsWith("]") ? suffix.slice(1) : suffix;
+  const separatorMatch = prefixWithoutBracket.match(/([\/-])$/);
+  const separator = separatorMatch ? separatorMatch[1] : "";
+  const basePrefix = separator ? prefixWithoutBracket.slice(0, -1) : prefixWithoutBracket;
+  const trailingNumberMatch = basePrefix.match(/^(.*?)(\d+)$/);
+
+  const variants = new Set<string>([normalizedPort]);
+  expandedMembers.forEach((member) => {
+    const expandedPort = trailingNumberMatch
+      ? `${trailingNumberMatch[1]}${member}${separator}${member}${suffixWithoutBracket}`
+      : `${basePrefix}${member}${suffixWithoutBracket}`;
+    variants.add(expandedPort);
+  });
+
+  return Array.from(variants);
+}
+
+function buildPatchPanelLookupKeys(
+  deviceName: string | undefined | null,
+  devicePort: string | undefined | null,
+  easyMark: unknown
+): string[] {
+  const normalizedDeviceName = String(deviceName || "").trim();
+  if (!normalizedDeviceName) return [];
+
+  const lookupKeys = new Set<string>();
+  expandGroupedPortVariants(devicePort).forEach((portVariant) => {
+    lookupKeys.add(toDevicePortKey(normalizedDeviceName, portVariant));
+  });
+
+  const easyMarkLines = Array.isArray(easyMark)
+    ? easyMark.map((value) => String(value || "").trim()).filter(Boolean)
+    : [];
+
+  if (easyMarkLines.length > 0) {
+    expandGroupedPortVariants(devicePort).forEach((portVariant) => {
+      const normalizedPortVariant = String(portVariant || "").trim();
+      if (!normalizedPortVariant) return;
+
+      const escapedPortVariant = escapeRegExp(normalizedPortVariant);
+      const groupedVariantPatterns = expandGroupedPortVariants(devicePort)
+        .map((candidate) => String(candidate || "").trim())
+        .filter(Boolean)
+        .map((candidate) => new RegExp(`(^|\\s)${escapeRegExp(candidate)}(?=\\s|$)`));
+
+      easyMarkLines.forEach((line) => {
+        const normalizedLine = line.replace(/•/g, "").trim();
+        if (!normalizedLine) return;
+
+        groupedVariantPatterns.forEach((pattern) => {
+          if (!pattern.test(normalizedLine)) return;
+
+          const replacedLine = normalizedLine.replace(pattern, (match, prefix) => `${prefix}${normalizedPortVariant}`);
+          lookupKeys.add(toDevicePortKey(normalizedDeviceName, normalizedPortVariant));
+
+          const normalizedDevicePrefix = normalizedDeviceName.toLowerCase();
+          const normalizedReplacedLine = replacedLine.toLowerCase();
+          if (normalizedReplacedLine.startsWith(`${normalizedDevicePrefix} `)) {
+            const candidatePort = replacedLine.slice(normalizedDeviceName.length).trim().split(/\s+/)[0];
+            if (candidatePort) {
+              lookupKeys.add(toDevicePortKey(normalizedDeviceName, candidatePort));
+            }
+          }
+        });
+      });
+    });
+  }
+
+  return Array.from(lookupKeys);
+}
+
 type PatchPanelLookupMap = Record<string, PatchPanelRow[]>;
 
 type TestSectionConfig = {
@@ -381,9 +476,13 @@ const DeviceAccordion = (props: Props) => {
 
  const patchPanelByDevicePort = useMemo(() => {
    return props.patchPanelRackRows.reduce((acc, panelRow) => {
-     const key = toDevicePortKey(panelRow.deviceName, panelRow.devicePort);
-     if (!acc[key]) acc[key] = [];
-     acc[key].push(panelRow);
+     const keys = buildPatchPanelLookupKeys(panelRow.deviceName, panelRow.devicePort, panelRow.easyMark);
+     keys.forEach((key) => {
+       if (!acc[key]) acc[key] = [];
+       if (!acc[key].includes(panelRow)) {
+         acc[key].push(panelRow);
+       }
+     });
      return acc;
    }, {} as PatchPanelLookupMap);
  }, [props.patchPanelRackRows]);
