@@ -123,6 +123,13 @@ function asArray(value: unknown): unknown[] {
     return Array.isArray(value) ? value : [];
 }
 
+function getRackSearchTerms(q: string): string[] {
+    return q
+        .split(",")
+        .map((term) => term.trim())
+        .filter((term) => term.length > 0);
+}
+
 function summarizeLegacyValidationRows(rows: unknown[]): RackValidationSummary {
     if (rows.length === 0) {
         return NOT_VALIDATED_SUMMARY;
@@ -570,19 +577,29 @@ const ProjectDetailsContainer = (props: Props) => {
 
         const q = searchText.trim().toLowerCase();
         if (q) {
-            rows = rows.filter((row) => {
-                const haystack = [
-                    row.rackLocation,
-                    row.block,
-                    row.rackSerialNumber,
-                    row.gpuRackLabel || "",
-                    row.ticketType || "",
-                    row.ticketId || "",
-                    row.rackState || "",
-                    row.platformName
-                ].join(" ").toLowerCase();
-                return haystack.includes(q);
-            });
+            const rackSearchItems = getRackSearchTerms(q);
+            const isMultiRackSearch = q.includes(",");
+
+            if (isMultiRackSearch && rackSearchItems.length > 0) {
+                rows = rows.filter((row) => {
+                    const rackLocation = String(row.rackLocation || "").trim();
+                    return rackSearchItems.some((term) => rackLocation.includes(term));
+                });
+            } else {
+                rows = rows.filter((row) => {
+                    const haystack = [
+                        row.rackLocation,
+                        row.block,
+                        row.rackSerialNumber,
+                        row.gpuRackLabel || "",
+                        row.ticketType || "",
+                        row.ticketId || "",
+                        row.rackState || "",
+                        row.platformName
+                    ].join(" ").toLowerCase();
+                    return haystack.includes(q);
+                });
+            }
         }
 
         return rows;
@@ -643,7 +660,7 @@ const ProjectDetailsContainer = (props: Props) => {
                     <input
                         type="text"
                         value={searchText}
-                        placeholder="Search rack location / platform / block / serial / type / ticket"
+                        placeholder="Search rack location(s) / platform / block / serial / type / ticket"
                         onInput={(e: any) =>
                             setSearchText((e.target as HTMLInputElement).value)
                         }

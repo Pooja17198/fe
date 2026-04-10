@@ -212,6 +212,8 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
             url.searchParams.set("regionName", props.region);
             url.searchParams.set("rackNumber", props.rack);
             url.searchParams.set("buildingName", props.building);
+            url.searchParams.set("isGPURack", String(Boolean(props.isGpuRack)));
+            url.searchParams.set("rackState", String(props.rackState || ""));
 
             const resp = await fetchWithRetry(url.href, {
                 method: "GET",
@@ -237,7 +239,7 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
             setDevicesLoading(false);
         }
         return false;
-    }, [props.region, props.rack, props.building, props.rack_serial]);
+    }, [props.region, props.rack, props.building, props.rack_serial, props.isGpuRack, props.rackState]);
 
     const prefetchPatchPanelRowsForCurrentRack = useCallback(async (): Promise<PatchPanelRow[]> => {
         if (!props.building || !props.rack || !props.rack_serial || !props.region) {
