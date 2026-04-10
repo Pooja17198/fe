@@ -1082,12 +1082,21 @@ function mapLldpRow(raw: unknown, deviceName: string, idx: number): LldpFailureR
         deviceARack: pick(row, ["Device A Rack", "deviceARack"]),
         deviceAName: pick(row, ["Device A Name", "deviceAName"], deviceName),
         deviceAPort: pick(row, ["Device A Port", "deviceAPort"]),
+        deviceALocation: pick(row, ["Device A Location", "deviceALocation"]),
         currentDeviceBRack: pick(row, ["Device B Rack", "Current Device B Rack", "deviceBRack"]),
         currentDeviceBName: pick(row, ["Device B Name", "Current Device B Name", "deviceBName"]),
         currentDeviceBPort: pick(row, ["Device B Port", "Current Device B Port", "deviceBPort"]),
+        currentBLocation: pick(
+            row,
+            ["Current B Location", "currentBLocation"]
+        ),
         expectedDeviceBRack: pick(row, ["Expected Device B Rack", "deviceBRackExpected"]),
         expectedDeviceBName: pick(row, ["Expected Device B Name", "deviceBNameExpected"]),
         expectedDeviceBPort: pick(row, ["Expected Device B Port", "deviceBPortExpected"]),
+        expectedBLocation: pick(
+            row,
+            ["Expected B Location", "expectedBLocation"]
+        ),
         linkStatus: pick(row, ["LLDP Status", "Link Status", "lldpStatus", "linkStatus"]),
         errorMessage: textOrEmpty(row["Error Message"] ?? row["errorMessage"]),
     };
@@ -1103,6 +1112,7 @@ function mapOpticRow(raw: unknown, deviceName: string, idx: number): OpticFailur
         rxPower: pick(row, ["Rx Power", "RX Power", "rxPower"]),
         sourceDeviceName: pick(row, ["Source Device Name", "sourceDeviceName"], deviceName),
         sourceDevicePort: pick(row, ["Source Device Port", "sourceDevicePort"]),
+        sourceDeviceLocation: pick(row, ["Source Device Location", "sourceDeviceLocation"]),
         remoteDeviceName: pick(row, ["Remote Device Name", "remoteDeviceName"]),
         remoteDevicePort: pick(row, ["Remote Device Port", "remoteDevicePort"]),
         errorMessage: textOrEmpty(row["Error Message"] ?? row["errorMessage"]),
@@ -1118,6 +1128,7 @@ function mapInterfaceRow(raw: unknown, deviceName: string, idx: number): Interfa
         issue: pick(row, ["Issue", "issue"]),
         sourceDeviceName: pick(row, ["Source Device Name", "sourceDeviceName"], deviceName),
         sourceDevicePort: pick(row, ["Source Device Port", "sourceDevicePort"]),
+        sourceDeviceLocation: pick(row, ["Source Device Location", "sourceDeviceLocation"]),
         remoteDeviceName: pick(row, ["Remote Device Name", "remoteDeviceName"]),
         remoteDevicePort: pick(row, ["Remote Device Port", "remoteDevicePort"]),
     };

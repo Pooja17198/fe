@@ -3,6 +3,12 @@ const DEFAULT_COLUMN_SETTINGS = {
   sortable: "enabled",
 } as const;
 
+const PATCH_PANEL_COLUMN_SETTINGS = {
+  ...DEFAULT_COLUMN_SETTINGS,
+  headerStyle: "min-width: 300px; width: 300px;",
+  style: "min-width: 300px; width: 300px;",
+} as const;
+
 export const LLDP_FAILURE_COLUMNS: any[] = [
   { headerText: "Device A Rack", field: "deviceARack", id: "deviceARack", ...DEFAULT_COLUMN_SETTINGS },
   { headerText: "Device A Name", field: "deviceAName", id: "deviceAName", ...DEFAULT_COLUMN_SETTINGS },
@@ -55,13 +61,27 @@ export const LLDP_FAILURE_COLUMNS: any[] = [
     field: "patchPanelMatrix",
     id: "patchPanelMatrix",
     template: "patchPanelMatrixTemplate",
-    ...DEFAULT_COLUMN_SETTINGS,
+    ...PATCH_PANEL_COLUMN_SETTINGS,
   },
 ];
 
 export const GPU_COMPUTE_LLDP_FAILURE_COLUMNS: any[] = [
+  {
+    headerText: "Error Message",
+    field: "errorMessage",
+    id: "errorMessage",
+    template: "gpuMultilineErrorMessageTemplate",
+    ...DEFAULT_COLUMN_SETTINGS,
+  },
   { headerText: "Device A Name", field: "deviceAName", id: "deviceAName", ...DEFAULT_COLUMN_SETTINGS },
   { headerText: "Device A Port", field: "deviceAPort", id: "deviceAPort", ...DEFAULT_COLUMN_SETTINGS },
+  {
+    headerText: "Device A Location",
+    field: "deviceALocation",
+    id: "deviceALocation",
+    template: "gpuMultilineValueTemplate",
+    ...DEFAULT_COLUMN_SETTINGS,
+  },
   {
     headerText: "Current Device B Name",
     field: "currentDeviceBName",
@@ -72,6 +92,13 @@ export const GPU_COMPUTE_LLDP_FAILURE_COLUMNS: any[] = [
     headerText: "Current Device B Port",
     field: "currentDeviceBPort",
     id: "currentDeviceBPort",
+    ...DEFAULT_COLUMN_SETTINGS,
+  },
+  {
+    headerText: "Current B Location",
+    field: "currentBLocation",
+    id: "currentBLocation",
+    template: "gpuMultilineValueTemplate",
     ...DEFAULT_COLUMN_SETTINGS,
   },
   {
@@ -87,10 +114,10 @@ export const GPU_COMPUTE_LLDP_FAILURE_COLUMNS: any[] = [
     ...DEFAULT_COLUMN_SETTINGS,
   },
   {
-    headerText: "Error Message",
-    field: "errorMessage",
-    id: "errorMessage",
-    template: "gpuMultilineErrorMessageTemplate",
+    headerText: "Expected B Location",
+    field: "expectedBLocation",
+    id: "expectedBLocation",
+    template: "gpuMultilineValueTemplate",
     ...DEFAULT_COLUMN_SETTINGS,
   },
   {
@@ -98,7 +125,7 @@ export const GPU_COMPUTE_LLDP_FAILURE_COLUMNS: any[] = [
     field: "patchPanelMatrix",
     id: "patchPanelMatrix",
     template: "patchPanelMatrixTemplate",
-    ...DEFAULT_COLUMN_SETTINGS,
+    ...PATCH_PANEL_COLUMN_SETTINGS,
   },
 ];
 
@@ -112,13 +139,20 @@ export const OPTIC_FAILURE_COLUMNS: any[] = [
     field: "patchPanelMatrix",
     id: "patchPanelMatrix",
     template: "patchPanelMatrixTemplate",
-    ...DEFAULT_COLUMN_SETTINGS,
+    ...PATCH_PANEL_COLUMN_SETTINGS,
   },
 ];
 
 export const GPU_COMPUTE_OPTIC_FAILURE_COLUMNS: any[] = [
   { headerText: "Source Device Name", field: "sourceDeviceName", id: "sourceDeviceName", ...DEFAULT_COLUMN_SETTINGS },
   { headerText: "Source Device Port", field: "sourceDevicePort", id: "sourceDevicePort", ...DEFAULT_COLUMN_SETTINGS },
+  {
+    headerText: "Source Device Location",
+    field: "sourceDeviceLocation",
+    id: "sourceDeviceLocation",
+    template: "gpuMultilineValueTemplate",
+    ...DEFAULT_COLUMN_SETTINGS,
+  },
   { headerText: "Remote Device Name", field: "remoteDeviceName", id: "remoteDeviceName", ...DEFAULT_COLUMN_SETTINGS },
   { headerText: "Remote Device Port", field: "remoteDevicePort", id: "remoteDevicePort", ...DEFAULT_COLUMN_SETTINGS },
   { headerText: "RX Power", field: "rxPower", id: "rxPower", ...DEFAULT_COLUMN_SETTINGS },
@@ -128,7 +162,7 @@ export const GPU_COMPUTE_OPTIC_FAILURE_COLUMNS: any[] = [
     field: "patchPanelMatrix",
     id: "patchPanelMatrix",
     template: "patchPanelMatrixTemplate",
-    ...DEFAULT_COLUMN_SETTINGS,
+    ...PATCH_PANEL_COLUMN_SETTINGS,
   },
 ];
 
@@ -141,13 +175,20 @@ export const INTERFACE_FAILURE_COLUMNS: any[] = [
     field: "patchPanelMatrix",
     id: "patchPanelMatrix",
     template: "patchPanelMatrixTemplate",
-    ...DEFAULT_COLUMN_SETTINGS,
+    ...PATCH_PANEL_COLUMN_SETTINGS,
   },
 ];
 
 export const GPU_COMPUTE_INTERFACE_FAILURE_COLUMNS: any[] = [
   { headerText: "Source Device Name", field: "sourceDeviceName", id: "sourceDeviceName", ...DEFAULT_COLUMN_SETTINGS },
   { headerText: "Source Device Port", field: "sourceDevicePort", id: "sourceDevicePort", ...DEFAULT_COLUMN_SETTINGS },
+  {
+    headerText: "Source Device Location",
+    field: "sourceDeviceLocation",
+    id: "sourceDeviceLocation",
+    template: "gpuMultilineValueTemplate",
+    ...DEFAULT_COLUMN_SETTINGS,
+  },
   { headerText: "Remote Device Name", field: "remoteDeviceName", id: "remoteDeviceName", ...DEFAULT_COLUMN_SETTINGS },
   { headerText: "Remote Device Port", field: "remoteDevicePort", id: "remoteDevicePort", ...DEFAULT_COLUMN_SETTINGS },
   { headerText: "Issue", field: "issue", id: "issue", ...DEFAULT_COLUMN_SETTINGS },
@@ -156,7 +197,7 @@ export const GPU_COMPUTE_INTERFACE_FAILURE_COLUMNS: any[] = [
     field: "patchPanelMatrix",
     id: "patchPanelMatrix",
     template: "patchPanelMatrixTemplate",
-    ...DEFAULT_COLUMN_SETTINGS,
+    ...PATCH_PANEL_COLUMN_SETTINGS,
   },
 ];
 
@@ -196,7 +237,7 @@ export const FEC_BER_FAILURE_COLUMNS: any[] = [
     field: "patchPanelMatrix",
     id: "patchPanelMatrix",
     template: "patchPanelMatrixTemplate",
-    ...DEFAULT_COLUMN_SETTINGS,
+    ...PATCH_PANEL_COLUMN_SETTINGS,
   },
 ];
 

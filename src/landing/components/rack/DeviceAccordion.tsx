@@ -28,6 +28,7 @@ import {
   booleanStatusTemplate,
   errorMessageClampTemplate,
   gpuMultilineErrorMessageTemplate,
+  gpuMultilineValueTemplate,
   lldpStatusTemplate,
   patchPanelMatrixTemplate,
   psuStatusTemplate,
@@ -799,6 +800,7 @@ const DeviceAccordion = (props: Props) => {
                                               <template slot="lldpStatusTemplate" render={lldpStatusTemplate} />
                                               <template slot="booleanStatusTemplate" render={booleanStatusTemplate} />
                                               <template slot="patchPanelMatrixTemplate" render={patchPanelMatrixTemplate} />
+                                              <template slot="gpuMultilineValueTemplate" render={gpuMultilineValueTemplate} />
                                               <template slot="gpuMultilineErrorMessageTemplate" render={gpuMultilineErrorMessageTemplate} />
                                               <template slot="errorMessageClampTemplate" render={errorMessageClampTemplate} />
                                             </oj-table>

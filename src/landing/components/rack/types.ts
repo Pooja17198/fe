@@ -44,12 +44,15 @@ export interface LldpFailureRow {
   deviceARack: string;
   deviceAName: string;
   deviceAPort: string;
+  deviceALocation?: string;
   currentDeviceBRack: string;
   currentDeviceBName: string;
   currentDeviceBPort: string;
+  currentBLocation?: string;
   expectedDeviceBRack: string;
   expectedDeviceBName: string;
   expectedDeviceBPort: string;
+  expectedBLocation?: string;
   linkStatus: string;
   patchPanelMatrix?: string;
   errorMessage?: string;
@@ -65,6 +68,7 @@ export interface OpticFailureRow {
   patchPanelMatrix?: string;
   sourceDeviceName?: string;
   sourceDevicePort?: string;
+  sourceDeviceLocation?: string;
   remoteDeviceName?: string;
   remoteDevicePort?: string;
 }
@@ -77,6 +81,7 @@ export interface InterfaceFailureRow {
   patchPanelMatrix?: string;
   sourceDeviceName?: string;
   sourceDevicePort?: string;
+  sourceDeviceLocation?: string;
   remoteDeviceName?: string;
   remoteDevicePort?: string;
 }
