@@ -149,38 +149,63 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+function normalizePortMembership(devicePort: string | undefined | null): { basePort: string; members: number[] } | null {
+  const normalizedPort = String(devicePort || "").trim();
+  if (!normalizedPort) return null;
+
+  const groupedPortMatch = normalizedPort.match(/^(.*\[)([^\]]+)(\].*)$/);
+  if (groupedPortMatch) {
+    const [, prefix, groupedSegment, suffix] = groupedPortMatch;
+    const prefixWithoutBracket = prefix.slice(0, -1);
+    const suffixWithoutBracket = suffix.startsWith("]") ? suffix.slice(1) : suffix;
+    const separatorMatch = prefixWithoutBracket.match(/([\/-])$/);
+    const separator = separatorMatch ? separatorMatch[1] : "";
+    const basePrefix = separator ? prefixWithoutBracket.slice(0, -1) : prefixWithoutBracket;
+    const trailingNumberMatch = basePrefix.match(/^(.*?)(\d+)$/);
+
+    const members = groupedSegment
+      .split("+")
+      .map((part) => Number(part.trim()))
+      .filter((part) => Number.isFinite(part))
+      .sort((a, b) => a - b);
+
+    if (members.length === 0) return null;
+
+    const basePort = trailingNumberMatch
+      ? `${trailingNumberMatch[1]}${separator}${suffixWithoutBracket}`
+      : `${basePrefix}${suffixWithoutBracket}`;
+
+    return {
+      basePort: basePort.toLowerCase(),
+      members,
+    };
+  }
+
+  const singlePortMatch = normalizedPort.match(/^(.*?)(\d+)$/);
+  if (!singlePortMatch) return null;
+
+  const [, prefix, trailingNumberText] = singlePortMatch;
+  const trailingNumber = Number(trailingNumberText);
+  if (!Number.isFinite(trailingNumber)) return null;
+
+  return {
+    basePort: prefix.toLowerCase(),
+    members: [trailingNumber],
+  };
+}
+
 function expandGroupedPortVariants(devicePort: string | undefined | null): string[] {
   const normalizedPort = String(devicePort || "").trim();
   if (!normalizedPort) return [];
 
-  const groupedPortMatch = normalizedPort.match(/^(.*\[)([^\]]+)(\].*)$/);
-  if (!groupedPortMatch) {
+  const membership = normalizePortMembership(normalizedPort);
+  if (!membership || membership.members.length === 1) {
     return [normalizedPort];
   }
-
-  const [, prefix, groupedSegment, suffix] = groupedPortMatch;
-  const expandedMembers = groupedSegment
-    .split("+")
-    .map((part) => part.trim())
-    .filter(Boolean);
-
-  if (expandedMembers.length === 0) {
-    return [normalizedPort];
-  }
-
-  const prefixWithoutBracket = prefix.slice(0, -1);
-  const suffixWithoutBracket = suffix.startsWith("]") ? suffix.slice(1) : suffix;
-  const separatorMatch = prefixWithoutBracket.match(/([\/-])$/);
-  const separator = separatorMatch ? separatorMatch[1] : "";
-  const basePrefix = separator ? prefixWithoutBracket.slice(0, -1) : prefixWithoutBracket;
-  const trailingNumberMatch = basePrefix.match(/^(.*?)(\d+)$/);
 
   const variants = new Set<string>([normalizedPort]);
-  expandedMembers.forEach((member) => {
-    const expandedPort = trailingNumberMatch
-      ? `${trailingNumberMatch[1]}${member}${separator}${member}${suffixWithoutBracket}`
-      : `${basePrefix}${member}${suffixWithoutBracket}`;
-    variants.add(expandedPort);
+  membership.members.forEach((member) => {
+    variants.add(`${membership.basePort}${member}`);
   });
 
   return Array.from(variants);
@@ -398,81 +423,22 @@ function toLogicalPortFamily(devicePort: string | undefined | null): string {
   const normalizedPort = String(devicePort || "").trim();
   if (!normalizedPort) return "";
 
-  const groupedPortMatch = normalizedPort.match(/^(.*\[)([^\]]+)(\].*)$/);
-  if (groupedPortMatch) {
-    const [, prefix, groupedSegment, suffix] = groupedPortMatch;
-    const members = groupedSegment
-      .split("+")
-      .map((part) => part.trim())
-      .filter(Boolean)
-      .map((part) => Number(part))
-      .filter((part) => Number.isFinite(part))
-      .sort((a, b) => a - b);
-
-    if (members.length > 0) {
-      return `${prefix}${members.join("+")}${suffix}`.toLowerCase();
-    }
-  }
-
-  const singlePortMatch = normalizedPort.match(/^(.*?)(\d+)$/);
-  if (!singlePortMatch) {
+  const membership = normalizePortMembership(normalizedPort);
+  if (!membership) {
     return normalizedPort.toLowerCase();
   }
 
-  const [, prefix, trailingNumberText] = singlePortMatch;
-  const trailingNumber = Number(trailingNumberText);
-  if (!Number.isFinite(trailingNumber)) {
-    return normalizedPort.toLowerCase();
+  if (membership.members.length > 1) {
+    return `${membership.basePort}[${membership.members.join("+")}]`;
   }
 
-  const pairStart = trailingNumber % 2 === 0 ? trailingNumber - 1 : trailingNumber;
+  const member = membership.members[0];
+  const pairStart = member % 2 === 0 ? member - 1 : member;
   if (pairStart <= 0) {
     return normalizedPort.toLowerCase();
   }
 
-  return `${prefix}[${pairStart}+${pairStart + 1}]`.toLowerCase();
-}
-
-function propagatePatchPanelFromSiblingRows(sectionId: TestSectionConfig["id"], rows: any[]): any[] {
-  if (sectionId === "fans") return rows;
-
-  const patchPanelByFamily = new Map<string, string>();
-  const patchPanelByAnyFamily = new Map<string, string>();
-
-  rows.forEach((row) => {
-    if (isMissingPatchPanelValue(row.patchPanelMatrix)) return;
-
-    const { deviceName, devicePort } = getRowDeviceAndPort(sectionId, row);
-    const normalizedFamily = toLogicalPortFamily(devicePort);
-    const normalizedDeviceName = normalizeDeviceName(deviceName);
-    const familyKey = `${normalizedDeviceName}|${normalizedFamily}`;
-    if (normalizedDeviceName && normalizedFamily) {
-      patchPanelByFamily.set(familyKey, String(row.patchPanelMatrix));
-      if (!patchPanelByAnyFamily.has(normalizedFamily)) {
-        patchPanelByAnyFamily.set(normalizedFamily, String(row.patchPanelMatrix));
-      }
-    }
-  });
-
-  return rows.map((row) => {
-    if (!isMissingPatchPanelValue(row.patchPanelMatrix)) {
-      return row;
-    }
-
-    const { deviceName, devicePort } = getRowDeviceAndPort(sectionId, row);
-    const normalizedFamily = toLogicalPortFamily(devicePort);
-    const familyKey = `${normalizeDeviceName(deviceName)}|${normalizedFamily}`;
-    const siblingPatchPanelValue = patchPanelByFamily.get(familyKey) || patchPanelByAnyFamily.get(normalizedFamily);
-
-    if (!siblingPatchPanelValue) {
-      return row;
-    }
-
-    return {
-      ...row,
-      patchPanelMatrix: siblingPatchPanelValue,
-    };
-  });
+  return `${membership.basePort}[${pairStart}+${pairStart + 1}]`;
 }
 
 function addPatchPanelToSectionRows(
@@ -482,7 +448,7 @@ function addPatchPanelToSectionRows(
 ): any[] {
   if (sectionId === "fans") return rows;
 
-  const rowsWithPatchPanel = rows.map((row) => {
+  return rows.map((row) => {
     let patchPanelRows: PatchPanelRow[] = [];
 
     if (sectionId === "lldp") {
@@ -518,8 +484,6 @@ function addPatchPanelToSectionRows(
       patchPanelMatrix: renderPatchPanelValue(patchPanelRows),
     };
   });
-
-  return propagatePatchPanelFromSiblingRows(sectionId, rowsWithPatchPanel);
 }
 
 function getPsuStatusLabel(jobStatus: string, hasPsuFailure: boolean): "UP" | "DOWN" | "-" {
