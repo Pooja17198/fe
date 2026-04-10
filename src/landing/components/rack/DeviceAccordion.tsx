@@ -362,6 +362,119 @@ function renderPatchPanelValue(rows: PatchPanelRow[]): string {
     .join("\n\n");
 }
 
+function isMissingPatchPanelValue(value: unknown): boolean {
+  return String(value || "").trim() === "" || String(value || "").trim() === "Not Available";
+}
+
+function getRowDeviceAndPort(sectionId: TestSectionConfig["id"], row: any): { deviceName: string; devicePort: string } {
+  if (sectionId === "lldp") {
+    return {
+      deviceName: getLookupValue(row.expectedDeviceBName, row.currentDeviceBName),
+      devicePort: getLookupValue(row.expectedDeviceBPort, row.currentDeviceBPort),
+    };
+  }
+
+  if (sectionId === "optics" || sectionId === "interfaces") {
+    return {
+      deviceName: getLookupValue(row.remoteDeviceName, row.sourceDeviceName ?? row.deviceName),
+      devicePort: getLookupValue(row.remoteDevicePort, row.sourceDevicePort ?? row.devicePort),
+    };
+  }
+
+  if (sectionId === "fecBer") {
+    return {
+      deviceName: getLookupValue(row.remoteDevice, row.deviceName),
+      devicePort: getLookupValue(row.remoteInterface, row.devicePort),
+    };
+  }
+
+  return {
+    deviceName: getLookupValue(row.remoteDeviceName ?? row.remoteDevice, row.deviceName),
+    devicePort: getLookupValue(row.remoteDevicePort ?? row.remoteInterface, row.devicePort),
+  };
+}
+
+function toLogicalPortFamily(devicePort: string | undefined | null): string {
+  const normalizedPort = String(devicePort || "").trim();
+  if (!normalizedPort) return "";
+
+  const groupedPortMatch = normalizedPort.match(/^(.*\[)([^\]]+)(\].*)$/);
+  if (groupedPortMatch) {
+    const [, prefix, groupedSegment, suffix] = groupedPortMatch;
+    const members = groupedSegment
+      .split("+")
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .map((part) => Number(part))
+      .filter((part) => Number.isFinite(part))
+      .sort((a, b) => a - b);
+
+    if (members.length > 0) {
+      return `${prefix}${members.join("+")}${suffix}`.toLowerCase();
+    }
+  }
+
+  const singlePortMatch = normalizedPort.match(/^(.*?)(\d+)$/);
+  if (!singlePortMatch) {
+    return normalizedPort.toLowerCase();
+  }
+
+  const [, prefix, trailingNumberText] = singlePortMatch;
+  const trailingNumber = Number(trailingNumberText);
+  if (!Number.isFinite(trailingNumber)) {
+    return normalizedPort.toLowerCase();
+  }
+
+  const pairStart = trailingNumber % 2 === 0 ? trailingNumber - 1 : trailingNumber;
+  if (pairStart <= 0) {
+    return normalizedPort.toLowerCase();
+  }
+
+  return `${prefix}[${pairStart}+${pairStart + 1}]`.toLowerCase();
+}
+
+function propagatePatchPanelFromSiblingRows(sectionId: TestSectionConfig["id"], rows: any[]): any[] {
+  if (sectionId === "fans") return rows;
+
+  const patchPanelByFamily = new Map<string, string>();
+  const patchPanelByAnyFamily = new Map<string, string>();
+
+  rows.forEach((row) => {
+    if (isMissingPatchPanelValue(row.patchPanelMatrix)) return;
+
+    const { deviceName, devicePort } = getRowDeviceAndPort(sectionId, row);
+    const normalizedFamily = toLogicalPortFamily(devicePort);
+    const normalizedDeviceName = normalizeDeviceName(deviceName);
+    const familyKey = `${normalizedDeviceName}|${normalizedFamily}`;
+    if (normalizedDeviceName && normalizedFamily) {
+      patchPanelByFamily.set(familyKey, String(row.patchPanelMatrix));
+      if (!patchPanelByAnyFamily.has(normalizedFamily)) {
+        patchPanelByAnyFamily.set(normalizedFamily, String(row.patchPanelMatrix));
+      }
+    }
+  });
+
+  return rows.map((row) => {
+    if (!isMissingPatchPanelValue(row.patchPanelMatrix)) {
+      return row;
+    }
+
+    const { deviceName, devicePort } = getRowDeviceAndPort(sectionId, row);
+    const normalizedFamily = toLogicalPortFamily(devicePort);
+    const familyKey = `${normalizeDeviceName(deviceName)}|${normalizedFamily}`;
+    const siblingPatchPanelValue = patchPanelByFamily.get(familyKey) || patchPanelByAnyFamily.get(normalizedFamily);
+
+    if (!siblingPatchPanelValue) {
+      return row;
+    }
+
+    return {
+      ...row,
+      patchPanelMatrix: siblingPatchPanelValue,
+    };
+  });
+}
+
 function addPatchPanelToSectionRows(
   sectionId: TestSectionConfig["id"],
   rows: any[],
@@ -369,7 +482,7 @@ function addPatchPanelToSectionRows(
 ): any[] {
   if (sectionId === "fans") return rows;
 
-  return rows.map((row) => {
+  const rowsWithPatchPanel = rows.map((row) => {
     let patchPanelRows: PatchPanelRow[] = [];
 
     if (sectionId === "lldp") {
@@ -405,6 +518,8 @@ function addPatchPanelToSectionRows(
       patchPanelMatrix: renderPatchPanelValue(patchPanelRows),
     };
   });
+
+  return propagatePatchPanelFromSiblingRows(sectionId, rowsWithPatchPanel);
 }
 
 function getPsuStatusLabel(jobStatus: string, hasPsuFailure: boolean): "UP" | "DOWN" | "-" {
