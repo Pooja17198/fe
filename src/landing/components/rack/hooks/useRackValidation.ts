@@ -278,6 +278,9 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
       try {
         if (!props.rack_serial || !props.region) return false;
 
+        // Start patch panel request early to overlap with cabling validation parsing.
+        const patchPanelRowsPromise = prefetchPatchPanelRowsForCurrentRack();
+
         const url = new URL(`${LVV_API}/cablingValidation`);
         url.searchParams.set("regionName", props.region);
         url.searchParams.set("rackSerialNumber", props.rack_serial);
@@ -298,12 +301,14 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
 
         if (!hasErrorRows) {
           setPatchPanelRackRows([]);
+          // Ensure early-started promise doesn't produce an unhandled rejection.
+          void patchPanelRowsPromise.catch(() => undefined);
           return true; // validation call succeeded
         }
 
-        // Patch panel fetch is non-blocking for the main validation response.
+        // Patch panel fetch is auxiliary; keep failures response successful even if it fails.
         try {
-          const rackRows = await prefetchPatchPanelRowsForCurrentRack();
+          const rackRows = await patchPanelRowsPromise;
           setPatchPanelRackRows(rackRows);
         } catch (patchPanelError: any) {
           if (patchPanelError?.name !== "AbortError") {
@@ -311,7 +316,6 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
               message: patchPanelError?.message || String(patchPanelError),
             });
           }
-          // Do NOT fail fetchValidationFailures because patch panel is auxiliary.
         }
 
         return true;
