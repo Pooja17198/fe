@@ -558,6 +558,9 @@ const DeviceAccordion = (props: Props) => {
     );
   };
 
+  const gpuRackSelectionDisabled = Boolean(props.isGpuRack);
+  const gpuRackSelectionDisabledReason = "Device selection is disabled for GPU racks.";
+
   const handleToggle = (key: string, expand: boolean, hasDeviceFailures: boolean) => {
     // Only allow expanding if there are device failures
     if (expand && !hasDeviceFailures) return;
@@ -815,9 +818,11 @@ const DeviceAccordion = (props: Props) => {
                   type="checkbox"
                   checked={allSelected}
                   onChange={(e: any) => toggleSelectAll((e.target as HTMLInputElement).checked)}
-                  disabled={!props.rackValidationAllowed || eligibleDeviceKeys.size === 0}
+                  disabled={gpuRackSelectionDisabled || !props.rackValidationAllowed || eligibleDeviceKeys.size === 0}
                   title={
-                    !props.rackValidationAllowed
+                    gpuRackSelectionDisabled
+                        ? gpuRackSelectionDisabledReason
+                        : !props.rackValidationAllowed
                         ? props.rackValidationTooltip
                         : eligibleDeviceKeys.size === 0
                         ? "No monitored and deployed devices are available for validation."
@@ -844,9 +849,11 @@ const DeviceAccordion = (props: Props) => {
                   const isExpanded = expandedKeys.has(device._key);
                   const isValidationEligible = props.eligibleDeviceNames.has(device.deviceName);
                   const statusToRender = isValidationEligible ? device.jobStatus : "NOT_ELIGIBLE";
-                  const rowSelectionDisabled = !props.rackValidationAllowed || !isValidationEligible;
+                  const rowSelectionDisabled = gpuRackSelectionDisabled || !props.rackValidationAllowed || !isValidationEligible;
                   const disabledReason =
-                      !props.rackValidationAllowed
+                      gpuRackSelectionDisabled
+                          ? gpuRackSelectionDisabledReason
+                          : !props.rackValidationAllowed
                           ? props.rackValidationTooltip
                           : (device.validationEligibilityReason ||
                               "Validation is available only for monitored and deployed devices.");
