@@ -651,7 +651,6 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
             setIsValidating(false);
             return;
         }
-        setPatchPanelRackRows([]);
         // Prefetch patch panel rows in parallel with validation polling so matrix can render sooner.
         void prefetchPatchPanelRowsForCurrentRack().catch((patchPanelError: any) => {
             if (patchPanelError?.name !== "AbortError") {
