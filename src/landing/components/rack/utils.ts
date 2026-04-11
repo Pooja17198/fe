@@ -19,8 +19,7 @@ export function isRackInService(rackState: string | null | undefined): boolean {
 }
 
 export function isRackValidationAllowed(isGpuRack: boolean | undefined, rackState: string | null | undefined): boolean {
-  if (!isGpuRack) return true;
-  return isRackInService(rackState);
+  return true;
 }
 
 export function getStatusClass(status: string): string {
