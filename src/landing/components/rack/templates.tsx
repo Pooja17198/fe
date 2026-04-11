@@ -242,9 +242,15 @@ function createPlainRenderPart(value: string, prefix = "", suffix = ""): DetailP
 }
 
 function buildLastTerminalValueSegments(value: string): HighlightSegment[] {
-  const match = value.match(/^(.*?)([^:\/\.\-_\s]+)$/);
+  const missingSplitMatch = value.match(/^(.*?)(missing)(:missing)?$/i);
+  if (missingSplitMatch) {
+    const [, leadingText] = missingSplitMatch;
+    return leadingText ? [{ text: leadingText }] : [{ text: value }];
+  }
+
+  const match = value.match(/^(.*?)(\d+)$/);
   if (!match) {
-    return [{ text: value, highlight: true }];
+    return [{ text: value }];
   }
 
   const [, leadingText, trailingValue] = match;
