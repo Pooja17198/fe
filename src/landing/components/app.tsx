@@ -47,7 +47,7 @@ const router = new CoreRouter<CoreRouter.DetailedRouteConfig>(routeArray, {
 });
 
 // ─── Session constants ────────────────────────────────────────────────────────
-const TOKEN_REFRESH_MS      = 15 * 60 * 1000;     // refresh IDCS token every 15 min
+const TOKEN_REFRESH_MS      = 14 * 60 * 1000;     // refresh IDCS token every 15 min
 const RELAUNCH_AUTH_URL     = "/";          // force fresh login flow
 
 function isLocalhost(): boolean {

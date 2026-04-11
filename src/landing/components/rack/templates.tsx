@@ -193,6 +193,188 @@ function buildGpuLldpDetailParts(location: unknown, port: unknown, name: unknown
   ];
 }
 
+type HighlightSegment = {
+  text: string;
+  highlight?: boolean;
+};
+
+type DetailPartRender = {
+  prefix?: string;
+  suffix?: string;
+  segments: HighlightSegment[];
+};
+
+function isMissingLikeValue(value: string): boolean {
+  return value.trim().toLowerCase() === "missing";
+}
+
+function splitPreservingDelimiters(value: string): string[] {
+  return value.split(/([:\/\.\-_\s]+)/).filter((part) => part !== "");
+}
+
+function commonPrefixLength(left: string, right: string): number {
+  const maxLength = Math.min(left.length, right.length);
+  let index = 0;
+  while (index < maxLength && left[index] === right[index]) {
+    index += 1;
+  }
+  return index;
+}
+
+function commonSuffixLength(left: string, right: string, prefixLength: number): number {
+  const maxLength = Math.min(left.length, right.length) - prefixLength;
+  let index = 0;
+  while (
+    index < maxLength
+    && left[left.length - 1 - index] === right[right.length - 1 - index]
+  ) {
+    index += 1;
+  }
+  return index;
+}
+
+function createPlainRenderPart(value: string, prefix = "", suffix = ""): DetailPartRender {
+  return {
+    prefix,
+    suffix,
+    segments: [{ text: value }],
+  };
+}
+
+function highlightLastToken(value: string): HighlightSegment[] {
+  const tokens = splitPreservingDelimiters(value);
+  if (tokens.length <= 1) {
+    return [{ text: value, highlight: true }];
+  }
+
+  const lastTokenIndex = tokens.length - 1;
+  return tokens.map((token, index) => ({
+    text: token,
+    highlight: index === lastTokenIndex,
+  }));
+}
+
+function createMissingAwareRenderPart(value: string, prefix = "", suffix = ""): DetailPartRender {
+  if (isMissingLikeValue(value)) {
+    return createPlainRenderPart(value, prefix, suffix);
+  }
+
+  return {
+    prefix,
+    suffix,
+    segments: highlightLastToken(value),
+  };
+}
+
+function buildDiffSegments(expectedValue: string, observedValue: string): [HighlightSegment[], HighlightSegment[]] {
+  if (expectedValue === observedValue) {
+    return [
+      [{ text: expectedValue }],
+      [{ text: observedValue }],
+    ];
+  }
+
+  const expectedTokens = splitPreservingDelimiters(expectedValue);
+  const observedTokens = splitPreservingDelimiters(observedValue);
+  const isSameShape = expectedTokens.length === observedTokens.length;
+
+  if (isSameShape) {
+    const differingTokenIndexes = expectedTokens.reduce<number[]>((indexes, token, index) => {
+      if (token !== observedTokens[index]) {
+        indexes.push(index);
+      }
+      return indexes;
+    }, []);
+
+    if (differingTokenIndexes.length > 0) {
+      return [
+        expectedTokens.map((token, index) => ({
+          text: token,
+          highlight: differingTokenIndexes.includes(index),
+        })),
+        observedTokens.map((token, index) => ({
+          text: token,
+          highlight: differingTokenIndexes.includes(index),
+        })),
+      ];
+    }
+  }
+
+  const prefixLength = commonPrefixLength(expectedValue, observedValue);
+  const suffixLength = commonSuffixLength(expectedValue, observedValue, prefixLength);
+  const expectedDiffEnd = expectedValue.length - suffixLength;
+  const observedDiffEnd = observedValue.length - suffixLength;
+
+  return [
+    [
+      ...(prefixLength > 0 ? [{ text: expectedValue.slice(0, prefixLength) }] : []),
+      {
+        text: expectedValue.slice(prefixLength, expectedDiffEnd) || expectedValue,
+        highlight: true,
+      },
+      ...(suffixLength > 0 ? [{ text: expectedValue.slice(expectedDiffEnd) }] : []),
+    ],
+    [
+      ...(prefixLength > 0 ? [{ text: observedValue.slice(0, prefixLength) }] : []),
+      {
+        text: observedValue.slice(prefixLength, observedDiffEnd) || observedValue,
+        highlight: true,
+      },
+      ...(suffixLength > 0 ? [{ text: observedValue.slice(observedDiffEnd) }] : []),
+    ],
+  ];
+}
+
+function buildComparableRenderParts(
+  expectedParts: string[],
+  observedParts: string[],
+): [DetailPartRender[], DetailPartRender[]] {
+  return expectedParts.map((expectedValue, index) => {
+    const observedValue = observedParts[index] ?? "missing";
+    const prefix = index < 2 ? "[" : "";
+    const suffix = index < 2 ? "]" : "";
+    const expectedMissing = isMissingLikeValue(expectedValue);
+    const observedMissing = isMissingLikeValue(observedValue);
+
+    if (expectedMissing || observedMissing) {
+      return [
+        createMissingAwareRenderPart(expectedValue, prefix, suffix),
+        createMissingAwareRenderPart(observedValue, prefix, suffix),
+      ] as const;
+    }
+
+    const [expectedSegments, observedSegments] = buildDiffSegments(expectedValue, observedValue);
+    return [
+      { prefix, suffix, segments: expectedSegments },
+      { prefix, suffix, segments: observedSegments },
+    ] as const;
+  }).reduce<[DetailPartRender[], DetailPartRender[]]>(
+    (accumulator, [expectedPart, observedPart]) => {
+      accumulator[0].push(expectedPart);
+      accumulator[1].push(observedPart);
+      return accumulator;
+    },
+    [[], []],
+  );
+}
+
+function renderDetailPart(part: DetailPartRender, key: string) {
+  return (
+    <span class="gpu-lldp-error-details-part" key={key}>
+      {part.prefix ?? ""}
+      {part.segments.map((segment, segmentIndex) => (
+        <span
+          class={segment.highlight ? "gpu-lldp-diff-highlight" : undefined}
+          key={`${key}-segment-${segmentIndex}`}
+        >
+          {segment.text}
+        </span>
+      ))}
+      {part.suffix ?? ""}
+    </span>
+  );
+}
+
 export const deviceALocationTemplate = createGpuMultilineValueTemplate("deviceALocation");
 export const currentBLocationTemplate = createGpuMultilineValueTemplate("currentBLocation");
 export const expectedBLocationTemplate = createGpuMultilineValueTemplate("expectedBLocation");
@@ -216,18 +398,22 @@ export const errorMessageClampTemplate = (context: any) => {
 
 export const gpuLldpErrorDetailsTemplate = (context: any) => {
   const row = (context?.item && context.item.data) || {};
+  const interfaceParts = buildGpuLldpDetailParts(row.deviceALocation, row.deviceAPort, row.deviceAName);
+  const expectedParts = buildGpuLldpDetailParts(row.expectedBLocation, row.expectedDeviceBPort, row.expectedDeviceBName);
+  const observedParts = buildGpuLldpDetailParts(row.currentBLocation, row.currentDeviceBPort, row.currentDeviceBName);
+  const [expectedRenderParts, observedRenderParts] = buildComparableRenderParts(expectedParts, observedParts);
   const detailRows = [
     {
       label: "Interface:",
-      parts: buildGpuLldpDetailParts(row.deviceALocation, row.deviceAPort, row.deviceAName),
+      parts: interfaceParts.map((part, index) => createPlainRenderPart(part, index < 2 ? "[" : "", index < 2 ? "]" : "")),
     },
     {
       label: "Expected remote:",
-      parts: buildGpuLldpDetailParts(row.expectedBLocation, row.expectedDeviceBPort, row.expectedDeviceBName),
+      parts: expectedRenderParts,
     },
     {
       label: "Observed remote:",
-      parts: buildGpuLldpDetailParts(row.currentBLocation, row.currentDeviceBPort, row.currentDeviceBName),
+      parts: observedRenderParts,
     },
   ];
 
@@ -237,14 +423,7 @@ export const gpuLldpErrorDetailsTemplate = (context: any) => {
         <span class="gpu-lldp-error-details-label" key={`${rowIndex}-label`}>
           {detailRow.label}
         </span>,
-        ...detailRow.parts.map((part, partIndex) => {
-          const content = partIndex < 2 ? `[${part}]` : part;
-          return (
-            <span class="gpu-lldp-error-details-part" key={`${rowIndex}-${partIndex}`}>
-              {content}
-            </span>
-          );
-        }),
+        ...detailRow.parts.map((part, partIndex) => renderDetailPart(part, `${rowIndex}-${partIndex}`)),
       ]
       )}
     </div>

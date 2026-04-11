@@ -715,6 +715,11 @@
   font-family: Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
 
+.gpu-lldp-diff-highlight {
+  background: #fde68a;
+  color: inherit;
+}
+
 .fec-ber-error-clamp {
   display: -webkit-box;
   -webkit-line-clamp: 3;

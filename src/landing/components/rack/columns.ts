@@ -3,6 +3,12 @@ const DEFAULT_COLUMN_SETTINGS = {
   sortable: "enabled",
 } as const;
 
+const RX_POWER_COLUMN_SETTINGS = {
+  ...DEFAULT_COLUMN_SETTINGS,
+  headerStyle: "min-width: 286px; width: 286px;",
+  style: "min-width: 286px; width: 286px;",
+} as const;
+
 const PATCH_PANEL_COLUMN_SETTINGS = {
   ...DEFAULT_COLUMN_SETTINGS,
   headerStyle: "min-width: 300px; width: 300px;",
@@ -120,7 +126,7 @@ export const GPU_COMPUTE_OPTIC_FAILURE_COLUMNS: any[] = [
    field: "rxPower",
    id: "rxPower",
    template: "rxPowerTemplate",
-   ...DEFAULT_COLUMN_SETTINGS,
+   ...RX_POWER_COLUMN_SETTINGS,
   },
   { headerText: "Error Message", field: "errorMessage", id: "errorMessage", template: "gpuMultilineErrorMessageTemplate", ...DEFAULT_COLUMN_SETTINGS },
   {
