@@ -115,7 +115,13 @@ export const GPU_COMPUTE_OPTIC_FAILURE_COLUMNS: any[] = [
   },
   { headerText: "Remote Device Name", field: "remoteDeviceName", id: "remoteDeviceName", ...DEFAULT_COLUMN_SETTINGS },
   { headerText: "Remote Device Port", field: "remoteDevicePort", id: "remoteDevicePort", ...DEFAULT_COLUMN_SETTINGS },
-  { headerText: "RX Power", field: "rxPower", id: "rxPower", ...DEFAULT_COLUMN_SETTINGS },
+  {
+   headerText: "Rx Power",
+   field: "rxPower",
+   id: "rxPower",
+   template: "rxPowerTemplate",
+   ...DEFAULT_COLUMN_SETTINGS,
+  },
   { headerText: "Error Message", field: "errorMessage", id: "errorMessage", template: "gpuMultilineErrorMessageTemplate", ...DEFAULT_COLUMN_SETTINGS },
   {
     headerText: "Patch Panel Matrix",

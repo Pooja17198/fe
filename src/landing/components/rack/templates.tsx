@@ -62,6 +62,25 @@ export const patchPanelMatrixTemplate = (context: any) => {
   return <div class="patch-panel-matrix-cell">{value}</div>;
 };
 
+function formatRxPowerValue(rawValue: unknown): string {
+  const value = `${rawValue ?? ""}`.trim().replace(/\\n/g, "\n");
+  if (!value) {
+    return "Not Available";
+  }
+
+  return value
+    .replace(/\s*\|\s*/g, "\n")
+    .replace(/\s*;\s*/g, "\n")
+    .replace(/,\s*(?=channel\.)/gi, "\n")
+    .replace(/\s+(?=channel\.\d+\.input_power\.instant:)/gi, "\n");
+}
+
+export const rxPowerTemplate = (context: any) => {
+  const row = (context?.item && context.item.data) || {};
+  const value = formatRxPowerValue(row.rxPower);
+  return <div class="gpu-multiline-value-cell">{value}</div>;
+};
+
 const renderGpuMultilineValue = (value: unknown) => {
   const text = formatLocationValue(value).replace(/\\n/g, "\n") || "Not Available";
   return <div class="gpu-multiline-value-cell">{text}</div>;

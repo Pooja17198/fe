@@ -35,6 +35,7 @@ import {
   lldpStatusTemplate,
   patchPanelMatrixTemplate,
   psuStatusTemplate,
+  rxPowerTemplate,
   sourceDeviceLocationTemplate,
 } from "./templates";
 import { formatStatusLabel, getStatusClass, isDeviceStatusCompleted, isGpuComputeDevice } from "./utils";
@@ -968,6 +969,7 @@ const DeviceAccordion = (props: Props) => {
                                               <template slot="lldpStatusTemplate" render={lldpStatusTemplate} />
                                               <template slot="booleanStatusTemplate" render={booleanStatusTemplate} />
                                               <template slot="patchPanelMatrixTemplate" render={patchPanelMatrixTemplate} />
+                                              <template slot="rxPowerTemplate" render={rxPowerTemplate} />
                                               <template slot="deviceALocationTemplate" render={deviceALocationTemplate} />
                                               <template slot="currentBLocationTemplate" render={currentBLocationTemplate} />
                                               <template slot="expectedBLocationTemplate" render={expectedBLocationTemplate} />
