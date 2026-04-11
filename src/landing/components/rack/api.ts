@@ -1,3 +1,5 @@
+import { getLvvApiBase } from "../../config/api";
+
 /**
  * Generic fetch with retry helper.
  * - Retries on 5xx errors or network failures
@@ -38,6 +40,20 @@ export async function fetchWithRetry(
  */
 export function createCsrfHeaders(): Headers {
   const headers = new Headers();
+  if (shouldSkipCsrfHeader()) {
+    return headers;
+  }
   headers.append("X-OCI-Splat-CSRF", "1");
   return headers;
+}
+
+function shouldSkipCsrfHeader(): boolean {
+  const apiBase = getLvvApiBase();
+
+  try {
+    const apiUrl = new URL(apiBase);
+    return ["localhost", "127.0.0.1", "::1"].includes(apiUrl.hostname);
+  } catch {
+    return false;
+  }
 }

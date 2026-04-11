@@ -15,6 +15,7 @@ import "ojs/ojselectcombobox";
 import "ojs/ojnavigationlist";
 import { ojTabBar } from "ojs/ojnavigationlist"; // eslint-disable-line no-duplicate-imports
 import MutableArrayDataProvider = require("ojs/ojmutablearraydataprovider");
+import { getLvvApiBase } from "../config/api";
 
 type Props = Readonly<{
   appName: string,
@@ -51,9 +52,7 @@ export function Header({ appName, userLogin, vendorName, regionValue, page, onRe
   }
 
   // Determine LVV_API dynamically as in rack/index.tsx
-  const LVV_API = window.location.host.includes("localhost")
-      ? "http://localhost:21000/lvv"
-      : `https://${window.location.host}/lvv`;
+  const LVV_API = getLvvApiBase();
 
   const [regions, setRegions] = useState<{ name: string, airportCode: string }[]>([]);
   const [regionsError, setRegionsError] = useState<string | null>(null);

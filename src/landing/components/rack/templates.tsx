@@ -63,7 +63,7 @@ export const patchPanelMatrixTemplate = (context: any) => {
 };
 
 const renderGpuMultilineValue = (value: unknown) => {
-  const text = `${value ?? ""}`.trim().replace(/\\n/g, "\n") || "Not Available";
+  const text = formatLocationValue(value).replace(/\\n/g, "\n") || "Not Available";
   return <div class="gpu-multiline-value-cell">{text}</div>;
 };
 
@@ -71,6 +71,108 @@ const createGpuMultilineValueTemplate = (field: string) => (context: any) => {
   const row = (context?.item && context.item.data) || {};
   return renderGpuMultilineValue(row[field]);
 };
+
+type RackLocation = {
+  building?: unknown;
+  number?: unknown;
+  elevation?: unknown;
+  rackNumber?: unknown;
+  rackElevation?: unknown;
+};
+
+function normalizeMissingValue(value: unknown): string {
+  const normalized = `${value ?? ""}`.trim();
+  if (normalized === "") {
+    return "missing";
+  }
+
+  const lowered = normalized.toLowerCase();
+  if (lowered === "unknown" || lowered === "no data" || lowered === "missing") {
+    return "missing";
+  }
+
+  return normalized;
+}
+
+function parseDelimitedLocationValue(rawLocation: string): RackLocation | null {
+  const pairs = rawLocation
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const separatorIndex = line.indexOf(":");
+      if (separatorIndex === -1) {
+        return null;
+      }
+
+      const key = line.slice(0, separatorIndex).trim().toLowerCase();
+      const value = line.slice(separatorIndex + 1).trim();
+      return key === "" ? null : [key, value] as const;
+    })
+    .filter((entry): entry is readonly [string, string] => Boolean(entry));
+
+  if (pairs.length === 0) {
+    return null;
+  }
+
+  const parsed: RackLocation = {};
+  pairs.forEach(([key, value]) => {
+    if (key === "building") parsed.building = value;
+    if (key === "racknumber" || key === "number") parsed.rackNumber = value;
+    if (key === "rackelevation" || key === "elevation") parsed.rackElevation = value;
+  });
+
+  if (
+    parsed.building === undefined &&
+    parsed.rackNumber === undefined &&
+    parsed.rackElevation === undefined
+  ) {
+    return null;
+  }
+
+  return parsed;
+}
+
+function formatLocationValue(rawLocation: unknown): string {
+  const normalized = `${rawLocation ?? ""}`.trim();
+  if (normalized === "") {
+    return "missing";
+  }
+
+  const lowered = normalized.toLowerCase();
+  if (lowered === "unknown" || lowered === "no data" || lowered === "missing") {
+    return "missing";
+  }
+
+  try {
+    const parsed = JSON.parse(normalized) as RackLocation;
+    return [
+      normalizeMissingValue(parsed?.building),
+      normalizeMissingValue(parsed?.rackNumber ?? parsed?.number),
+      normalizeMissingValue(parsed?.rackElevation ?? parsed?.elevation),
+    ].join(":");
+  } catch {
+    const parsed = parseDelimitedLocationValue(normalized);
+    if (!parsed) {
+      return normalized;
+    }
+
+    return [
+      normalizeMissingValue(parsed?.building),
+      normalizeMissingValue(parsed?.rackNumber ?? parsed?.number),
+      normalizeMissingValue(parsed?.rackElevation ?? parsed?.elevation),
+    ].join(":");
+  }
+}
+
+function buildGpuLldpDetailParts(location: unknown, port: unknown, name: unknown): string[] {
+  const portValue = normalizeMissingValue(port);
+  return [
+    formatLocationValue(location),
+    portValue,
+    `${normalizeMissingValue(name)}:${portValue}`,
+  ];
+}
 
 export const deviceALocationTemplate = createGpuMultilineValueTemplate("deviceALocation");
 export const currentBLocationTemplate = createGpuMultilineValueTemplate("currentBLocation");
@@ -89,6 +191,43 @@ export const errorMessageClampTemplate = (context: any) => {
   return (
     <div class="fec-ber-error-clamp" title={value}>
       {value}
+    </div>
+  );
+};
+
+export const gpuLldpErrorDetailsTemplate = (context: any) => {
+  const row = (context?.item && context.item.data) || {};
+  const detailRows = [
+    {
+      label: "Interface:",
+      parts: buildGpuLldpDetailParts(row.deviceALocation, row.deviceAPort, row.deviceAName),
+    },
+    {
+      label: "Expected remote:",
+      parts: buildGpuLldpDetailParts(row.expectedBLocation, row.expectedDeviceBPort, row.expectedDeviceBName),
+    },
+    {
+      label: "Observed remote:",
+      parts: buildGpuLldpDetailParts(row.currentBLocation, row.currentDeviceBPort, row.currentDeviceBName),
+    },
+  ];
+
+  return (
+    <div class="gpu-lldp-error-details-cell">
+      {detailRows.flatMap((detailRow, rowIndex) => [
+        <span class="gpu-lldp-error-details-label" key={`${rowIndex}-label`}>
+          {detailRow.label}
+        </span>,
+        ...detailRow.parts.map((part, partIndex) => {
+          const content = partIndex < 2 ? `[${part}]` : part;
+          return (
+            <span class="gpu-lldp-error-details-part" key={`${rowIndex}-${partIndex}`}>
+              {content}
+            </span>
+          );
+        }),
+      ]
+      )}
     </div>
   );
 };

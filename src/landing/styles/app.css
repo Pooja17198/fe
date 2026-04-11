@@ -691,6 +691,30 @@
   word-break: break-word;
 }
 
+.gpu-lldp-error-details-cell {
+  display: grid;
+  grid-template-columns: max-content max-content max-content max-content;
+  column-gap: 0;
+  row-gap: 8px;
+}
+
+.gpu-lldp-error-details-label {
+  display: block;
+  white-space: nowrap;
+  padding-right: 8px;
+  line-height: 1.35;
+  font-weight: 600;
+  color: #334155;
+}
+
+.gpu-lldp-error-details-part {
+  display: block;
+  white-space: nowrap;
+  word-break: normal;
+  overflow-wrap: normal;
+  font-family: Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
 .fec-ber-error-clamp {
   display: -webkit-box;
   -webkit-line-clamp: 3;

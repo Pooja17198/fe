@@ -86,6 +86,9 @@ export interface NamespacePatchRequest {
     "compartmentId"?: string;
     "status"?: string;
 }
+export interface ParResponseObject {
+    "par"?: string;
+}
 export interface PhysicalConnectionCollection {
     "roomName"?: string;
     "type"?: string;
@@ -93,7 +96,7 @@ export interface PhysicalConnectionCollection {
 }
 export interface PhysicalConnectionImageResponse {
     "image": string;
-    "materials"?: Array<MaterialSummary[]>;
+    "materials"?: MaterialSummary[];
 }
 export interface PhysicalConnectionSummary {
     "id"?: string;
@@ -141,7 +144,7 @@ export interface BuildArtifactsApiDownloadBuildArtifactArgs {
 }
 export type BuildArtifactsApiDownloadBuildArtifactReturnType = {
     response: Response;
-    data: string;
+    data: ParResponseObject;
 };
 export interface BuildArtifactsApiListBuildArtifactsArgs {
     "roomName": string;
@@ -157,7 +160,7 @@ export declare class BuildArtifactsApi extends base.BaseAPI {
         "filePath": string;
     }, options?: any): Promise<{
         response: Response;
-        data: string;
+        data: ParResponseObject;
     }>;
     listBuildArtifacts(params: {
         "roomName": string;

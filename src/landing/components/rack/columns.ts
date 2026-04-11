@@ -67,57 +67,10 @@ export const LLDP_FAILURE_COLUMNS: any[] = [
 
 export const GPU_COMPUTE_LLDP_FAILURE_COLUMNS: any[] = [
   {
-    headerText: "Error Message",
-    field: "errorMessage",
-    id: "errorMessage",
-    template: "gpuMultilineErrorMessageTemplate",
-    ...DEFAULT_COLUMN_SETTINGS,
-  },
-  { headerText: "Device A Name", field: "deviceAName", id: "deviceAName", ...DEFAULT_COLUMN_SETTINGS },
-  { headerText: "Device A Port", field: "deviceAPort", id: "deviceAPort", ...DEFAULT_COLUMN_SETTINGS },
-  {
-    headerText: "Device A Location",
-    field: "deviceALocation",
-    id: "deviceALocation",
-    template: "deviceALocationTemplate",
-    ...DEFAULT_COLUMN_SETTINGS,
-  },
-  {
-    headerText: "Current Device B Name",
-    field: "currentDeviceBName",
-    id: "currentDeviceBName",
-    ...DEFAULT_COLUMN_SETTINGS,
-  },
-  {
-    headerText: "Current Device B Port",
-    field: "currentDeviceBPort",
-    id: "currentDeviceBPort",
-    ...DEFAULT_COLUMN_SETTINGS,
-  },
-  {
-    headerText: "Current B Location",
-    field: "currentBLocation",
-    id: "currentBLocation",
-    template: "currentBLocationTemplate",
-    ...DEFAULT_COLUMN_SETTINGS,
-  },
-  {
-    headerText: "Expected Device B Name",
-    field: "expectedDeviceBName",
-    id: "expectedDeviceBName",
-    ...DEFAULT_COLUMN_SETTINGS,
-  },
-  {
-    headerText: "Expected Device B Port",
-    field: "expectedDeviceBPort",
-    id: "expectedDeviceBPort",
-    ...DEFAULT_COLUMN_SETTINGS,
-  },
-  {
-    headerText: "Expected B Location",
-    field: "expectedBLocation",
-    id: "expectedBLocation",
-    template: "expectedBLocationTemplate",
+    headerText: "Error Details",
+    field: "errorDetails",
+    id: "errorDetails",
+    template: "gpuLldpErrorDetailsTemplate",
     ...DEFAULT_COLUMN_SETTINGS,
   },
   {
@@ -126,6 +79,13 @@ export const GPU_COMPUTE_LLDP_FAILURE_COLUMNS: any[] = [
     id: "patchPanelMatrix",
     template: "patchPanelMatrixTemplate",
     ...PATCH_PANEL_COLUMN_SETTINGS,
+  },
+  {
+    headerText: "Error Message",
+    field: "errorMessage",
+    id: "errorMessage",
+    template: "gpuMultilineErrorMessageTemplate",
+    ...DEFAULT_COLUMN_SETTINGS,
   },
 ];
 

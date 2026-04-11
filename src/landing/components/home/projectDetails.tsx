@@ -9,6 +9,7 @@ import "ojs/ojprogress-circle";
 import "ojs/ojpagingcontrol";
 import { ProjectLoadMeasurement } from "./types";
 import { emitMetric, TELEMETRY_METRICS } from "../telemetry/api";
+import { getLvvApiBase } from "../../config/api";
 
 const RACK_COLUMNS = [
     { headerText: "Rack Location", field: "rackLocation", id: "rackLocation", resizable: "enabled" as const, sortable: 'enabled' as const },
@@ -44,7 +45,7 @@ const INIT_SELECTION_MODE: TableIntrinsicProps['selectionMode'] = {
 // TODO: Check it out
 const ACC = {rowHeader: "Rack"}
 
-const API_URL = window.location.host.includes('localhost') ? "http://localhost:21000/lvv" : `https://${window.location.host}/lvv`;
+const API_URL = getLvvApiBase();
 
 interface ProjectRackRow {
     _key: string;

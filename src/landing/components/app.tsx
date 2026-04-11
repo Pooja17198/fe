@@ -50,6 +50,15 @@ const router = new CoreRouter<CoreRouter.DetailedRouteConfig>(routeArray, {
 const TOKEN_REFRESH_MS      = 15 * 60 * 1000;     // refresh IDCS token every 15 min
 const RELAUNCH_AUTH_URL     = "/";          // force fresh login flow
 
+function isLocalhost(): boolean {
+  return window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+}
+
+function isSyncOverriddenError(error: unknown): boolean {
+  return error === "sync overridden"
+    || (error instanceof Error && error.message === "sync overridden");
+}
+
 type Route = {
   path: string;
   id?: string;
@@ -58,7 +67,13 @@ type Route = {
 
 const pageChangeHandler = async (route: Route) => {
   // Navigate via CoreRouter using path/params; master accepts passing params for all routes
-  await router.go({ path: route.path, params: { id: route.id } as any });
+  try {
+    await router.go({ path: route.path, params: { id: route.id } as any });
+  } catch (error) {
+    if (!isSyncOverriddenError(error)) {
+      throw error;
+    }
+  }
 
   // Unified URL normalization approach:
   // 1) Clear any existing query
@@ -139,6 +154,9 @@ export const App = registerCustomElement("app-root", (props: Props) => {
     };
 
       const startTokenRefresh = () => {
+        if (isLocalhost()) {
+          return;
+        }
         void refreshToken();
         tokenRefreshTimer.current = setInterval(() => {
           void refreshToken();
@@ -167,7 +185,11 @@ export const App = registerCustomElement("app-root", (props: Props) => {
       }
 
       router.currentState.subscribe(routerUpdated);
-      router.sync();
+      void router.sync().catch((error) => {
+        if (!isSyncOverriddenError(error)) {
+          console.error(error);
+        }
+      });
       startTokenRefresh();
 
       return () => {

@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "preact/hooks";
 import ProjectDetailsContainer from "./projectDetails";
 import { ProjectLoadMeasurement } from "./types";
 import "ojs/ojprogress-circle";
+import { getLvvApiBase } from "../../config/api";
 
 
 let INIT_SELECTEDPROJECT: any | null = null;
@@ -34,7 +35,7 @@ type ProjectMetadata = {
     blocks: string[];
 }
 
-const API_URL = window.location.host.includes('localhost') ? "http://localhost:21000/lvv" : `https://${window.location.host}/lvv`;
+const API_URL = getLvvApiBase();
 
 const HomeContainer = (props: Props) => {
 
@@ -44,6 +45,7 @@ const HomeContainer = (props: Props) => {
     let projectListProvider = new MutableArrayDataProvider<any, any>(projectList, { keyAttributes: "projectId" })
 
     const [isLoading, setIsLoading] = useState(false);
+    const isLocalDesktop = window.location.host.includes("localhost");
 
     const vendorUrl = `${API_URL}/projects?vendorName=${props.vendor}&regionName=${props.region}`
     let params = '';
@@ -60,28 +62,33 @@ const HomeContainer = (props: Props) => {
             let vendorResponse;
 
             try {
-                // Fetch from vendorUrl
-                const vendorFetch = await fetch(vendorUrl);
-                vendorResponse = await vendorFetch.json();
+                if (!props.vendor && isLocalDesktop) {
+                    const masterFetch = await fetch(masterUrl);
+                    projects = masterFetch.ok ? await masterFetch.json() : [];
+                } else {
+                    // Fetch from vendorUrl
+                    const vendorFetch = await fetch(vendorUrl);
+                    vendorResponse = await vendorFetch.json();
 
-                // Assuming the API returns an array of projects
-                if (Array.isArray(vendorResponse) && vendorResponse.length === 0) {
-                    // vendorUrl returned empty: try masterUrl
-                    try {
-                        const masterFetch = await fetch(masterUrl);
-                        if (masterFetch.status === 404) {
-                            // masterUrl returns 404: fallback to vendorResponse
+                    // Assuming the API returns an array of projects
+                    if (Array.isArray(vendorResponse) && vendorResponse.length === 0) {
+                        // vendorUrl returned empty: try masterUrl
+                        try {
+                            const masterFetch = await fetch(masterUrl);
+                            if (masterFetch.status === 404) {
+                                // masterUrl returns 404: fallback to vendorResponse
+                                projects = vendorResponse;
+                            } else {
+                                projects = await masterFetch.json();
+                            }
+                        } catch (error) {
+                            // Error fetching masterUrl: fallback to vendorResponse
                             projects = vendorResponse;
-                        } else {
-                            projects = await masterFetch.json();
                         }
-                    } catch (error) {
-                        // Error fetching masterUrl: fallback to vendorResponse
+                    } else {
+                        // vendorUrl returned data
                         projects = vendorResponse;
                     }
-                } else {
-                    // vendorUrl returned data
-                    projects = vendorResponse;
                 }
             } catch (error) {
                 // Error fetching vendorUrl
@@ -92,10 +99,10 @@ const HomeContainer = (props: Props) => {
             setIsLoading(false);
         };
 
-        if (props.vendor) {
+        if (props.vendor || isLocalDesktop) {
             fetchData();
         }
-    }, [props.vendor, props.region]);
+    }, [props.vendor, props.region, isLocalDesktop]);
 
     const [selectedProject, setSelectedProject] = useState(
         INIT_SELECTEDPROJECT

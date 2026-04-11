@@ -4,7 +4,12 @@
   "description": "An Oracle JavaScript Extension Toolkit(JET) web app",
   "author": "Network Automation opc_nw_automation_dev_us_grp@oracle.com ",
   "scripts": {
-    "codegen:clients": "./build_clients.sh"
+    "codegen:clients": "./build_clients.sh",
+    "start": "ojet serve web --server-port 8000",
+    "build": "ojet build web --release",
+    "build:dev": "ojet build web",
+    "serve:release": "ojet serve web --release --server-port 8000",
+    "check": "npm run build:dev"
   },
   "config": {
     "registry": "https://artifactory.oci.oraclecorp.com/api/npm/global-release-npm"

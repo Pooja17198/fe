@@ -30,6 +30,7 @@ import {
   deviceALocationTemplate,
   errorMessageClampTemplate,
   expectedBLocationTemplate,
+  gpuLldpErrorDetailsTemplate,
   gpuMultilineErrorMessageTemplate,
   lldpStatusTemplate,
   patchPanelMatrixTemplate,
@@ -971,6 +972,7 @@ const DeviceAccordion = (props: Props) => {
                                               <template slot="currentBLocationTemplate" render={currentBLocationTemplate} />
                                               <template slot="expectedBLocationTemplate" render={expectedBLocationTemplate} />
                                               <template slot="sourceDeviceLocationTemplate" render={sourceDeviceLocationTemplate} />
+                                              <template slot="gpuLldpErrorDetailsTemplate" render={gpuLldpErrorDetailsTemplate} />
                                               <template slot="gpuMultilineErrorMessageTemplate" render={gpuMultilineErrorMessageTemplate} />
                                               <template slot="errorMessageClampTemplate" render={errorMessageClampTemplate} />
                                             </oj-table>
