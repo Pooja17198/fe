@@ -5,8 +5,8 @@ const DEFAULT_COLUMN_SETTINGS = {
 
 const RX_POWER_COLUMN_SETTINGS = {
   ...DEFAULT_COLUMN_SETTINGS,
-  headerStyle: "min-width: 286px; width: 286px;",
-  style: "min-width: 286px; width: 286px;",
+  headerStyle: "min-width: 289px; width: 289px;",
+  style: "min-width: 289px; width: 289px;",
 } as const;
 
 const PATCH_PANEL_COLUMN_SETTINGS = {

@@ -241,17 +241,17 @@ function createPlainRenderPart(value: string, prefix = "", suffix = ""): DetailP
   };
 }
 
-function highlightLastToken(value: string): HighlightSegment[] {
-  const tokens = splitPreservingDelimiters(value);
-  if (tokens.length <= 1) {
+function buildLastTerminalValueSegments(value: string): HighlightSegment[] {
+  const match = value.match(/^(.*?)([^:\/\.\-_\s]+)$/);
+  if (!match) {
     return [{ text: value, highlight: true }];
   }
 
-  const lastTokenIndex = tokens.length - 1;
-  return tokens.map((token, index) => ({
-    text: token,
-    highlight: index === lastTokenIndex,
-  }));
+  const [, leadingText, trailingValue] = match;
+  return [
+    ...(leadingText ? [{ text: leadingText }] : []),
+    { text: trailingValue, highlight: true },
+  ];
 }
 
 function createMissingAwareRenderPart(value: string, prefix = "", suffix = ""): DetailPartRender {
@@ -262,7 +262,7 @@ function createMissingAwareRenderPart(value: string, prefix = "", suffix = ""): 
   return {
     prefix,
     suffix,
-    segments: highlightLastToken(value),
+    segments: buildLastTerminalValueSegments(value),
   };
 }
 
