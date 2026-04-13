@@ -243,7 +243,10 @@ type DetailPartRender = {
 };
 
 function isMissingLikeValue(value: string): boolean {
-  return value.trim().toLowerCase() === "missing";
+  const normalized = value.trim().toLowerCase();
+  return normalized === "[missing]"
+    || normalized === "missing"
+    || normalized === "missing:missing";
 }
 
 function splitPreservingDelimiters(value: string): string[] {
@@ -279,34 +282,11 @@ function createPlainRenderPart(value: string, prefix = "", suffix = ""): DetailP
   };
 }
 
-function buildLastTerminalValueSegments(value: string): HighlightSegment[] {
-  const missingSplitMatch = value.match(/^(.*?)(missing)(:missing)?$/i);
-  if (missingSplitMatch) {
-    const [, leadingText] = missingSplitMatch;
-    return leadingText ? [{ text: leadingText }] : [{ text: value }];
-  }
-
-  const match = value.match(/^(.*?)(\d+)$/);
-  if (!match) {
-    return [{ text: value }];
-  }
-
-  const [, leadingText, trailingValue] = match;
-  return [
-    ...(leadingText ? [{ text: leadingText }] : []),
-    { text: trailingValue, highlight: true },
-  ];
-}
-
-function createMissingAwareRenderPart(value: string, prefix = "", suffix = ""): DetailPartRender {
-  if (isMissingLikeValue(value)) {
-    return createPlainRenderPart(value, prefix, suffix);
-  }
-
+function createHighlightedRenderPart(value: string, prefix = "", suffix = ""): DetailPartRender {
   return {
     prefix,
     suffix,
-    segments: buildLastTerminalValueSegments(value),
+    segments: [{ text: value, highlight: true }],
   };
 }
 
@@ -380,10 +360,24 @@ function buildComparableRenderParts(
     const expectedMissing = isMissingLikeValue(expectedValue);
     const observedMissing = isMissingLikeValue(observedValue);
 
-    if (expectedMissing || observedMissing) {
+    if (expectedMissing && observedMissing) {
       return [
-        createMissingAwareRenderPart(expectedValue, prefix, suffix),
-        createMissingAwareRenderPart(observedValue, prefix, suffix),
+        createPlainRenderPart(expectedValue, prefix, suffix),
+        createPlainRenderPart(observedValue, prefix, suffix),
+      ] as const;
+    }
+
+    if (expectedMissing) {
+      return [
+        createPlainRenderPart(expectedValue, prefix, suffix),
+        createHighlightedRenderPart(observedValue, prefix, suffix),
+      ] as const;
+    }
+
+    if (observedMissing) {
+      return [
+        createHighlightedRenderPart(expectedValue, prefix, suffix),
+        createPlainRenderPart(observedValue, prefix, suffix),
       ] as const;
     }
 
