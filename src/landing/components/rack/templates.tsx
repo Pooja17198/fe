@@ -184,11 +184,49 @@ function formatLocationValue(rawLocation: unknown): string {
   }
 }
 
-function buildGpuLldpDetailParts(location: unknown, port: unknown, name: unknown): string[] {
+function mapGpuComputePortToNicLabel(rawPort: string): string | null {
+  const match = rawPort.match(/^slot(\d+)\/port(\d+)-(\d+)$/i);
+  if (!match) {
+    return null;
+  }
+
+  const slot = Number(match[1]);
+  const portGroup = Number(match[2]);
+  const lane = Number(match[3]);
+  if (!Number.isFinite(slot) || !Number.isFinite(portGroup) || !Number.isFinite(lane)) {
+    return null;
+  }
+
+  const mpoSuffixByLane: Record<number, string> = {
+    1: "left.1",
+    2: "left.2",
+    3: "right.1",
+    4: "right.2",
+  };
+  const mpoSuffix = mpoSuffixByLane[lane];
+  if (!mpoSuffix) {
+    return null;
+  }
+
+  const nicNumber = (slot - 1) * 2 + portGroup;
+  if (nicNumber < 1) {
+    return null;
+  }
+
+  return `NIC${nicNumber}.MPO-${mpoSuffix}`;
+}
+
+function buildGpuLldpDetailParts(
+  location: unknown,
+  port: unknown,
+  name: unknown,
+  mapPortLabel: boolean = false
+): string[] {
   const portValue = normalizeMissingValue(port);
+  const mappedPortValue = mapPortLabel ? mapGpuComputePortToNicLabel(portValue) || portValue : portValue;
   return [
     formatLocationValue(location),
-    portValue,
+    mappedPortValue,
     `${normalizeMissingValue(name)}:${portValue}`,
   ];
 }
@@ -405,8 +443,18 @@ export const errorMessageClampTemplate = (context: any) => {
 export const gpuLldpErrorDetailsTemplate = (context: any) => {
   const row = (context?.item && context.item.data) || {};
   const interfaceParts = buildGpuLldpDetailParts(row.deviceALocation, row.deviceAPort, row.deviceAName);
-  const expectedParts = buildGpuLldpDetailParts(row.expectedBLocation, row.expectedDeviceBPort, row.expectedDeviceBName);
-  const observedParts = buildGpuLldpDetailParts(row.currentBLocation, row.currentDeviceBPort, row.currentDeviceBName);
+  const expectedParts = buildGpuLldpDetailParts(
+    row.expectedBLocation,
+    row.expectedDeviceBPort,
+    row.expectedDeviceBName,
+    true
+  );
+  const observedParts = buildGpuLldpDetailParts(
+    row.currentBLocation,
+    row.currentDeviceBPort,
+    row.currentDeviceBName,
+    true
+  );
   const [expectedRenderParts, observedRenderParts] = buildComparableRenderParts(expectedParts, observedParts);
   const detailRows = [
     {
