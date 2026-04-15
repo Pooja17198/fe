@@ -527,6 +527,7 @@
 
 .rack-page .device-accordion-header-row .device-col.last-validated {
     justify-self: center;
+    min-width: 0;
 }
 
 .rack-page .device-accordion-header-row .device-col.errors {
@@ -588,29 +589,38 @@
     }
 }
 
-.device-last-validated-dot {
-    display: inline-block;
-    width: 12px;
-    height: 12px;
+.device-last-validated-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    max-width: 100%;
+    min-height: 32px;
+    padding: 4px 14px;
     border-radius: 999px;
-    flex-shrink: 0;
+    color: #ffffff;
+    font-size: 0.84rem;
+    font-weight: 500;
+    line-height: 1.2;
+    white-space: nowrap;
+    text-align: center;
 }
 
-.device-last-validated-dot.legend {
-    width: 10px;
-    height: 10px;
+.device-last-validated-pill.legend {
+    min-height: 28px;
+    padding: 4px 14px;
+    font-size: 0.82rem;
 }
 
-.device-last-validated-dot.green {
-    background: #12b76a;
+.device-last-validated-pill.green {
+    background: #4f8f1f;
 }
 
-.device-last-validated-dot.orange {
+.device-last-validated-pill.orange {
     background: #f79009;
 }
 
-.device-last-validated-dot.red {
-    background: #f04438;
+.device-last-validated-pill.red {
+    background: #e14b2b;
 }
 
 .device-last-validated-na {

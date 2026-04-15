@@ -43,10 +43,17 @@ type ValidationAgeColor = "green" | "orange" | "red";
 
 const VALIDATION_AGE_THRESHOLDS_MS = {
   // when currentTime - lastValidated <= GREEN_MAX then display green color
-  // else when currentTime - lastValidated >= RED_MIN then display red color
-  // else display orange color
-  GREEN_MAX: 2 * 60 * 1000,
-  RED_MIN: 10 * 60 * 1000,
+  // else when currentTime - lastValidated <= ORANGE_MAX then display orange color
+  // else display red color
+  GREEN_MAX: 10 * 60 * 1000,
+  ORANGE_MAX: 60 * 60 * 1000,
+} as const;
+
+const RELATIVE_TIME_UNITS = {
+  minute: 60 * 1000,
+  hour: 60 * 60 * 1000,
+  day: 24 * 60 * 60 * 1000,
+  week: 7 * 24 * 60 * 60 * 1000,
 } as const;
 
 function parseLastValidatedTimestampMs(lastValidatedAt?: string | null): number | null {
@@ -64,8 +71,42 @@ function resolveValidationAgeColor(
 
   const elapsedSinceValidationMs = Math.max(0, referenceTimeMs - lastValidatedTimestampMs);
   if (elapsedSinceValidationMs <= VALIDATION_AGE_THRESHOLDS_MS.GREEN_MAX) return "green";
-  if (elapsedSinceValidationMs >= VALIDATION_AGE_THRESHOLDS_MS.RED_MIN) return "red";
-  return "orange";
+  if (elapsedSinceValidationMs <= VALIDATION_AGE_THRESHOLDS_MS.ORANGE_MAX) return "orange";
+  return "red";
+}
+
+function formatRelativeValidationAge(
+    lastValidatedAt: string | null | undefined,
+    referenceTimeMs: number
+): string {
+  const lastValidatedTimestampMs = parseLastValidatedTimestampMs(lastValidatedAt);
+  if (lastValidatedTimestampMs === null) return "Unknown";
+
+  const elapsedSinceValidationMs = Math.max(0, referenceTimeMs - lastValidatedTimestampMs);
+  const elapsedSeconds = Math.floor(elapsedSinceValidationMs / 1000);
+
+  if (elapsedSinceValidationMs < RELATIVE_TIME_UNITS.minute) {
+    const seconds = Math.max(1, elapsedSeconds);
+    return `${seconds} second${seconds === 1 ? "" : "s"} ago`;
+  }
+
+  if (elapsedSinceValidationMs < RELATIVE_TIME_UNITS.hour) {
+    const minutes = Math.floor(elapsedSinceValidationMs / RELATIVE_TIME_UNITS.minute);
+    return `${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+  }
+
+  if (elapsedSinceValidationMs < RELATIVE_TIME_UNITS.day) {
+    const hours = Math.floor(elapsedSinceValidationMs / RELATIVE_TIME_UNITS.hour);
+    return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  }
+
+  if (elapsedSinceValidationMs < RELATIVE_TIME_UNITS.week) {
+    const days = Math.floor(elapsedSinceValidationMs / RELATIVE_TIME_UNITS.day);
+    return `${days} day${days === 1 ? "" : "s"} ago`;
+  }
+
+  const weeks = Math.floor(elapsedSinceValidationMs / RELATIVE_TIME_UNITS.week);
+  return `${weeks} week${weeks === 1 ? "" : "s"} ago`;
 }
 
 function getNextValidationColorTransitionAtMs(
@@ -79,8 +120,8 @@ function getNextValidationColorTransitionAtMs(
   if (elapsedSinceValidationMs <= VALIDATION_AGE_THRESHOLDS_MS.GREEN_MAX) {
     return lastValidatedTimestampMs + VALIDATION_AGE_THRESHOLDS_MS.GREEN_MAX + 50;
   }
-  if (elapsedSinceValidationMs < VALIDATION_AGE_THRESHOLDS_MS.RED_MIN) {
-    return lastValidatedTimestampMs + VALIDATION_AGE_THRESHOLDS_MS.RED_MIN + 50;
+  if (elapsedSinceValidationMs < VALIDATION_AGE_THRESHOLDS_MS.ORANGE_MAX) {
+    return lastValidatedTimestampMs + VALIDATION_AGE_THRESHOLDS_MS.ORANGE_MAX + 50;
   }
   return null;
 }
@@ -723,12 +764,15 @@ const DeviceAccordion = (props: Props) => {
     }
 
     const validationColor = resolveValidationAgeColor(deviceFailures.lastValidated, validationReferenceTimeMs);
+    const relativeValidationAge = formatRelativeValidationAge(deviceFailures.lastValidated, validationReferenceTimeMs);
     return (
         <span
-            className={`device-last-validated-dot ${validationColor}`}
-            title={`Last validated indicator: ${validationColor}`}
-            aria-label={`Last validated status ${validationColor}`}
-        />
+            className={`device-last-validated-pill ${validationColor}`}
+            title={relativeValidationAge}
+            aria-label={`Last validated ${relativeValidationAge}`}
+        >
+          {relativeValidationAge}
+        </span>
     );
   };
 
@@ -796,16 +840,13 @@ const DeviceAccordion = (props: Props) => {
               <div class="device-last-validated-legend full-bleed">
                 <span className="device-accordion-legend-title">Last Validated Legend</span>
                 <span className="device-accordion-legend-item">
-                  <span className="device-last-validated-dot green legend" />
-                  Within last 2 minutes
+                  <span className="device-last-validated-pill green legend">Up to 10 minutes</span>
                 </span>
                 <span className="device-accordion-legend-item">
-                  <span className="device-last-validated-dot orange legend" />
-                  Between 2 to 10 min ago
+                  <span className="device-last-validated-pill orange legend">Up to 1 hour</span>
                 </span>
                 <span className="device-accordion-legend-item">
-                  <span className="device-last-validated-dot red legend" />
-                  Over 10 minutes ago
+                  <span className="device-last-validated-pill red legend">Greater than 1 hour</span>
                 </span>
                 <span className="device-accordion-legend-item">
                   <span className="device-last-validated-na">N/A</span>
