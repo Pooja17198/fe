@@ -9,6 +9,7 @@ const HtmlWebpackPlugin = require('html-webpack-plugin');
 const InlineChunkHtmlPlugin = require('inline-chunk-html-plugin')
 const HTMLInlineCSSWebpackPlugin = require("html-inline-css-webpack-plugin").default;
 const TerserPlugin = require('terser-webpack-plugin');
+const CopyWebpackPlugin = require('copy-webpack-plugin');
 
 module.exports = {
   /**
@@ -46,6 +47,16 @@ module.exports = {
       config.output.path = path.resolve(__dirname, './web');
       config.output.publicPath = '';
       config.output.clean = false;
+      config.plugins.push(
+              new CopyWebpackPlugin({
+                patterns: [
+                  {
+                    from: path.resolve(__dirname, 'src/landing/resources'),
+                    to: path.resolve(__dirname, 'web/landing/resources')
+                  }
+                ]
+              })
+            );
       config.resolve.alias = {
         ...config.resolve.alias,
         '@oracle/oraclejet-preact': path.resolve(__dirname, 'node_modules/@oracle/oraclejet-preact/amd'),

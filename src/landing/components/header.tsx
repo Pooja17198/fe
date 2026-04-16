@@ -82,6 +82,22 @@ export function Header({ appName, userLogin, vendorName, regionValue, page, onRe
   }, [LVV_API]);
 
   const logoutUrl = `/logout`;
+  const guideFiles = {
+      helpPortalGuide: "lvv_portal_tutorial.pdf",
+      helpValidationGuide: "lvv_validation_failure_resolution_guide.pptx"
+    } as const;
+
+  function openGuide(guideFileName: string) {
+      const pdfUrl = `${window.location.origin}/landing/resources/${guideFileName}`;
+      const link = document.createElement("a");
+      link.href = pdfUrl;
+      link.download = guideFileName;
+      link.target = "_blank";
+      link.rel = "noopener";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+  }
 
   function handleUserMenuAction(e: any) {
     const detail = e?.detail || {};
@@ -90,7 +106,8 @@ export function Header({ appName, userLogin, vendorName, regionValue, page, onRe
     let resolved = actionValue;
     if (!resolved && typeof targetId === "string") {
       if (targetId.includes("out")) resolved = "out";
-      else if (targetId.includes("help")) resolved = "help";
+      else if (targetId.includes("helpPortalGuide")) resolved = "helpPortalGuide";
+      else if (targetId.includes("helpValidationGuide")) resolved = "helpValidationGuide";
       else if (targetId.includes("home")) resolved = "home";
       else resolved = null;
     }
@@ -99,16 +116,12 @@ export function Header({ appName, userLogin, vendorName, regionValue, page, onRe
       window.location.assign("/");
       return;
     }
-    else if (resolved === "help") {
-      const pdfUrl = `${window.location.origin}/landing/resources/lvv_portal_tutorial.pdf`;
-      const link = document.createElement("a");
-      link.href = pdfUrl;
-      link.download = "lvv_portal_tutorial.pdf";
-      link.target = "_blank";
-      link.rel = "noopener";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+    else if (resolved === "helpPortalGuide") {
+      openGuide(guideFiles.helpPortalGuide);
+      return;
+    }
+    else if (resolved === "helpValidationGuide") {
+      openGuide(guideFiles.helpValidationGuide);
       return;
     }
     else if (resolved === "out") {
@@ -232,7 +245,8 @@ export function Header({ appName, userLogin, vendorName, regionValue, page, onRe
                 <span slot="endIcon" class={getEndIconClass()}></span>
                 <oj-menu id="menu1" slot="menu" onojAction={handleUserMenuAction}>
                   <oj-option id="home" value="home">Home</oj-option>
-                  <oj-option id="help" value="help">Help</oj-option>
+                  <oj-option id="helpPortalGuide" value="helpPortalGuide">Portal User Guide</oj-option>
+                  <oj-option id="helpValidationGuide" value="helpValidationGuide">Validation Failures &amp; Resolutions</oj-option>
                   <oj-option id="out" value="out">Sign Out</oj-option>
                 </oj-menu>
               </oj-menu-button>
