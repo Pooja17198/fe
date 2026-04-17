@@ -23,10 +23,18 @@ const PAN_DISTANCE = 50;
 
 interface PathGraphProps {
   room: RoomLayout;
+  racksWithPhysicalCutsheet: string[];
+  onRackClick: (rackId: string, hasCutsheet: boolean) => void;
+  hoverRackId: string | null;
   // highlights: HighlightsInfo;
 }
 
-export const PathGraph = ({ room }: PathGraphProps) => {
+export const PathGraph = ({
+  room,
+  racksWithPhysicalCutsheet,
+  onRackClick,
+  hoverRackId,
+}: PathGraphProps) => {
   const [graphProp, setGraphProp] = useState<GraphProp>();
   const generateLine = d3
     .line()
@@ -57,7 +65,7 @@ export const PathGraph = ({ room }: PathGraphProps) => {
       if (item.type.startsWith("BasketTray")) {
         basketTrays.push({
           ...item,
-          id: index + '',
+          id: index + "",
         });
       } else if (item.type.endsWith("Rack")) {
         racks.push(item);
@@ -66,7 +74,7 @@ export const PathGraph = ({ room }: PathGraphProps) => {
     if (!racks.length) {
       setGraphProp(undefined);
       return;
-    };
+    }
     let minX = Infinity;
     let maxX = -Infinity;
     let minY = Infinity;
@@ -142,11 +150,112 @@ export const PathGraph = ({ room }: PathGraphProps) => {
       .on("dblclick.zoom", null);
   }, [room]);
 
+  const renderRackInfo = (d: any, node: any) => {
+    const rackInfo = node["__data__"].label;
+    const { offsetX, offsetY } = d;
+    if (!rackInfo) return;
+    svgElement
+      .append("g")
+      .attr("class", "rack-hover-text")
+      .attr("key", d.key)
+      .append("rect")
+      .attr("width", rackInfo.length * 10 + 15)
+      .attr("height", 20)
+      .attr("stroke", "grey")
+      .attr("stroke-width", "1")
+      .attr("fill", "lightgrey")
+      .attr("x", offsetX + 20)
+      .attr("y", offsetY);
+
+    svgElement
+      .selectAll("g.rack-hover-text")
+      .append("text")
+      .attr("x", offsetX + 25)
+      .attr("y", offsetY)
+      .attr("font-size", "1em")
+      .html(
+        `<tspan x=${offsetX + 25} dy='1em'>${rackInfo || ""}</tspan>
+      `,
+      );
+
+    d3.selectAll(`.rack-hover-text`).raise();
+  };
+  // helper: enlarge a rack polygon and show label, same as mouseover
+  const enlargeRackById = (rackId: string) => {
+    if (!graphProp) return;
+    const sel = svgElement.select(`g#node-group-rack-${rackId} polygon`);
+    if (sel.empty()) return;
+
+    const data: any = (sel.node() as any)?.__data__;
+    if (!data || !data.coordinates) return;
+
+    sel
+      .transition()
+      .duration(100)
+      .attr("points", (d: any) => {
+        const coords = data.coordinates || [];
+        const xs = coords.map((c: [number, number]) => c[0]);
+        const ys = coords.map((c: [number, number]) => c[1]);
+
+        const minX = Math.min(...xs);
+        const maxX = Math.max(...xs);
+        const minY = Math.min(...ys);
+        const maxY = Math.max(...ys);
+
+        return (coords || [])
+          .map((pt: any) => {
+            const x = pt[0];
+            const y = pt[1];
+            const left = x <= (minX + maxX) / 2;
+            const top = y <= (minY + maxY) / 2;
+            return [
+              calculateScaledX(x, graphProp, true) + (left ? -5 : 5),
+              calculateScaledY(y, graphProp, true) + (top ? 5 : -5),
+            ].join(",");
+          })
+          .join(" ");
+      });
+
+    // approximate mouse position to reuse renderRackInfo; we can take first coordinate
+    const first = data.coordinates[0];
+    const dLike = {
+      offsetX: calculateScaledX(first[0], graphProp, true),
+      offsetY: calculateScaledY(first[1], graphProp, true),
+    };
+    renderRackInfo(dLike, sel.node() as Element);
+  };
+
+  // helper: reset rack polygon and remove label, same as mouseout
+  const resetRackById = (rackId: string) => {
+    if (!graphProp) return;
+    const sel = svgElement.select(`g#node-group-rack-${rackId} polygon`);
+    if (sel.empty()) return;
+
+    const data: any = (sel.node() as any)?.__data__;
+    if (!data || !data.coordinates) return;
+
+    sel
+      .transition()
+      .duration(200)
+      .attr("points", (d: any) => {
+        return (data.coordinates || [])
+          .map((pt: any) => {
+            return [
+              calculateScaledX(pt[0], graphProp, true),
+              calculateScaledY(pt[1], graphProp, true),
+            ].join(",");
+          })
+          .join(" ");
+      });
+
+    d3.selectAll(".rack-hover-text").remove();
+  };
+
   // inital node rendering
   useEffect(() => {
     const svgElement = d3.select(svgRef.current as Element);
     d3.selectAll(".node-group").remove();
-    if(!graphProp) return;
+    if (!graphProp) return;
 
     // rack node group handles the mouse over/out event
     svgElement
@@ -182,10 +291,75 @@ export const PathGraph = ({ room }: PathGraphProps) => {
           })
           .join(" ");
       })
-      .attr("stroke", "darkgreen")
-      .attr("fill", "green")
-      .attr("opacity", "0.8");
+      .attr("stroke", (d: any) => {
+        const rackId = d.label || d.id || "";
+        if (racksWithPhysicalCutsheet.includes(rackId)) {
+          return "darkgreen";
+        }
+        return "darkgrey";
+      })
+      .attr("fill", (d: any) => {
+        const rackId = d.label || d.id || "";
+        if (racksWithPhysicalCutsheet.includes(rackId)) {
+          return "green";
+        }
+        return "lightblue";
+      })
+      .attr("stroke-width", "0.6")
+      .attr("opacity", (d: any) => {
+        const rackId = d.label || d.id || "";
+        if (racksWithPhysicalCutsheet.includes(rackId)) {
+          return "0.9";
+        }
+        return "0.8";
+      })
+      .on("mouseover", function (d) {
+        d3.select(this)
+          .transition()
+          .duration(100)
+          .attr("points", (d: any) => {
+            const coords = d.coordinates || [];
+            // Determine min/max for x and y across all four points
+            const xs = coords.map((c: [number, number]) => c[0]);
+            const ys = coords.map((c: [number, number]) => c[1]);
 
+            const minX = Math.min(...xs);
+            const maxX = Math.max(...xs);
+            const minY = Math.min(...ys);
+            const maxY = Math.max(...ys);
+
+            return (d.coordinates || [])
+              .map((d: any) => {
+                const x = d[0];
+                const y = d[1];
+                const left = x <= (minX + maxX) / 2;
+                const top = y <= (minY + maxY) / 2;
+                return [
+                  calculateScaledX(x, graphProp, true) + (left ? -5 : 5),
+                  calculateScaledY(y, graphProp, true) + (top ? 5 : -5),
+                ].join(",");
+              })
+              .join(" ");
+          });
+        renderRackInfo(d, d3.select(this).node() as Element);
+      })
+      .on("mouseout", function (d: any, node: any) {
+        if (hoverRackId === (node.label || node.id)) return;
+        d3.select(this)
+          .transition()
+          .duration(200)
+          .attr("points", (d: any) => {
+            return (d.coordinates || [])
+              .map((d: any) => {
+                return [
+                  calculateScaledX(d[0], graphProp, true),
+                  calculateScaledY(d[1], graphProp, true),
+                ].join(",");
+              })
+              .join(" ");
+          });
+        d3.selectAll(".rack-hover-text").remove();
+      });
     // basket trays connections
     svgElement
       .selectAll("g.basket-tray-group")
@@ -204,7 +378,8 @@ export const PathGraph = ({ room }: PathGraphProps) => {
       })
       .attr("stroke", "darkgrey")
       .attr("fill", "lightgrey")
-      .attr("opacity", "0.5");
+      .attr("stroke-width", "0.6")
+      .attr("opacity", "0.3");
 
     d3.selectAll(".node-group").raise();
     d3.selectAll(".edge").lower();
@@ -213,7 +388,59 @@ export const PathGraph = ({ room }: PathGraphProps) => {
       .transition()
       .duration(100)
       .call(zoom.transform, currentTransform.translate(50, 0));
+    if (racksWithPhysicalCutsheet.length) {
+      racksWithPhysicalCutsheet.forEach((rackId) => {
+        svgElement
+          .selectAll("g#node-group-rack-" + rackId + " polygon")
+          .attr("stroke", "darkgreen")
+          .attr("fill", "green")
+          .attr("opacity", "0.9")
+          .on("click", function (_event, d: any) {
+            const rackId = d.label || d.id || "";
+            const hasCutsheet = racksWithPhysicalCutsheet.includes(rackId);
+            onRackClick(rackId, hasCutsheet);
+          });
+      });
+    }
   }, [graphProp]);
+
+  useEffect(() => {
+    svgElement
+      .selectAll("g.node-group polygon")
+      .attr("stroke", (d: any) => {
+        const rackId = d.label || d.id || "";
+        if (racksWithPhysicalCutsheet.includes(rackId)) {
+          return "darkgreen";
+        }
+        return "darkgrey";
+      })
+      .attr("fill", (d: any) => {
+        const rackId = d.label || d.id || "";
+        if (racksWithPhysicalCutsheet.includes(rackId)) {
+          return "green";
+        }
+        return "lightblue";
+      })
+      .attr("opacity", "0.9")
+      .on("click", function (_event, d: any) {
+        const rackId = d.label || d.id || "";
+        const hasCutsheet = racksWithPhysicalCutsheet.includes(rackId);
+        onRackClick(rackId, hasCutsheet);
+      });
+  }, [racksWithPhysicalCutsheet]);
+
+  // respond to hoverRackId from PhysicalCutsheetPanel
+  const prevHoverRef = useRef<string | null>(null);
+  useEffect(() => {
+    const prev = prevHoverRef.current;
+    if (prev && prev !== hoverRackId) {
+      resetRackById(prev);
+    }
+    if (hoverRackId) {
+      enlargeRackById(hoverRackId);
+    }
+    prevHoverRef.current = hoverRackId;
+  }, [hoverRackId, graphProp]);
 
   // const renderPathInfo = (
   //   d: any,
@@ -229,36 +456,36 @@ export const PathGraph = ({ room }: PathGraphProps) => {
   //     id,
   //   } = connection;
 
-    // const { offsetX, offsetY } = d;
-    // svgElement
-    //   .append("g")
-    //   .attr("class", "path-hover-text")
-    //   .attr("key", d.key)
-    //   .append("rect")
-    //   .attr("width", 300)
-    //   .attr("height", 90)
-    //   .attr("stroke", getPathColor(routeType, id))
-    //   .attr("stroke-width", "3")
-    //   .attr("fill", "lightgrey")
-    //   .attr("x", offsetX + 70)
-    //   .attr("y", offsetY);
+  // const { offsetX, offsetY } = d;
+  // svgElement
+  //   .append("g")
+  //   .attr("class", "path-hover-text")
+  //   .attr("key", d.key)
+  //   .append("rect")
+  //   .attr("width", 300)
+  //   .attr("height", 90)
+  //   .attr("stroke", getPathColor(routeType, id))
+  //   .attr("stroke-width", "3")
+  //   .attr("fill", "lightgrey")
+  //   .attr("x", offsetX + 70)
+  //   .attr("y", offsetY);
 
-    // svgElement
-    //   .selectAll("g.path-hover-text")
-    //   .append("text")
-    //   .attr("x", offsetX + 75)
-    //   .attr("y", offsetY + 5)
-    //   .attr("font-size", "1em")
-    //   .html(
-    //     `<tspan x=${offsetX + 75} dy='1em'>SrcRackNumber: ${sourceRackNumber}</tspan>
-    //      <tspan x=${
-    //        offsetX + 75
-    //      } dy='1em'>DestRackNumber: ${destinationRackNumber}</tspan>
-    //      <tspan x=${offsetX + 75} dy='1em'>Route: ${routeType}</tspan>
-    //      <tspan x=${offsetX + 75} dy='1em'>CableType: ${cableType}</tspan>
-    //     </tspan>
-    //       `,
-    //   );
+  // svgElement
+  //   .selectAll("g.path-hover-text")
+  //   .append("text")
+  //   .attr("x", offsetX + 75)
+  //   .attr("y", offsetY + 5)
+  //   .attr("font-size", "1em")
+  //   .html(
+  //     `<tspan x=${offsetX + 75} dy='1em'>SrcRackNumber: ${sourceRackNumber}</tspan>
+  //      <tspan x=${
+  //        offsetX + 75
+  //      } dy='1em'>DestRackNumber: ${destinationRackNumber}</tspan>
+  //      <tspan x=${offsetX + 75} dy='1em'>Route: ${routeType}</tspan>
+  //      <tspan x=${offsetX + 75} dy='1em'>CableType: ${cableType}</tspan>
+  //     </tspan>
+  //       `,
+  //   );
 
   //   d3.selectAll(`.path-hover-text`).raise();
   // };

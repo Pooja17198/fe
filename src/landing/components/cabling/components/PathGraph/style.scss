@@ -4,23 +4,31 @@ div > .svg-container {
   overflow: hidden;
   position: relative;
   min-height: $height;
-}
-  
-.control-buttons {
-    position: absolute;
-    right: 0px;
-    top: 0px;
-    z-index: 1;
-    margin: 10px;
+  border: 1px solid black;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
-.material-panel{
-  width: 400px;
+div:has(> .svg-container-img) {
+  place-items: center;
+  flex-direction: row;
+}
+
+.control-buttons {
+  position: absolute;
+  right: 0px;
+  top: 0px;
+  z-index: 1;
+  margin: 10px;
+}
+
+.material-panel {
+  width: 500px;
 }
 
 .svg-viewport {
   height: $height;
-  border: 1px solid black;
   overflow: hidden;
   display: flex;
   position: relative;

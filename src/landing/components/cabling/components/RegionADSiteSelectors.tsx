@@ -5,6 +5,7 @@ import { useRoomMetadata } from "../api/hooks/materialApi";
 import "oj-c/select-single";
 
 import ArrayDataProvider from "ojs/ojarraydataprovider";
+import { UseMockData } from "./GraphView";
 
 interface RegionADSiteSelectorsProps {
   rooms?: DataCenterRoom[];
@@ -22,7 +23,7 @@ const RegionADSiteSelectors = ({
   setSelectedRoom,
 }: RegionADSiteSelectorsProps) => {
   const { data: adrBuildingData, isFetching: adsLoading } =
-    useRoomMetadata();
+    useRoomMetadata(UseMockData);
 
   const [regionsInfo, setRegionsInfo] =
     useState<ArrayDataProvider<any, any>>(emptyDP);

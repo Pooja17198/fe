@@ -3,7 +3,9 @@ import {
   PhysicalConnectionApi,
   RoomMetadataApi,
   RoomMetadataLayoutApi,
-  BuildArtifactsApi
+  BuildArtifactsApi,
+  PhysicalCutsheetApi,
+  RackViewApi,
 } from "../../../../../gen/clients/ide-lvv-client";
 
 
@@ -52,5 +54,14 @@ export const RoomMetadataLayoutApiClient = new RoomMetadataLayoutApi(
 export const BuildArtifactsApiClient = new BuildArtifactsApi(
   window.fetch.bind(window),
   paths.dxfPath,
-)
+);
 
+export const PhysicalCutsheeAPIClient = new PhysicalCutsheetApi(
+  window.fetch.bind(window),
+  paths.dxfPath,
+);
+
+export const RackViewApiClient = new RackViewApi(
+  window.fetch.bind(window),
+  paths.dxfPath,  
+);

@@ -485,7 +485,119 @@ paths:
               schema:
                 $ref: '#/definitions/Error'
 
+  /physicalcutsheets:
+    get:
+      tags: ['physicalCutsheet']
+      operationId: ListPhysicalCutsheets
+      summary: Gets a list of Physical Cutsheets.
+      description: |
+        Gets a list of Physical Cutsheets.
 
+        At least one of `buildingName`, `roomName`, `rackNumber`, `deviceName`, or `devicePort`
+        must be provided to ensure the query is bounded and does not scan the entire database.
+      parameters:
+        - $ref: '#/parameters/PhyCutBuildingNameQueryParam'
+        - $ref: '#/parameters/PhyCutRoomNameQueryParam'
+        - $ref: '#/parameters/PhyCutRackNumberQueryParam'
+        - $ref: '#/parameters/PhyCutRackRoleQueryParam'
+        - $ref: '#/parameters/PhyCutDeviceNameQueryParam'
+        - $ref: '#/parameters/PhyCutDevicePortQueryParam'
+        - $ref: '#/parameters/PaginationLimitQueryParam'
+        - $ref: '#/parameters/PaginationTokenQueryParam'
+        - $ref: '#/parameters/SortOrderQueryParam'
+        - $ref: '#/parameters/PhysicalCutsheetSortByQueryParam'
+      x-related-resource: '#/definitions/PhysicalCutsheetCollection'
+      responses:
+        200:
+          description: A page of Physical Cutsheet Summary objects.
+          schema:
+            $ref: '#/definitions/PhysicalCutsheetCollection'
+          headers:
+            opc-request-id: *ref-opc-request-id
+            opc-next-page: *ref-opc-next-page
+        400:
+          description: |
+            Bad request.
+          $ref: '#/responses/400'
+        401:
+          $ref: '#/responses/401'
+        404:
+          $ref: '#/responses/404'
+        429:
+          $ref: '#/responses/429'
+        500:
+          $ref: '#/responses/500'
+        default:
+          $ref: '#/responses/DefaultError'
+
+  /physicalcutsheets/rack-numbers:
+    get:
+      tags: ['physicalCutsheet']
+      operationId: ListPhysicalCutsheetRackNumbers
+      summary: Gets distinct rack numbers for a room.
+      description: |
+        Gets the distinct rack numbers for the provided `roomName`.
+
+        The `roomName` query parameter is required.
+        `rackRole` is optional.
+        `rackType` is optional and currently only supports `gpu`.
+      parameters:
+        - $ref: '#/parameters/PhyCutRoomNameRequiredQueryParam'
+        - $ref: '#/parameters/PhyCutRackRoleQueryParam'
+        - $ref: '#/parameters/PhyCutRackTypeQueryParam'
+      x-related-resource: '#/definitions/PhysicalCutsheetRackNumberCollection'
+      responses:
+        200:
+          description: A list of distinct rack numbers for the specified room.
+          schema:
+            $ref: '#/definitions/PhysicalCutsheetRackNumberCollection'
+          headers:
+            opc-request-id: *ref-opc-request-id
+        400:
+          description: |
+            Bad request.
+          $ref: '#/responses/400'
+        401:
+          $ref: '#/responses/401'
+        404:
+          $ref: '#/responses/404'
+        429:
+          $ref: '#/responses/429'
+        500:
+          $ref: '#/responses/500'
+        default:
+          $ref: '#/responses/DefaultError'  
+  /rackview:
+    get:
+      tags: ['RackView']
+      operationId: GetRackView
+      summary: Gets the rack view for a given rack
+      description: Used for getting the elevation, device name, ports and errors for a given rack.
+      parameters:
+        - $ref: '#/parameters/RackViewRoomNameQueryParam'
+        - $ref: '#/parameters/RackViewRackNumberQueryParam'
+      responses:
+        200:
+          description: Rack view of a given rack.
+          schema:
+            $ref: '#/definitions/RackViewResponse'
+          headers:
+            opc-request-id: *ref-opc-request-id
+            opc-next-page: *ref-opc-next-page
+        400:
+          description: |
+            Bad request.
+          $ref: '#/responses/400'
+        401:
+          $ref: '#/responses/401'
+        404:
+          $ref: '#/responses/404'
+        429:
+          $ref: '#/responses/429'
+        500:
+          $ref: '#/responses/500'
+        default:
+          $ref: '#/responses/DefaultError'
 
 #==========[ Definitions ]================================================================================================
 definitions:
@@ -957,7 +1069,206 @@ definitions:
       par:
         type: string
         example: "us.objectstorage/jcbakjwfbew"
+  PhysicalCutsheetSummary:
+    type: object
+    description: Physical cutsheet summary
+    properties:
+      deviceName:
+        type: string
+        description: Device name
+      devicePort:
+        type: string
+        description: Device port
+      buildingName:
+        type: string
+        description: Building name
+      roomName:
+        type: string
+        description: Room name
+      rackNumber:
+        type: string
+        description: Rack number
+      easyMark:
+        type: array
+        description: List of easymark entries
+        items:
+          type: string
+  PhysicalCutsheetCollection:
+    type: object
+    description: Results of a List Physical Cutsheets call. Contains a list of PhysicalCutsheetSummary.
+    required:
+      - items
+    properties:
+      items:
+        description: List of PhysicalCutsheetSummary.
+        type: array
+        items:
+          $ref: "#/definitions/PhysicalCutsheetSummary"
 
+  PhysicalCutsheetSummary:
+    type: object
+    description: Physical cutsheet summary
+    properties:
+      deviceName:
+        type: string
+        description: Device name
+      devicePort:
+        type: string
+        description: Device port
+      buildingName:
+        type: string
+        description: Building name
+      roomName:
+        type: string
+        description: Room name
+      rackNumber:
+        type: string
+        description: Rack number
+      easyMark:
+        type: array
+        description: List of easymark entries
+        items:
+          type: string
+  PhysicalCutsheetCollection:
+    type: object
+    description: Results of a List Physical Cutsheets call. Contains a list of PhysicalCutsheetSummary.
+    required:
+      - items
+    properties:
+      items:
+        description: List of PhysicalCutsheetSummary.
+        type: array
+        items:
+          $ref: "#/definitions/PhysicalCutsheetSummary"
+
+  PortErrorSummary:
+    type: object
+    description: Error summary for a port
+    properties:
+      lldpErrors:
+        description: LLDP errors
+        type: array
+        items:
+          type: string
+      opticErrors:
+        description: Optic errors
+        type: array
+        items:
+          type: string
+      interfaceErrors:
+        description: Interface errors
+        type: array
+        items:
+          type: string
+      otherErrors:
+        description: Any other type of errors
+        type: array
+        items:
+          type: string
+      lastValidated:
+        description: Timestamp of last validation
+        type: string
+  PatchPanelPortSummary:
+    type: object
+    description: Summary of Patch Panel ports
+    properties:
+      portName:
+        description: The name of the port
+        type: string
+      hasError:
+        description: Flag indicating presence of error or not.
+        type: boolean
+      easyMark:
+        description: The easy-mark for the port
+        type: array
+        items:
+          type: string
+      errors:
+        description: Validation errors for that port
+        type: array
+        items:
+          $ref: "#/definitions/PortErrorSummary"
+  RackDeviceSummary:
+    type: object
+    description: Rack device summary
+    properties:
+      deviceName:
+        description: The name of the device
+        type: string
+      elevation:
+        description: The elevation number at which the device is present
+        type: integer
+      patchPanel:
+        description: The patch panel for the device.
+        type: array
+        items:
+          type: array
+          items:
+            $ref: "#/definitions/PatchPanelPortSummary"
+  RackViewResponse:
+    type: object
+    description: Response for rack view
+    properties:
+      rackDevices:
+        description: List of Device summaries.
+        type: array
+        items:
+          $ref: "#/definitions/RackDeviceSummary"
+  PhysicalCutsheetSummary:
+    type: object
+    description: Physical cutsheet summary
+    properties:
+      deviceName:
+        type: string
+        description: Device name
+      devicePort:
+        type: string
+        description: Device port
+      buildingName:
+        type: string
+        description: Building name
+      roomName:
+        type: string
+        description: Room name
+      rackNumber:
+        type: string
+        description: Rack number
+      rackRole:
+        type: string
+        description: Rack role (SOURCE or DESTINATION)
+      easyMark:
+        type: array
+        description: List of easymark entries
+        items:
+          type: string
+      additionalAttributes:
+        type: object
+        description: Additional attributes for the physical cutsheet
+        additionalProperties: true
+
+  PhysicalCutsheetCollection:
+    type: object
+    description: Results of a List Physical Cutsheets call. Contains a list of PhysicalCutsheetSummary.
+    required:
+      - items
+    properties:
+      items:
+        description: List of PhysicalCutsheetSummary.
+        type: array
+        items:
+          $ref: "#/definitions/PhysicalCutsheetSummary"
+
+  PhysicalCutsheetRackNumberCollection:
+    type: object
+    description: Results of a rack number lookup for a room. Contains a list of distinct rack numbers.
+    required:
+      - items
+    properties:
+      items:
+        description: List of distinct rack numbers.
+        type: array
+        items:
+          type: string
 #==========[ Parameters ]================================================================================================
 parameters:
   RoomNameQueryParam:
@@ -1042,6 +1353,92 @@ parameters:
     type: string
     description: Destination rack number
 
+  PhyCutBuildingNameQueryParam:
+    in: query
+    name: buildingName
+    description: Building name for filtering
+    required: false
+    type: string
+
+  PhyCutRoomNameQueryParam:
+    in: query
+    name: roomName
+    description: Room name for filtering
+    required: false
+    type: string
+
+  PhyCutRoomNameRequiredQueryParam:
+    in: query
+    name: roomName
+    description: Room name for filtering
+    required: true
+    type: string
+
+  PhyCutRackNumberQueryParam:
+    in: query
+    name: rackNumber
+    description: Rack number for filtering
+    required: false
+    type: string
+
+  PhyCutRackRoleQueryParam:
+    in: query
+    name: rackRole
+    description: Rack role for filtering
+    required: false
+    type: string
+    enum:
+      - SOURCE
+      - DESTINATION
+
+  PhyCutRackTypeQueryParam:
+    in: query
+    name: rackType
+    description: Rack type for filtering. Currently only gpu is supported.
+    required: false
+    type: string
+    enum:
+      - GPU
+
+  PhyCutDeviceNameQueryParam:
+    in: query
+    name: deviceName
+    description: Device name for filtering
+    required: false
+    type: string
+
+  PhyCutDevicePortQueryParam:
+    in: query
+    name: devicePort
+    description: Device port for filtering
+    required: false
+    type: string
+
+  PhysicalCutsheetSortByQueryParam:
+    in: query
+    name: sortBy
+    description: Sort field
+    required: false
+    type: string
+    enum:
+      - buildingName
+      - rackNumber
+      - deviceName
+      - devicePort
+    default: rackNumber
+
+  RackViewRoomNameQueryParam:
+    in: query
+    name: roomName
+    description: Room name for filtering
+    required: false
+    type: string
+  RackViewRackNumberQueryParam:
+    in: query
+    name: rackNumber
+    description: Rack number for filtering
+    required: false
+    type: string
 #==========[ Responses ]================================================================================================
 responses:
 # This is being included in the 'responses:' section.

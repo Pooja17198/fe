@@ -304,6 +304,28 @@ export interface ParResponseObject {
 }
 
 /**
+ * Summary of Patch Panel ports
+ */
+export interface PatchPanelPortSummary {
+    /**
+     * The name of the port
+     */
+    "portName"?: string;
+    /**
+     * Flag indicating presence of error or not.
+     */
+    "hasError"?: boolean;
+    /**
+     * The easy-mark for the port
+     */
+    "easyMark"?: Array<string>;
+    /**
+     * Validation errors for that port
+     */
+    "errors"?: Array<PortErrorSummary>;
+}
+
+/**
  * Results of a Physical connections search. Contains a list of PhysicalConnectionSummary.
  */
 export interface PhysicalConnectionCollection {
@@ -408,6 +430,64 @@ export interface PhysicalConnectionSummary {
 
 export type PhysicalConnectionSummaryRouteTypeEnum = "A" | "SINGLE";
 /**
+ * Results of a List Physical Cutsheets call. Contains a list of PhysicalCutsheetSummary.
+ */
+export interface PhysicalCutsheetCollection {
+    /**
+     * List of PhysicalCutsheetSummary.
+     */
+    "items": Array<PhysicalCutsheetSummary>;
+}
+
+/**
+ * Results of a rack number lookup for a room. Contains a list of distinct rack numbers.
+ */
+export interface PhysicalCutsheetRackNumberCollection {
+    /**
+     * List of distinct rack numbers.
+     */
+    "items": Array<string>;
+}
+
+/**
+ * Physical cutsheet summary
+ */
+export interface PhysicalCutsheetSummary {
+    /**
+     * Device name
+     */
+    "deviceName"?: string;
+    /**
+     * Device port
+     */
+    "devicePort"?: string;
+    /**
+     * Building name
+     */
+    "buildingName"?: string;
+    /**
+     * Room name
+     */
+    "roomName"?: string;
+    /**
+     * Rack number
+     */
+    "rackNumber"?: string;
+    /**
+     * Rack role (SOURCE or DESTINATION)
+     */
+    "rackRole"?: string;
+    /**
+     * List of easymark entries
+     */
+    "easyMark"?: Array<string>;
+    /**
+     * Additional attributes for the physical cutsheet
+     */
+    "additionalAttributes"?: any;
+}
+
+/**
  * Physical connection path polyline
  */
 export interface Polyline {
@@ -419,6 +499,60 @@ export interface Polyline {
      * Polyline y axis
      */
     "pointY": number;
+}
+
+/**
+ * Error summary for a port
+ */
+export interface PortErrorSummary {
+    /**
+     * LLDP errors
+     */
+    "lldpErrors"?: Array<string>;
+    /**
+     * Optic errors
+     */
+    "opticErrors"?: Array<string>;
+    /**
+     * Interface errors
+     */
+    "interfaceErrors"?: Array<string>;
+    /**
+     * Any other type of errors
+     */
+    "otherErrors"?: Array<string>;
+    /**
+     * Timestamp of last validation
+     */
+    "lastValidated"?: string;
+}
+
+/**
+ * Rack device summary
+ */
+export interface RackDeviceSummary {
+    /**
+     * The name of the device
+     */
+    "deviceName"?: string;
+/**
+     * The elevation number at which the device is present
+     */
+    "elevation"?: number;
+    /**
+     * The patch panel for the device.
+     */
+    "patchPanel"?: Array<Array<PatchPanelPortSummary>>;
+}
+
+/**
+ * Response for rack view
+ */
+export interface RackViewResponse {
+    /**
+     * List of Device summaries.
+     */
+    "rackDevices"?: Array<RackDeviceSummary>;
 }
 
 export interface RoomLayout {
@@ -1028,6 +1162,176 @@ export class PhysicalConnectionApi extends base.BaseAPI {
             parseResponseBody: true,
 
             operationName: "listPhysicalConnections",
+            httpMethod: "GET"
+        });
+    }
+};
+
+export interface PhysicalCutsheetApiListPhysicalCutsheetRackNumbersArgs {
+     "roomName": string;
+     "rackRole"?: string;
+     "rackType"?: string
+}
+export type PhysicalCutsheetApiListPhysicalCutsheetRackNumbersReturnType = { response: Response, data: PhysicalCutsheetRackNumberCollection };
+
+export interface PhysicalCutsheetApiListPhysicalCutsheetsArgs {
+     "buildingName"?: string;
+     "roomName"?: string;
+     "rackNumber"?: string;
+     "rackRole"?: string;
+     "deviceName"?: string;
+     "devicePort"?: string;
+     "limit"?: number;
+     "page"?: string;
+     "sortOrder"?: string;
+     "sortBy"?: string
+}
+export type PhysicalCutsheetApiListPhysicalCutsheetsReturnType = { response: Response, data: PhysicalCutsheetCollection };
+
+
+/**
+ * PhysicalCutsheetApi - object-oriented interface
+ */
+export class PhysicalCutsheetApi extends base.BaseAPI {
+    public static createFromEndpointTemplate(fetch: base.Fetch, region: string, secondLevelDomain: string, config?: base.BaseApiConfig): PhysicalCutsheetApi {
+        const endpoint = base.buildEndpointFromTemplate(
+            "https://infradeliveryengineering.{region}.oci.{secondLevelDomain}",
+            "/idelvv",
+            region,
+            secondLevelDomain
+        );
+
+        return new PhysicalCutsheetApi(fetch, endpoint, config);
+    }
+
+    /** 
+     * Gets distinct rack numbers for a room.
+     * Gets the distinct rack numbers for the provided &#x60;roomName&#x60;.  The &#x60;roomName&#x60; query parameter is required. &#x60;rackRole&#x60; is optional. &#x60;rackType&#x60; is optional and currently only supports &#x60;gpu&#x60;. 
+     * @param roomName Room name for filtering
+     * @param rackRole Rack role for filtering
+     * @param rackType Rack type for filtering. Currently only gpu is supported.
+     */
+    public listPhysicalCutsheetRackNumbers(params: {  "roomName": string; "rackRole"?: string; "rackType"?: string; }, options?: any): Promise<{ response: Response, data: PhysicalCutsheetRackNumberCollection }> {
+        base.validateRequiredParameters([
+            "roomName",
+        ], "listPhysicalCutsheetRackNumbers", params);
+
+        const path = `${this.basePath}/physicalcutsheets/rack-numbers`;
+
+        return this.request<PhysicalCutsheetRackNumberCollection>({
+            options,
+            path,
+
+            queryParameters: {
+                    "roomName": { values: params["roomName"] },
+                    "rackRole": { values: params["rackRole"] },
+                    "rackType": { values: params["rackType"] }
+            },
+
+
+
+            parseResponseBody: true,
+
+            operationName: "listPhysicalCutsheetRackNumbers",
+            httpMethod: "GET"
+        });
+    }
+    
+    /** 
+     * Gets a list of Physical Cutsheets.
+     * Gets a list of Physical Cutsheets.  At least one of &#x60;buildingName&#x60;, &#x60;roomName&#x60;, &#x60;rackNumber&#x60;, &#x60;deviceName&#x60;, or &#x60;devicePort&#x60; must be provided to ensure the query is bounded and does not scan the entire database. 
+     * @param buildingName Building name for filtering
+     * @param roomName Room name for filtering
+     * @param rackNumber Rack number for filtering
+     * @param rackRole Rack role for filtering
+     * @param deviceName Device name for filtering
+     * @param devicePort Device port for filtering
+     * @param limit Max items per page
+     * @param page Pagination token
+     * @param sortOrder Sort order
+     * @param sortBy Sort field
+     */
+    public listPhysicalCutsheets(params: {  "buildingName"?: string; "roomName"?: string; "rackNumber"?: string; "rackRole"?: string; "deviceName"?: string; "devicePort"?: string; "limit"?: number; "page"?: string; "sortOrder"?: string; "sortBy"?: string; }, options?: any): Promise<{ response: Response, data: PhysicalCutsheetCollection }> {
+        base.validateRequiredParameters([
+        ], "listPhysicalCutsheets", params);
+
+        const path = `${this.basePath}/physicalcutsheets`;
+
+        return this.request<PhysicalCutsheetCollection>({
+            options,
+            path,
+
+            queryParameters: {
+                    "buildingName": { values: params["buildingName"] },
+                    "roomName": { values: params["roomName"] },
+                    "rackNumber": { values: params["rackNumber"] },
+                    "rackRole": { values: params["rackRole"] },
+                    "deviceName": { values: params["deviceName"] },
+                    "devicePort": { values: params["devicePort"] },
+                    "limit": { values: params["limit"] },
+                    "page": { values: params["page"] },
+                    "sortOrder": { values: params["sortOrder"] },
+                    "sortBy": { values: params["sortBy"] }
+            },
+
+
+
+            parseResponseBody: true,
+
+            operationName: "listPhysicalCutsheets",
+            httpMethod: "GET"
+        });
+    }
+};
+
+export interface RackViewApiGetRackViewArgs {
+     "roomName"?: string;
+     "rackNumber"?: string
+}
+export type RackViewApiGetRackViewReturnType = { response: Response, data: RackViewResponse };
+
+
+/**
+ * RackViewApi - object-oriented interface
+ */
+export class RackViewApi extends base.BaseAPI {
+    public static createFromEndpointTemplate(fetch: base.Fetch, region: string, secondLevelDomain: string, config?: base.BaseApiConfig): RackViewApi {
+        const endpoint = base.buildEndpointFromTemplate(
+            "https://infradeliveryengineering.{region}.oci.{secondLevelDomain}",
+            "/idelvv",
+            region,
+            secondLevelDomain
+        );
+
+        return new RackViewApi(fetch, endpoint, config);
+    }
+
+    /** 
+     * Gets the rack view for a given rack
+     * Used for getting the elevation, device name, ports and errors for a given rack.
+     * @param roomName Room name for filtering
+     * @param rackNumber Rack number for filtering
+     */
+    public getRackView(params: {  "roomName"?: string; "rackNumber"?: string; }, options?: any): Promise<{ response: Response, data: RackViewResponse }> {
+        base.validateRequiredParameters([
+        ], "getRackView", params);
+
+        const path = `${this.basePath}/rackview`;
+
+        return this.request<RackViewResponse>({
+            options,
+            path,
+
+            queryParameters: {
+                    "roomName": { values: params["roomName"] },
+                    "rackNumber": { values: params["rackNumber"] }
+            },
+
+
+
+            parseResponseBody: true,
+
+            operationName: "getRackView",
             httpMethod: "GET"
         });
     }

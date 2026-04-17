@@ -2,20 +2,20 @@
   display: flex;
   gap: 10px;
 
-  & > div {
-    width: 30%;
+  & > .rack-select {
+    width: 32.9%;
   }
 }
 
 .layout-material-tab-bar {
-  width: 400px;
-  
+  width: 700px;
+
   .layout-material-tab-label span {
     display: flex;
-    
+
     > div {
       align-self: center;
-    } 
+    }
   }
 }
 
@@ -31,7 +31,7 @@ div > .isMax {
 
 .material-tab {
   border: 1px solid black;
-  
+
   .material-panel {
     width: unset;
   }
@@ -62,8 +62,53 @@ div > .isMax {
   margin: 0;
 }
 
+div:has(> .elevation-accordion-header) {
+  padding: 4px 8px;
+  border: 2px solid rgb(86, 173, 68) !important;
+  background: rgb(108, 216, 85) !important;
+  border-left: 15px solid rgb(86, 173, 68) !important;
+  height: 50px;
+  text-align: center;
+  margin-bottom: 10px;
+}
+
+div:has(> .device-accordion-header) {
+  padding: 2px 6px;
+  border: 1px solid #b0b0b0 !important; /* light grey border */
+  background: #f2f2f2 !important; /* light grey background */
+  border-left: 8px solid #9a9a9a !important; /* darker grey accent */
+  height: 32px; /* smaller height */
+  text-align: left; /* likely better for device names */
+  margin-left: 20px; /* extra space to the right */
+  border-radius: 2px; /* optional: slightly rounded */
+}
+
+.device-accordion-header,
+.port-accordion-header {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: #444;
+  display: inline-flex;
+  align-items: center;
+}
+
+div:has(> .port-accordion-header) {
+  padding: 2px 8px;
+  border: 1px solid #c6c6c6 !important;
+  background: #fafafa !important;
+  border-left: 8px solid #c6c6c6 !important;
+  height: 30px;
+  text-align: left;
+  margin-bottom: 4px;
+  margin-left: 30px; /* extra space to the right */
+}
+
 .info-section li {
   margin-bottom: 5px;
+}
+
+.elevation-easymark {
+  text-align: center;
 }
 
 .info-key {
@@ -73,6 +118,176 @@ div > .isMax {
 .info-value {
   padding-left: 5px;
   color: #666;
+}
+
+.rack-list.rack-list--no-indicator {
+  list-style: none;
+  padding-left: 0;
+  margin: 0;
+}
+
+.rack-list-item {
+  margin: 0;
+  padding: 4px 0;
+}
+
+.rack-list-item-shape {
+  display: inline-block;
+  padding: 4px 8px;
+  border: 2px solid rgb(86, 173, 68);
+  background: rgb(108, 216, 85);
+  border-left: 15px solid rgb(86, 173, 68);
+  width: 100%;
+  height: 50px;
+  text-align: center;
+  align-content: space-evenly;
+}
+
+.rack-list-item-elevation-count {
+  font-size: smaller;
+}
+
+.rack-list-item:hover .rack-list-item-shape {
+  filter: brightness(1.05);
+}
+
+.rack-list-separator {
+  height: 1px;
+  background-color: lightgrey;
+  margin-top: 4px;
+}
+
+.easyMark-item {
+  padding-top: 1px;
+  padding-bottom: 1px;
+}
+
+.device-port-grid-cell--selected {
+  border: 2px solid black !important;
+  background-color: lightgrey;
+  font-weight: 600;
+}
+
+.device-port-grid-cell {
+  border: 1px solid black;
+  padding: 4px 6px;
+  text-align: center;
+  min-height: 24px; /* to make empty cells visible/consistent */
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.device-port-grid-cell-label {
+  flex: 1 1 auto;
+}
+
+/* Base circle */
+.port-status-circle {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: block;
+
+}
+
+.slot-grid {
+  flex-grow: 1;
+}
+.slot-title {
+  font-size: xx-small;
+  align-self: end;
+  width: 26px;
+}
+
+.slot-section {
+  display: flex;    
+}
+
+.slot-grid-cell {
+  border: black 1px solid;
+  justify-content: center;
+  padding: 4px 6px;
+  text-align: center;
+  min-height: 24px; /* to make empty cells visible/consistent */
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+.port-status-circle {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.port-status-circle--error {
+  background-color: #d8342c; /* red */
+}
+
+.port-status-circle--ok {
+  background-color: #4caf50; /* green */
+}
+
+.port-status-circle--no-easymark {
+  background-color: #9e9e9e; /* grey */
+}
+.elevation-accordion-header {
+  display: flex;
+  align-items: center;
+}
+
+.elevation-status-indicator-wrapper {
+  margin-right: 8px;
+}
+
+.elevation-status-indicator {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  display: block;
+}
+
+.elevation-status-indicator--error {
+  background-color: #d8342c;
+}
+
+.elevation-status-indicator--ok {
+  background-color: #4caf50;
+}
+
+.elevation-status-indicator--no-easymark {
+  background-color: #9e9e9e;
+}
+
+.validation-easymark-dialog-body {
+  min-width: 480px;
+}
+
+.validation-easymark-columns {
+  display: flex;
+  gap: 2rem;
+}
+
+.validation-easymark-column {
+  flex: 1 1 0;
+}
+
+.validation-title-cell {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  max-width: 950px;
+}
+
+.validation-title-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gpu-error-kv-line {
+    margin-left: 15px;
 }
 
 .artifact-tab {

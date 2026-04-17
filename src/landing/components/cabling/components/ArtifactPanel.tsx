@@ -5,6 +5,7 @@ import { KeySetImpl } from "ojs/ojkeyset";
 
 import { useDownloadArtifact } from "../api/hooks/artifactsApi";
 import { FileMetadata } from "gen/clients/ide-lvv-client";
+import { UseMockData } from "./GraphView";
 
 type ArtifactTreeNode = {
   id: string;
@@ -126,7 +127,7 @@ export const ArtifactPanel = ({ artifacts, roomName, loading }: ArtifactPanelPro
     data: downloadLink,
     isFetching: downloadLinkLoading,
     refetch: refetchDownloadLink,
-  } = useDownloadArtifact(false, onSuccess);
+  } = useDownloadArtifact(UseMockData, onSuccess);
 
   const handleExpandedChanged = (event: any) => {
     setExpanded(event.detail.value as KeySetImpl<string>);

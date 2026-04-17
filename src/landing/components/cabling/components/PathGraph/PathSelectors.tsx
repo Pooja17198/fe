@@ -6,18 +6,27 @@
  * @ignore
  */
 import "oj-c/select-single";
-import { Dispatch, StateUpdater, useEffect, useState } from "preact/hooks";
+import {
+  Dispatch,
+  StateUpdater,
+  useEffect,
+  useMemo,
+  useState,
+} from "preact/hooks";
 import { FlattenedConnection, HighlightsInfo } from "./types";
 import { flattenConnections } from "./GraphUtil";
 import ArrayDataProvider from "ojs/ojarraydataprovider";
 import { PhysicalConnectionSummary } from "../../../../../../gen/clients/ide-lvv-client";
-
+import mapping from "../../api/mockAPI/deployment-groups.json";
+import { on } from "events";
 interface Option {
   label: string;
   value: string;
 }
 
 interface PathSelectorsProps {
+  roomName?: string | null; // NEW
+  gpuRacks: string[];
   connections: PhysicalConnectionSummary[] | undefined;
   //   highlights: HighlightsInfo;
   //   setHighlights: Dispatch<StateUpdater<HighlightsInfo>>;
@@ -25,21 +34,29 @@ interface PathSelectorsProps {
     StateUpdater<{
       sourceRack: string;
       destinationRack: string;
+      showRackToRackImageView?: boolean;
     } | null>
   >;
 
   clearRackSelection: boolean;
   disableSrcRackSelect?: boolean;
+  onRackListChange?: (
+    racksInGroup: string[],
+  ) => void;
 }
 
 export const PathSelectors = ({
+  roomName,
+  gpuRacks,
   connections,
   //   setHighlights,
   setRackToRack,
   clearRackSelection,
   disableSrcRackSelect,
+  onRackListChange,
 }: PathSelectorsProps) => {
   const [selected, setSelected] = useState<any>({
+    deploymentGroup: null,
     srcRack: null,
     destRack: null,
     destRack2: null,
@@ -52,6 +69,7 @@ export const PathSelectors = ({
 
   useEffect(() => {
     setSelected({
+      deploymentGroup: null,
       srcRack: null,
       destRack: null,
       destRack2: null,
@@ -62,64 +80,121 @@ export const PathSelectors = ({
 
   useEffect(() => {
     if (!connections || connections.length === 0) {
-      setSrcOptions([]);
-      setDestOptions([]);
-      setSrcRackMapping(new Map());
-      return;
-    }
-    if (connections && connections.length > 0) {
-      const srcRackMapping: Map<string, Set<string>> = new Map();
-      const destRackMapping: Map<string, Set<string>> = new Map();
+      // Even if there are no connections, we still want to show GPU racks as selectable
+      const srcRackMappingLocal: Map<string, Set<string>> = new Map();
+      const destRackMappingLocal: Map<string, Set<string>> = new Map();
 
-      connections.forEach((connection) => {
-        const { sourceRackNumber, destinationRackNumber } = connection;
-
-        if (!sourceRackNumber || !destinationRackNumber) return;
-
-        if (!srcRackMapping.has(sourceRackNumber)) {
-          srcRackMapping.set(sourceRackNumber, new Set());
+      // Seed mapping with GPU racks (no destinations yet)
+      gpuRacks?.forEach((rack) => {
+        if (!srcRackMappingLocal.has(rack)) {
+          srcRackMappingLocal.set(rack, new Set());
         }
-        srcRackMapping.get(sourceRackNumber)?.add(destinationRackNumber);
-
-        if (!destRackMapping.has(destinationRackNumber)) {
-          destRackMapping.set(destinationRackNumber, new Set());
-        }
-        destRackMapping.get(destinationRackNumber)?.add(sourceRackNumber);
       });
 
-      setSrcRackMapping(srcRackMapping);
+      setSrcRackMapping(srcRackMappingLocal);
+
       setSrcOptions(
-        Array.from(srcRackMapping.keys())
+        Array.from(srcRackMappingLocal.keys())
           .sort()
-          .map((src) => ({
-            label: `${src} - (${Array.from(srcRackMapping.get(src) || [])
-              .sort()
-              .join(", ")})`,
-            value: src,
-          })),
+          .map((src) => {
+            const destinations = Array.from(
+              srcRackMappingLocal.get(src) || [],
+            ).sort();
+            const label =
+              destinations.length > 0
+                ? `${src} - (${destinations.join(", ")})`
+                : src;
+            return {
+              label,
+              value: src,
+            };
+          }),
       );
       setDestOptions(
-        Array.from(destRackMapping.keys())
+        Array.from(destRackMappingLocal.keys())
           .sort()
           .map((dest) => ({
             label: dest,
             value: dest,
           })),
       );
+      return;
     }
-  }, [connections]);
+
+    const srcRackMappingLocal: Map<string, Set<string>> = new Map();
+    const destRackMappingLocal: Map<string, Set<string>> = new Map();
+
+    connections.forEach((connection) => {
+      const { sourceRackNumber, destinationRackNumber } = connection;
+      if (!sourceRackNumber || !destinationRackNumber) return;
+
+      if (!srcRackMappingLocal.has(sourceRackNumber)) {
+        srcRackMappingLocal.set(sourceRackNumber, new Set());
+      }
+      srcRackMappingLocal.get(sourceRackNumber)!.add(destinationRackNumber);
+
+      if (!destRackMappingLocal.has(destinationRackNumber)) {
+        destRackMappingLocal.set(destinationRackNumber, new Set());
+      }
+      destRackMappingLocal.get(destinationRackNumber)!.add(sourceRackNumber);
+    });
+
+    // Ensure all GPU racks exist in the mapping (even if they didn't appear as a source)
+    gpuRacks?.forEach((rack) => {
+      if (!srcRackMappingLocal.has(rack)) {
+        srcRackMappingLocal.set(rack, new Set());
+      }
+    });
+
+    setSrcRackMapping(srcRackMappingLocal);
+
+    // srcOptions now includes both connection-derived racks and GPU racks
+    setSrcOptions(
+      Array.from(srcRackMappingLocal.keys())
+        .sort()
+        .map((src) => {
+          const destinations = Array.from(
+            srcRackMappingLocal.get(src) || [],
+          ).sort();
+          const label =
+            destinations.length > 0
+              ? `${src} - (${destinations.join(", ")})`
+              : src;
+          return {
+            label,
+            value: src,
+          };
+        }),
+    );
+
+    setDestOptions(
+      Array.from(destRackMappingLocal.keys())
+        .sort()
+        .map((dest) => ({
+          label: dest,
+          value: dest,
+        })),
+    );
+  }, [connections, gpuRacks]);
 
   useEffect(() => {
     if (selected.destRack && !selected.srcRack) {
       setSrcOptions(
         Array.from(srcRackMapping.get(selected.destRack) || [])
           ?.sort()
-          .map((src: string) => ({
-            label: `${src} - (${Array.from(srcRackMapping.get(src) || [])
-              .sort()
-              .join(", ")})`,
-            value: src,
-          })),
+          .map((src) => {
+            const destinations = Array.from(
+              srcRackMapping.get(src) || [],
+            ).sort();
+            const label =
+              destinations.length > 0
+                ? `${src} - (${destinations.join(", ")})`
+                : src;
+            return {
+              label,
+              value: src,
+            };
+          }),
       );
     } else if (selected.srcRack && selected.destRack) {
       setDestOptions(
@@ -144,15 +219,131 @@ export const PathSelectors = ({
       setRackToRack({
         sourceRack: selected.srcRack,
         destinationRack: selected.destRack,
+        showRackToRackImageView: true,
       });
+      onRackListChange?.([selected.srcRack]);
+    } else if (selected.srcRack && !selected.destRack) {
+      setDestOptions([]);
+      onRackListChange?.([selected.srcRack]);
     }
-  }, [selected]);
+  }, [selected, srcRackMapping]);
+
+  const deploymentGroupOptions: Option[] = useMemo(
+    () => [
+      { label: "All Racks", value: "" }, // explicit unselect
+      ...(mapping.groups || []).map((g) => ({
+        label:
+          String(g.placementGroup) +
+          " (" +
+          (g.rackPositions || []).join(", ") +
+          ")",
+        value: String(g.placementGroup),
+      })),
+    ],
+    [],
+  );
+
+  const filteredSrcOptions = useMemo(() => {
+    // Start from GPU racks only
+    const gpuRackSet = new Set(gpuRacks || []);
+
+    // base set: all GPU racks that have (or were added into) srcRackMapping
+    let candidateRacks = Array.from(srcRackMapping.keys()).filter((rack) =>
+      gpuRackSet.has(rack),
+    );
+
+    // If in aga5.1 and a specific group is chosen, further filter by group
+    if (roomName?.startsWith("aga5") && selected.deploymentGroup) {
+      const group = mapping.groups.find(
+        (g) => String(g.placementGroup) === selected.deploymentGroup,
+      );
+      if (!group || !group.rackPositions || group.rackPositions.length === 0) {
+        candidateRacks = [];
+      } else {
+        const allowedRacks = new Set(group.rackPositions);
+        candidateRacks = candidateRacks.filter((r) => allowedRacks.has(r));
+      }
+    } else {
+      candidateRacks = Array.from(srcRackMapping.keys());
+    }
+
+    return candidateRacks.sort().map((src) => {
+      const destinations = Array.from(srcRackMapping.get(src) || []).sort();
+      const label =
+        destinations.length > 0 ? `${src} - (${destinations.join(", ")})` : src;
+      return {
+        label,
+        value: src,
+      };
+    });
+  }, [roomName, selected.deploymentGroup, srcRackMapping, gpuRacks]);
+
+  // Determine which GPU racks are in the selected deployment group
+  useEffect(() => {
+    // if not aga5.1 or no callback, do nothing
+    if (!roomName || !roomName.startsWith("aga5") || !onRackListChange) {
+      return;
+    }
+
+    const groupId = selected.deploymentGroup;
+
+    // groupId empty string or null => "no group filter": send all gpuRacks
+    if (!groupId) {
+      onRackListChange(gpuRacks || []);
+      return;
+    }
+
+    const group = mapping.groups.find(
+      (g) => String(g.placementGroup) === groupId,
+    );
+    if (!group || !group.rackPositions) {
+      onRackListChange([]); // nothing in group
+      return;
+    }
+
+    const allowedRacks = new Set(group.rackPositions);
+    const gpuInGroup = (gpuRacks || []).filter((r) => allowedRacks.has(r));
+
+    onRackListChange(gpuInGroup);
+  }, [roomName, selected.deploymentGroup, gpuRacks]);
 
   return (
     <div className="region-dropdown-group">
+      {roomName?.startsWith("aga5") && (
+        <oj-c-select-single
+          id="deploymentGroupSelect"
+          class="rack-select"
+          data={
+            new ArrayDataProvider<Option["value"], Option>(
+              deploymentGroupOptions,
+              {
+                keyAttributes: "value",
+              },
+            )
+          }
+          item-text="label"
+          label-hint="Deployment Group"
+          placeholder="Select a deployment group"
+          value={selected.deploymentGroup ?? ""} // map null -> "" for "All"
+          onvalueChanged={(event) => {
+            const newGroup = event.detail.value as string | null;
+            // Reset racks when deployment group changes
+            setRackToRack(null);
+            setSelected({
+              deploymentGroup: newGroup,
+              srcRack: null,
+              destRack: null,
+              destRack2: null,
+            });
+          }}
+        />
+      )}
       <oj-c-select-single
         id="srcRackSelect"
-        data={new ArrayDataProvider(srcOptions, { keyAttributes: "value" })}
+        class="rack-select"
+        data={
+          new ArrayDataProvider(filteredSrcOptions, { keyAttributes: "value" })
+        }
         item-text="label"
         label-hint="Source Rack ID"
         placeholder={"Choose a single source"}
@@ -164,19 +355,6 @@ export const PathSelectors = ({
           const destRack = destRackSet
             ? Array.from(destRackSet).sort()[0]
             : null;
-          setSrcOptions(
-            Array.from(srcRackMapping.keys())
-              .sort()
-              .map((src) => ({
-                label:
-                  src === selectedSrcRack
-                    ? src
-                    : `${src} - (${Array.from(srcRackMapping.get(src) || [])
-                        .sort()
-                        .join(", ")})`,
-                value: src,
-              })),
-          );
           setSelected({
             ...selected,
             srcRack: selectedSrcRack,
@@ -188,7 +366,8 @@ export const PathSelectors = ({
         disabled={!!disableSrcRackSelect}
       />
       <oj-c-select-single
-        id="selectedRoom"
+        id="destRackSelect"
+        class="rack-select"
         data={new ArrayDataProvider(destOptions, { keyAttributes: "value" })}
         item-text="label"
         label-hint="Dest Rack ID"
@@ -197,25 +376,11 @@ export const PathSelectors = ({
           setSelected({ ...selected, destRack: event.detail.value })
         }
         value={selected.destRack}
-        disabled={!selected.srcRack || !!disableSrcRackSelect}
-      />
-      <oj-c-select-single
-        id="selectedRoom"
-        data={
-          new ArrayDataProvider(
-            destOptions.filter((value) => value.value !== selected.destRack),
-            { keyAttributes: "value" },
-          )
+        disabled={
+          !selected.srcRack ||
+          !!disableSrcRackSelect ||
+          destOptions.length === 0
         }
-        item-text="label"
-        label-hint="Dest Rack ID - second"
-        placeholder={"Choose a second destination rack"}
-        onvalueChanged={(event) =>
-          setSelected({ ...selected, destRack2: event.detail.value })
-        }
-        value={selected.destRack2}
-        // disabled={!selected.srcRack || !selected.destRack}
-        disabled={true}
       />
     </div>
   );

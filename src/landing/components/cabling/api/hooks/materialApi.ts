@@ -5,6 +5,9 @@ import {
   PhysicalConnectionCollection,
   PhysicalConnectionImageResponse,
   PhysicalConnectionSummary,
+  PhysicalCutsheetApi,
+  PhysicalCutsheetRackNumberCollection,
+  RackViewResponse,
   RoomLayout,
   RoomMetadata,
 } from "../../../../../../gen/clients/ide-lvv-client";
@@ -14,11 +17,14 @@ import {
   MaterialApiClient,
   PhysicalConnectionApiClient,
   RoomMetadataLayoutApiClient,
+  RackViewApiClient,
+  PhysicalCutsheeAPIClient,
 } from "../apiClients";
 import { MockRoomMetadataApi } from "../mockAPI/MockRoomMetadataApi";
 import { MockConnectionsApi } from "../mockAPI/MockConnectionsApi";
 import { MockMaterialApi } from "../mockAPI/MockMaterialApi";
 import { MockPhysicalConnectionRackToRackApi } from "../mockAPI/MockPhysicalConnectionRackToRack";
+import { MockPhysicalCutsheetsApi } from "../mockAPI/MockPhysicalCutsheetsApi";
 
 export const useRoomMetadata = (mockData?: boolean) => {
   return useQuery<RoomMetadata[] | undefined>({
@@ -53,14 +59,18 @@ export const useRoomLayout = (mockData?: boolean) => {
 export const useListMaterial = (mockData?: boolean) => {
   return useQuery<MaterialCollection, [string]>({
     queryFn: mockData
-      ? (roomName: string) => MockMaterialApi.listMaterial({ roomName }).then(
+      ? (roomName: string) =>
+          MockMaterialApi.listMaterial({ roomName }).then(
             (response) => response.data,
-        )
+          )
       : (roomName: string) =>
-          getListWithAllPages<MaterialSummary>(MaterialApiClient.listMaterials.bind(MaterialApiClient), {
-            roomName,
-            limit: 100
-          }).then((response) => response),
+          getListWithAllPages<MaterialSummary>(
+            MaterialApiClient.listMaterials.bind(MaterialApiClient),
+            {
+              roomName,
+              limit: 100,
+            },
+          ).then((response) => response),
     enabled: false,
   });
 };
@@ -74,7 +84,9 @@ export const useConnections = (mockData?: boolean) => {
           )
       : (roomName: string) =>
           getListWithAllPages<PhysicalConnectionSummary>(
-            PhysicalConnectionApiClient.listPhysicalConnections.bind(PhysicalConnectionApiClient),
+            PhysicalConnectionApiClient.listPhysicalConnections.bind(
+              PhysicalConnectionApiClient,
+            ),
             { roomName, limit: 100 },
           ).then((response) => response),
     enabled: false,
@@ -108,6 +120,38 @@ export const useRackToRackConnections = (mockData?: boolean) => {
   });
 };
 
+export const useRackView = (mockData?: boolean) => {
+  return useQuery<RackViewResponse, [string, string]>({
+    queryFn: mockData
+      ? (roomName: string, rackNumber: string) =>
+          MockPhysicalCutsheetsApi.getRackView({
+            roomName,
+            rackNumber,
+          }).then((response) => response.data)
+      : (roomName: string, rackNumber: string) =>
+          RackViewApiClient.getRackView({
+            roomName,
+            rackNumber,
+          }).then((response) => response.data),
+    enabled: false,
+  });
+};
+
+export const useListGPURacks = (mockData?: boolean) => {
+  return useQuery<string[], [string]>({
+    queryFn: mockData
+      ? (roomName: string) =>
+          MockPhysicalCutsheetsApi.listPhysicalCutsheetRackNumbers(roomName).then(
+            (response) => response.data.items,
+          )
+      : (roomName: string) =>
+        PhysicalCutsheeAPIClient.listPhysicalCutsheetRackNumbers({roomName, rackRole: "source", rackType: "gpu"},).then(
+          (response) => response.data.items,
+        ),
+    enabled: false,
+  });
+};
+
 type ListFn<T> = (
   params: {
     roomName: string;
@@ -121,10 +165,14 @@ type Collection<T> = { items: T[] };
 /**
  * Fetches all pages of materials, following the "opc-next-page" header.
  */
-const getListWithAllPages = async <T> (
+const getListWithAllPages = async <T>(
   listFn: ListFn<T>,
   params: {
-    roomName: string;
+    buildingName?: string;
+    rackNumber?: string;
+    deviceName?: string;
+    devicePort?: string;
+    roomName: any;
     bomId?: number;
     limit?: number;
     page?: string;
@@ -156,7 +204,7 @@ const getListWithAllPages = async <T> (
       // merge other fields if needed
     }
 
-    const nextPage = response.headers.get("opc-next-page");
+    const nextPage = response?.headers?.get("opc-next-page");
     if (!nextPage) break;
 
     page = nextPage;
@@ -171,4 +219,4 @@ const getListWithAllPages = async <T> (
   }
 
   return accumulated;
-}
+};

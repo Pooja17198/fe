@@ -9,9 +9,10 @@ import "oj-c/select-single";
 import PathGraph from "./PathGraph/PathGraph";
 import RegionADSiteSelectors from "./RegionADSiteSelectors";
 import { DataCenterRoom } from "../types";
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 import {
   useConnections,
+  useListGPURacks,
   useListMaterial,
   useRackToRackConnections,
   useRoomLayout,
@@ -29,6 +30,13 @@ import "oj-c/button";
 import { ArtifactPanel } from "./ArtifactPanel";
 import { useBuildartifacts } from "../api/hooks/artifactsApi";
 import ToastMessage from "./ToastMessage";
+import { ValidationErrorsTab } from "./ValidationErrorsTab";
+import { PhysicalCutsheetPanel } from "./PhysicalCutsheetPanel";
+
+// export const UseMockData = window.location.host.includes("localhost")
+//   ? true
+//   : false; // toggle this to switch between mock and real API data
+export const UseMockData = false;
 
 export const GraphView = () => {
   const [selectedRoom, setSelectedRoom] = useState<DataCenterRoom | null>(null);
@@ -36,47 +44,62 @@ export const GraphView = () => {
   // const [highlights, setHighlights] = useState<HighlightsInfo>({
   //   items: {},
   // });
+  const [physicalCutsheetsPanelOpen, setPhysicalCutsheetsPanelOpen] =
+    useState<boolean>(false);
+  const [selectedCutsheetRack, setSelectedCutsheetRack] = useState<
+    string | null
+  >(null);
+  const [hoverRackId, setHoverRackId] = useState<string | null>(null);
+
   const [selectedRackToRack, setSelectedRackToRack] = useState<{
     sourceRack: string;
     destinationRack: string;
+    showRackToRackImageView?: boolean;
   } | null>(null);
+
+  const [filteredGpuRacks, setFilteredGpuRacks] = useState<string[] | null>(
+    null,
+  );
 
   const {
     data: connections,
     isFetching: connectionsLoading,
     refetch: refetchConnections,
     error: connectionsError,
-    // } = useConnections(true);
-  } = useConnections();
+  } = useConnections(UseMockData);
   const {
     data: materials,
     isFetching: materialsLoading,
     refetch: refetchMaterials,
     error: materialsError,
-    // } = useListMaterial(true);
-  } = useListMaterial();
+  } = useListMaterial(UseMockData);
   const {
     data: roomLayout,
     isFetching: roomLayoutLoading,
     refetch: refetchRoomLayout,
     error: roomLayoutError,
     isPending: roomLayoutIsPending,
-    // } = useRoomLayout(true);
-  } = useRoomLayout();
+  } = useRoomLayout(UseMockData);
   const {
     data: rackToRackConnections,
     isFetching: rackToRackConnectionsLoading,
     refetch: refetchRackToRackConnections,
     error: rackToRackConnectionsError,
-    // } = useRackToRackConnections(true);
-  } = useRackToRackConnections();
+  } = useRackToRackConnections(UseMockData);
+
   const {
     data: artifacts,
     isFetching: artifactsLoading,
     refetch: refetchArtifacts,
     error: artifactsError,
-    // } = useBuildartifacts(true);
-  } = useBuildartifacts();
+  } = useBuildartifacts(UseMockData);
+
+  const {
+    data: gpuRacks,
+    refetch: refetchGPURacks,
+    isFetching: gpuRacksLoading,
+    error: gpuRacksError,
+  } = useListGPURacks(UseMockData);
 
   const [errors, setErrors] = useState<any[]>([]);
 
@@ -97,6 +120,9 @@ export const GraphView = () => {
     if (artifactsError) {
       errors.push("Failed to load artifacts");
     }
+    if (gpuRacksError) {
+      errors.push("Failed to load GPU racks");
+    }
     setErrors(errors);
   }, [
     roomLayoutError,
@@ -105,6 +131,7 @@ export const GraphView = () => {
     rackToRackConnectionsError,
     artifactsError,
   ]);
+
   type Tab = {
     path: string;
     label: string;
@@ -116,6 +143,7 @@ export const GraphView = () => {
     { path: "artifacts", label: "Artifacts" },
   ];
   const [activeTab, setActiveTab] = useState<string>(tabs[0].path);
+  const lastFetchedRoomforLayoutRef = useRef<string | null>(null);
 
   const materialShown = !selectedRoom?.roomName
     ? []
@@ -128,15 +156,32 @@ export const GraphView = () => {
         : materials?.items;
 
   useEffect(() => {
-    if (selectedRoom?.roomName) {
-      refetchRoomLayout(selectedRoom?.roomName);
-      refetchConnections(selectedRoom?.roomName);
-      refetchMaterials(selectedRoom?.roomName);
-      refetchArtifacts(selectedRoom?.roomName);
+    const roomName = selectedRoom?.roomName || null;
+
+    // Only react when roomName actually changes
+    if (roomName && roomName !== lastFetchedRoomforLayoutRef.current) {
+      // Only do the big refetch if we are *not* on the validation tab and remember this room as the latest one we fetched for
+      lastFetchedRoomforLayoutRef.current = roomName;
+      refetchRoomLayout(roomName);
+      refetchConnections(roomName);
+      refetchMaterials(roomName);
+      refetchArtifacts(roomName);
+      refetchGPURacks(roomName);
       setSelectedRackToRack(null);
+      setSelectedCutsheetRack(null);
+      setHoverRackId(null);
+      // Always clear rack selection when the room changes
+      setClearRackSelection((prev) => !prev);
+      setFilteredGpuRacks(null);
+      setPhysicalCutsheetsPanelOpen(false);
     }
-    setClearRackSelection((prev) => !prev); // trigger clearing rack selection in PathSelectors
-  }, [selectedRoom?.roomName]);
+  }, [selectedRoom?.roomName, activeTab]);
+
+  // useEffect(() => {
+  //   if (!roomPhysicalCutsheets) {
+  //     setRoomPhysicalCutsheets(physicalCutsheets?.items);
+  //   }
+  // }, [physicalCutsheets]);
 
   useEffect(() => {
     if (selectedRoom?.roomName && selectedRackToRack) {
@@ -154,9 +199,6 @@ export const GraphView = () => {
         <div className={"oj-sm-padding-1x"}>{item.data.label}</div>
         {item.data.path === "materials" && (
           <div>{`(${materialsLoading || rackToRackConnectionsLoading ? "..." : materialShown?.length || 0})`}</div>
-          // <oj-c-button id="icon_button1" display="icons" label="Icon Button" chroming="borderless" disabled={activeTab !== "materials"}>
-          //   <span slot="startIcon" class="oj-ux-ico-acl-export"></span>
-          // </oj-c-button>
         )}
         {item.data.path === "artifacts" && (
           <oj-c-button
@@ -176,12 +218,11 @@ export const GraphView = () => {
   const loadTabContent = (
     event: ojTabBar.selectionChanged<Tab["path"], Tab>,
   ) => {
-    if (event.detail.value === "layout") {
-      setActiveTab(tabs[0].path);
-    } else if (event.detail.value === "materials") {
-      setActiveTab(tabs[1].path);
-    } else {
-      setActiveTab(tabs[2].path);
+    const value = event.detail.value;
+    setActiveTab(value || "layout");
+    if (value !== "layout") {
+      setMaterialPanelOpen(false);
+      setPhysicalCutsheetsPanelOpen(false);
     }
   };
 
@@ -198,14 +239,30 @@ export const GraphView = () => {
         setSelectedRoom={setSelectedRoom}
       />
       <PathSelectors
+        roomName={selectedRoom?.roomName}
+        gpuRacks={gpuRacks}
         connections={connections?.items}
         // highlights={highlights}
         // setHighlights={setHighlights}
         setRackToRack={setSelectedRackToRack}
         clearRackSelection={clearRackSelection}
         disableSrcRackSelect={
-          connections?.items.length === 0 || activeTab === "artifacts"
+          (gpuRacks?.length === 0 && connections?.items.length === 0) ||
+          activeTab === "artifacts"
         }
+        onRackListChange={(rackList) => {
+          // rackList: gpu racks that are in the selected group (or all if cleared)
+          // keep this in state so PathGraph can use the same filtered list
+          if (rackList.length > 0) {
+            setMaterialPanelOpen(false);
+            setPhysicalCutsheetsPanelOpen(true);
+            if (rackList.length === 1) {
+              setSelectedCutsheetRack(rackList[0]);
+              setHoverRackId(rackList[0]);
+            }
+          }
+          setFilteredGpuRacks(rackList);
+        }}
       />
       <div className="layout-material-tab-bar">
         <oj-tab-bar
@@ -218,11 +275,14 @@ export const GraphView = () => {
           <template slot="itemTemplate" render={tabItemTemplate}></template>
         </oj-tab-bar>
       </div>
-
-      {activeTab === "layout" ? (
-        <oj-c-drawer-layout endDisplay="reflow" end-opened={materialPanelOpen}>
+      <oj-c-drawer-layout
+        endDisplay="reflow"
+        end-opened={materialPanelOpen || physicalCutsheetsPanelOpen}
+      >
+        {activeTab === "layout" ? (
           <div class="svg-container">
-            {selectedRackToRack ? (
+            {selectedRackToRack &&
+            selectedRackToRack.showRackToRackImageView ? (
               selectedRoom?.roomName &&
               rackToRackConnections &&
               rackToRackConnections.image &&
@@ -230,6 +290,7 @@ export const GraphView = () => {
                 <img
                   src={`data:image/png;base64,${rackToRackConnections.image}`}
                   alt={"Room Design"}
+                  className="svg-container-img"
                   style={{ width: "100%", height: "auto" }}
                 />
               ) : (
@@ -246,61 +307,116 @@ export const GraphView = () => {
                 Room layout not available
               </p>
             ) : (
-              <PathGraph room={roomLayout} />
+              <PathGraph
+                room={roomLayout}
+                racksWithPhysicalCutsheet={filteredGpuRacks || gpuRacks || []}
+                onRackClick={(rackId: string, hasCutsheet: boolean) => {
+                  if (hasCutsheet) {
+                    setSelectedCutsheetRack(rackId);
+                  }
+                  setMaterialPanelOpen(false);
+                  setPhysicalCutsheetsPanelOpen(true);
+                }}
+                hoverRackId={hoverRackId}
+              />
             )}
             {/* <PathGraph room={roomLayout} highlights={highlights} /> */}
             {!roomLayoutIsPending && !!roomLayout && (
               <div class="control-buttons">
+                {selectedRackToRack && (
+                  <oj-button
+                    class="oj-md-padding-2x-horizontal"
+                    onojAction={() => {
+                      setSelectedRackToRack((prev) => ({
+                        ...(prev as any),
+                        showRackToRackImageView: !prev?.showRackToRackImageView,
+                      }));
+                    }}
+                  >
+                    {selectedRackToRack?.showRackToRackImageView
+                      ? "Show Layout View"
+                      : "Show Path Image View"}
+                  </oj-button>
+                )}
                 <oj-button
-                  class="oj-md-padding-5x-horizontal"
+                  class="oj-md-padding-2x-horizontal"
                   onojAction={(value) => {
                     value.preventDefault();
                     setClearRackSelection(!clearRackSelection);
                     setMaterialPanelOpen(false);
+                    setPhysicalCutsheetsPanelOpen(false);
+                    setSelectedCutsheetRack(null);
+                    setHoverRackId(null);
+                    setFilteredGpuRacks(null);
                   }}
                 >
                   Clear Rack Selection
                 </oj-button>
                 <oj-button
+                  class="oj-md-padding-2x-horizontal"
                   onojAction={() => {
                     setMaterialPanelOpen(!materialPanelOpen);
+                    setPhysicalCutsheetsPanelOpen(false);
                   }}
                 >
                   {`${materialPanelOpen ? "Hide" : "View"} Materials (${materialsLoading || rackToRackConnectionsLoading ? "..." : materialShown?.length || 0} items)`}
                 </oj-button>
+                <oj-button
+                  onojAction={() => {
+                    setMaterialPanelOpen(false);
+                    setPhysicalCutsheetsPanelOpen(!physicalCutsheetsPanelOpen);
+                  }}
+                >
+                  {`${physicalCutsheetsPanelOpen ? "Hide" : "View"} GPU Connections (${
+                    gpuRacksLoading || !selectedRoom?.roomName
+                      ? "..."
+                      : filteredGpuRacks?.length || gpuRacks?.length || 0
+                  } racks)`}
+                </oj-button>
               </div>
             )}
           </div>
-          <div slot="end" className={activeTab ? "isMax" : ""}>
+        ) : activeTab === "materials" ? (
+          <div className="material-tab">
             <MaterialPanel
               materials={materialShown}
               loading={materialsLoading || !selectedRoom?.roomName}
             />
           </div>
-        </oj-c-drawer-layout>
-      ) : activeTab === "materials" ? (
-        <div className="material-tab">
-          <MaterialPanel
-            materials={materialShown}
-            loading={materialsLoading || !selectedRoom?.roomName}
-          />
+        ) : (
+          <div className="artifact-tab">
+            <ArtifactPanel
+              artifacts={artifacts?.items}
+              roomName={selectedRoom?.roomName}
+              loading={!selectedRoom?.roomName || artifactsLoading}
+            />
+          </div>
+        )}
+        <div slot="end" className={activeTab ? "isMax" : ""}>
+          {materialPanelOpen ? (
+            <MaterialPanel
+              materials={materialShown}
+              loading={materialsLoading || !selectedRoom?.roomName}
+            />
+          ) : (
+            <PhysicalCutsheetPanel
+              gpuRacks={filteredGpuRacks || gpuRacks || []}
+              roomName={selectedRoom?.roomName}
+              initialSelectedRack={selectedCutsheetRack}
+              onRackHover={setHoverRackId}
+              disableBackButton={activeTab !== "validation"}
+            />
+          )}
         </div>
-      ) : (
-        <div className="artifact-tab">
-          <ArtifactPanel
-            artifacts={artifacts?.items}
-            roomName={selectedRoom?.roomName}
-            loading={!selectedRoom?.roomName || artifactsLoading}
-          />
-        </div>
-      )}
+      </oj-c-drawer-layout>
       <oj-c-dialog
         opened={
           roomLayoutLoading ||
           connectionsLoading ||
           materialsLoading ||
           rackToRackConnectionsLoading ||
-          artifactsLoading
+          artifactsLoading ||
+          gpuRacksLoading
         }
         id="modalDialogLoading"
         aria-describedby="desc"
