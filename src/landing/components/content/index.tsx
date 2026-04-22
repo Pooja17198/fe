@@ -39,6 +39,7 @@ type RackMetadata = {
   ticket: string;
   rackSerialNumber?: string;
   isGpuRack?: boolean;
+  availabilityDomain?: string;
   resolveEnabled?: boolean;
   resolveDisabledReason?: string;
 }
@@ -56,6 +57,9 @@ function decodeRackUrlContext(): Partial<RackMetadata> {
   const rackState = params.get("rackState") ? decodeURIComponent(params.get("rackState") as string) : "";
   const project = params.get("project") ? decodeURIComponent(params.get("project") as string) : "";
   const isGpuRack = params.get("isGpuRack") === "true";
+  const availabilityDomain = params.get("availabilityDomain")
+    ? decodeURIComponent(params.get("availabilityDomain") as string)
+    : "";
   const ticketParam = params.get("ticket");
   const ticket = ticketParam && ticketParam.trim() !== "" ? decodeURIComponent(ticketParam) : undefined;
 
@@ -69,6 +73,7 @@ function decodeRackUrlContext(): Partial<RackMetadata> {
     rack,
     rackState,
     isGpuRack,
+    availabilityDomain,
   };
 
   if (ticket) {
@@ -97,6 +102,7 @@ const Content = (props: Props) => {
   const [selectedProject, setSelectedProject] = useState(INIT_DEFAULT)
   const [selectedRackSerialNumber, setSelectedRackSerialNumber] = useState(INIT_DEFAULT)
   const [selectedIsGpuRack, setSelectedIsGpuRack] = useState<boolean>(false);
+  const [selectedAvailabilityDomain, setSelectedAvailabilityDomain] = useState(INIT_DEFAULT);
   const [selectedVendor, setSelectedVendor] = useState(INIT_DEFAULT);
   const [selectedResolveEnabled, setSelectedResolveEnabled] = useState<boolean>(false);
   const [selectedResolveDisabledReason, setSelectedResolveDisabledReason] = useState<string>("");
@@ -128,6 +134,7 @@ const Content = (props: Props) => {
     if (typeof ctx.rackState === "string") setSelectedRackState(ctx.rackState);
     if (ctx.project) setSelectedProject(ctx.project);
     if (typeof ctx.isGpuRack === "boolean") setSelectedIsGpuRack(Boolean(ctx.isGpuRack));
+    if (typeof ctx.availabilityDomain === "string") setSelectedAvailabilityDomain(ctx.availabilityDomain);
     if (typeof ctx.ticket === "string") setSelectedTicket(ctx.ticket);
     if (typeof ctx.resolveEnabled === "boolean") setSelectedResolveEnabled(Boolean(ctx.resolveEnabled));
     if (typeof ctx.resolveDisabledReason === "string") setSelectedResolveDisabledReason(String(ctx.resolveDisabledReason || ""));
@@ -144,6 +151,7 @@ const Content = (props: Props) => {
     setSelectedBlock(value.block);
     setSelectedProject(value.project);
     setSelectedIsGpuRack(Boolean(value.isGpuRack));
+    setSelectedAvailabilityDomain(String(value.availabilityDomain || ""));
     setSelectedTicket(value.ticket);
     setSelectedResolveEnabled(value.resolveEnabled !== false);
     setSelectedResolveDisabledReason(String(value.resolveDisabledReason || ""));
@@ -175,6 +183,7 @@ const Content = (props: Props) => {
         rack: String(selectedRack || ""),
         rackState: String(selectedRackState || ""),
         isGpuRack: String(Boolean(selectedIsGpuRack)),
+        availabilityDomain: String(selectedAvailabilityDomain || ""),
       };
       if (hasTicket) {
         queryObj.ticket = String(selectedTicket);
@@ -214,6 +223,7 @@ const Content = (props: Props) => {
                 ticket={selectedTicket}
                 rack_serial={selectedRackSerialNumber}
                 isGpuRack={selectedIsGpuRack}
+                availabilityDomain={selectedAvailabilityDomain}
                 resolveEnabled={selectedResolveEnabled}
                 resolveDisabledReason={selectedResolveDisabledReason}
                 region={props.region}

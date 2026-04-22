@@ -89,6 +89,12 @@ export interface NamespacePatchRequest {
 export interface ParResponseObject {
     "par"?: string;
 }
+export interface PatchPanelPortSummary {
+    "portName"?: string;
+    "hasError"?: boolean;
+    "easyMark"?: Array<string>;
+    "errors"?: Array<PortErrorSummary>;
+}
 export interface PhysicalConnectionCollection {
     "roomName"?: string;
     "type"?: string;
@@ -118,9 +124,40 @@ export interface PhysicalConnectionSummary {
     "timeUpdated"?: string;
 }
 export type PhysicalConnectionSummaryRouteTypeEnum = "A" | "SINGLE";
+export interface PhysicalCutsheetCollection {
+    "items": Array<PhysicalCutsheetSummary>;
+}
+export interface PhysicalCutsheetRackNumberCollection {
+    "items": Array<string>;
+}
+export interface PhysicalCutsheetSummary {
+    "deviceName"?: string;
+    "devicePort"?: string;
+    "buildingName"?: string;
+    "roomName"?: string;
+    "rackNumber"?: string;
+    "rackRole"?: string;
+    "easyMark"?: Array<string>;
+    "additionalAttributes"?: any;
+}
 export interface Polyline {
     "pointX": number;
     "pointY": number;
+}
+export interface PortErrorSummary {
+    "lldpErrors"?: Array<string>;
+    "opticErrors"?: Array<string>;
+    "interfaceErrors"?: Array<string>;
+    "otherErrors"?: Array<string>;
+    "lastValidated"?: string;
+}
+export interface RackDeviceSummary {
+    "deviceName"?: string;
+    "elevation"?: number;
+    "patchPanel"?: Array<Array<PatchPanelPortSummary>>;
+}
+export interface RackViewResponse {
+    "rackDevices"?: Array<RackDeviceSummary>;
 }
 export interface RoomLayout {
     "roomCanonicalName"?: string;
@@ -338,6 +375,75 @@ export declare class PhysicalConnectionApi extends base.BaseAPI {
     }, options?: any): Promise<{
         response: Response;
         data: PhysicalConnectionCollection;
+    }>;
+}
+export interface PhysicalCutsheetApiListPhysicalCutsheetRackNumbersArgs {
+    "roomName": string;
+    "rackRole"?: string;
+    "rackType"?: string;
+}
+export type PhysicalCutsheetApiListPhysicalCutsheetRackNumbersReturnType = {
+    response: Response;
+    data: PhysicalCutsheetRackNumberCollection;
+};
+export interface PhysicalCutsheetApiListPhysicalCutsheetsArgs {
+    "buildingName"?: string;
+    "roomName"?: string;
+    "rackNumber"?: string;
+    "rackRole"?: string;
+    "deviceName"?: string;
+    "devicePort"?: string;
+    "limit"?: number;
+    "page"?: string;
+    "sortOrder"?: string;
+    "sortBy"?: string;
+}
+export type PhysicalCutsheetApiListPhysicalCutsheetsReturnType = {
+    response: Response;
+    data: PhysicalCutsheetCollection;
+};
+export declare class PhysicalCutsheetApi extends base.BaseAPI {
+    static createFromEndpointTemplate(fetch: base.Fetch, region: string, secondLevelDomain: string, config?: base.BaseApiConfig): PhysicalCutsheetApi;
+    listPhysicalCutsheetRackNumbers(params: {
+        "roomName": string;
+        "rackRole"?: string;
+        "rackType"?: string;
+    }, options?: any): Promise<{
+        response: Response;
+        data: PhysicalCutsheetRackNumberCollection;
+    }>;
+    listPhysicalCutsheets(params: {
+        "buildingName"?: string;
+        "roomName"?: string;
+        "rackNumber"?: string;
+        "rackRole"?: string;
+        "deviceName"?: string;
+        "devicePort"?: string;
+        "limit"?: number;
+        "page"?: string;
+        "sortOrder"?: string;
+        "sortBy"?: string;
+    }, options?: any): Promise<{
+        response: Response;
+        data: PhysicalCutsheetCollection;
+    }>;
+}
+export interface RackViewApiGetRackViewArgs {
+    "roomName"?: string;
+    "rackNumber"?: string;
+}
+export type RackViewApiGetRackViewReturnType = {
+    response: Response;
+    data: RackViewResponse;
+};
+export declare class RackViewApi extends base.BaseAPI {
+    static createFromEndpointTemplate(fetch: base.Fetch, region: string, secondLevelDomain: string, config?: base.BaseApiConfig): RackViewApi;
+    getRackView(params: {
+        "roomName"?: string;
+        "rackNumber"?: string;
+    }, options?: any): Promise<{
+        response: Response;
+        data: RackViewResponse;
     }>;
 }
 export declare class RoomMetadataApi extends base.BaseAPI {

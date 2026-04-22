@@ -4,7 +4,26 @@ export type DeviceStatus = {
   elevation?: number;
   validationEligible?: boolean;
   validationEligibilityReason?: string;
+  hostReadinessStatus?: string;
+  hostSerial?: string;
+  hostInstanceId?: string | null;
+  hostHopsState?: string;
+  hostComputeState?: string;
+  hostComputePool?: string;
+  hostTicketIds?: string[];
   _key: string;
+};
+
+export type HostReadinessItem = {
+  hostSerial: string;
+  hostName: string;
+  instanceId?: string | null;
+  hopsState?: string;
+  computeState?: string;
+  computePool?: string;
+  status: string;
+  ticketId?: string | null;
+  ticketIds?: string[];
 };
 
 /**
@@ -165,6 +184,7 @@ export type RackProps = {
   rack_serial: string;
   isGpuRack?: boolean;
   region: string;
+  availabilityDomain?: string;
   resolveEnabled?: boolean;
   resolveDisabledReason?: string;
 };

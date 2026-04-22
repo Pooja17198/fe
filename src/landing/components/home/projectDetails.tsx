@@ -10,8 +10,9 @@ import "ojs/ojpagingcontrol";
 import { ProjectLoadMeasurement } from "./types";
 import { emitMetric, TELEMETRY_METRICS } from "../telemetry/api";
 import { getLvvApiBase } from "../../config/api";
+import "oj-c/button";
 
-const RACK_COLUMNS = [
+const BASE_RACK_COLUMNS = [
     { headerText: "Rack Location", field: "rackLocation", id: "rackLocation", resizable: "enabled" as const, sortable: 'enabled' as const },
     { headerText: "Platform", field: "platformName", id: "platformName", resizable: "enabled" as const, sortable: 'enabled' as const },
     { headerText: "Block", field: "block", id: "block", resizable: "enabled" as const, sortable: 'enabled' as const },
@@ -54,6 +55,7 @@ interface ProjectRackRow {
     rackLocation: string;
     rackSerialNumber: string;
     isGpuRack?: boolean;
+    availabilityDomain?: string;
     gpuRackLabel?: string;
     ticketType?: string;
     ticketId?: string;
@@ -61,6 +63,7 @@ interface ProjectRackRow {
     resolveDisabledReason?: string;
     rackState?: string;
     platformName?: string;
+    _validationReady?: number;
 }
 
 type RackValidationSummary = {
@@ -76,6 +79,17 @@ type RackStatusToken = {
     title: string;
 };
 
+type RackValidationReadySummary = {
+    readyCount: number;
+};
+
+type RackHostCountSummary = {
+    hopsCount: number;
+    lvvCount: number;
+    cpvCount: number;
+    customerCount: number;
+};
+
 type JsonRecord = Record<string, unknown>;
 
 const NOT_VALIDATED_SUMMARY: RackValidationSummary = {
@@ -83,6 +97,17 @@ const NOT_VALIDATED_SUMMARY: RackValidationSummary = {
     cableFailures: 0,
     opticsFailures: 0,
     deviceFailures: 0,
+};
+
+const EMPTY_VALIDATION_READY_SUMMARY: RackValidationReadySummary = {
+    readyCount: 0,
+};
+
+const EMPTY_HOST_COUNT_SUMMARY: RackHostCountSummary = {
+    hopsCount: 0,
+    lvvCount: 0,
+    cpvCount: 0,
+    customerCount: 0,
 };
 
 async function fetchWithRetry(url: string, options: any = {}, maxAttempts: number = 3, delayMs: number = 1000): Promise<Response> {
@@ -337,12 +362,118 @@ async function fetchRackStatusSummary(
     }
 }
 
+function summarizeHostReadinessPayload(payload: unknown): RackValidationReadySummary {
+    const payloadRecord = asRecord(payload);
+    if (!payloadRecord) {
+        return EMPTY_VALIDATION_READY_SUMMARY;
+    }
+
+    const hostReadiness = asArray(payloadRecord["hostReadiness"]);
+    const readyCount = hostReadiness.reduce<number>((count, rawItem) => {
+        const item = asRecord(rawItem);
+        if (!item) {
+            return count;
+        }
+        const status = String(item["status"] ?? "").trim().toUpperCase();
+        return status === "LVV" ? count + 1 : count;
+    }, 0);
+
+    return { readyCount };
+}
+
+function summarizeHostCountPayload(payload: unknown): RackHostCountSummary {
+    const payloadRecord = asRecord(payload);
+    if (!payloadRecord) {
+        return EMPTY_HOST_COUNT_SUMMARY;
+    }
+
+    const hostReadiness = asArray(payloadRecord["hostReadiness"]);
+
+    return hostReadiness.reduce<RackHostCountSummary>((summary, rawItem) => {
+        const item = asRecord(rawItem);
+        if (!item) {
+            return summary;
+        }
+
+        const status = String(item["status"] ?? "").trim().toUpperCase();
+        if (status.startsWith("HOPS")) {
+            summary.hopsCount += 1;
+        } else if (status === "LVV") {
+            summary.lvvCount += 1;
+        } else if (status.startsWith("CPV")) {
+            summary.cpvCount += 1;
+        } else if (status.startsWith("CUSTOMER")) {
+            summary.customerCount += 1;
+        }
+
+        return summary;
+    }, {
+        hopsCount: 0,
+        lvvCount: 0,
+        cpvCount: 0,
+        customerCount: 0,
+    });
+}
+
+async function fetchRackValidationReadySummary(
+    row: ProjectRackRow,
+    region: string,
+    signal: AbortSignal
+): Promise<RackValidationReadySummary> {
+    if (!row.isGpuRack || !row.rackSerialNumber || !region) {
+        return EMPTY_VALIDATION_READY_SUMMARY;
+    }
+
+    const availabilityDomains = [1, 2, 3].map((adNumber) => `${region}-ad-${adNumber}`);
+    let lastError: unknown = null;
+
+    for (const availabilityDomain of availabilityDomains) {
+        try {
+            const readinessUrl = new URL(`${API_URL}/rackHostCableValidationReadiness`);
+            readinessUrl.searchParams.set("rackSerialNumber", row.rackSerialNumber);
+            readinessUrl.searchParams.set("regionName", region);
+            readinessUrl.searchParams.set("availabilityDomain", availabilityDomain);
+
+            const response = await fetchWithRetry(readinessUrl.href, { method: "GET", signal });
+            if (!response.ok) {
+                throw new Error(`rackHostCableValidationReadiness query failed (${response.status} ${response.statusText})`);
+            }
+
+            const body = await response.text();
+            if (!body.trim()) {
+                continue;
+            }
+
+            const payload: unknown = JSON.parse(body);
+            const summary = summarizeHostReadinessPayload(payload);
+            const hasHostReadiness = asArray(asRecord(payload)?.["hostReadiness"]).length > 0;
+            if (hasHostReadiness) {
+                return summary;
+            }
+        } catch (e) {
+            if ((e as any)?.name === "AbortError") {
+                throw e;
+            }
+            lastError = e;
+        }
+    }
+
+    if (lastError) {
+        return EMPTY_VALIDATION_READY_SUMMARY;
+    }
+
+    return EMPTY_VALIDATION_READY_SUMMARY;
+}
+
 const ProjectDetailsContainer = (props: Props) => {
 
     const [allProjectData, setAllProjectData] = useState<ProjectRackRow[]>([]);
     const [loading, setLoading] = useState(false);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [rackStatusByKey, setRackStatusByKey] = useState<Record<string, RackValidationSummary | undefined>>({});
+    const [rackValidationReadyByKey, setRackValidationReadyByKey] = useState<Record<string, RackValidationReadySummary | undefined>>({});
+    const [rackHostCountByKey, setRackHostCountByKey] = useState<Record<string, RackHostCountSummary | undefined>>({});
+    const [isRefreshingHostReadiness, setIsRefreshingHostReadiness] = useState(false);
 
     const [activeBlocks, setActiveBlocks] = useState<string[]>([]);
     const [searchText, setSearchText] = useState("");
@@ -557,6 +688,117 @@ const ProjectDetailsContainer = (props: Props) => {
         return () => ac.abort();
     }, [allProjectData, props.project, props.region]);
 
+    const refreshHostReadiness = async (signal: AbortSignal) => {
+        if (!showOnlyGpuRacks || !props.project?.projectId || allProjectData.length === 0) {
+            setRackValidationReadyByKey({});
+            setRackHostCountByKey({});
+            return;
+        }
+
+        const gpuRows = allProjectData.filter(
+            (row) => row.isGpuRack && row.rackSerialNumber && row.rackSerialNumber.trim() !== ""
+        );
+
+        const nextReadyCounts: Record<string, RackValidationReadySummary | undefined> = {};
+        const nextHostCounts: Record<string, RackHostCountSummary | undefined> = {};
+        gpuRows.forEach((row) => {
+            nextReadyCounts[row._key] = undefined;
+            nextHostCounts[row._key] = undefined;
+        });
+        setRackValidationReadyByKey(nextReadyCounts);
+        setRackHostCountByKey(nextHostCounts);
+
+        const entries = await Promise.all(
+            gpuRows.map(async (row) => {
+                try {
+                    const availabilityDomains = [1, 2, 3].map((adNumber) => `${props.region}-ad-${adNumber}`);
+                    let lastError: unknown = null;
+
+                    for (const availabilityDomain of availabilityDomains) {
+                        try {
+                            const readinessUrl = new URL(`${API_URL}/rackHostCableValidationReadiness`);
+                            readinessUrl.searchParams.set("rackSerialNumber", row.rackSerialNumber);
+                            readinessUrl.searchParams.set("regionName", props.region);
+                            readinessUrl.searchParams.set("availabilityDomain", availabilityDomain);
+
+                            const response = await fetchWithRetry(readinessUrl.href, { method: "GET", signal });
+                            if (!response.ok) {
+                                throw new Error(`rackHostCableValidationReadiness query failed (${response.status} ${response.statusText})`);
+                            }
+
+                            const body = await response.text();
+                            if (!body.trim()) {
+                                continue;
+                            }
+
+                            const payload: unknown = JSON.parse(body);
+                            const hasHostReadiness = asArray(asRecord(payload)?.["hostReadiness"]).length > 0;
+                            if (hasHostReadiness) {
+                                return [
+                                    row._key,
+                                    summarizeHostReadinessPayload(payload),
+                                    summarizeHostCountPayload(payload)
+                                ] as const;
+                            }
+                        } catch (e) {
+                            if ((e as any)?.name === "AbortError") {
+                                return null;
+                            }
+                            lastError = e;
+                        }
+                    }
+
+                    if (lastError) {
+                        return [row._key, EMPTY_VALIDATION_READY_SUMMARY, EMPTY_HOST_COUNT_SUMMARY] as const;
+                    }
+
+                    return [row._key, EMPTY_VALIDATION_READY_SUMMARY, EMPTY_HOST_COUNT_SUMMARY] as const;
+                } catch (e) {
+                    if ((e as any)?.name === "AbortError") {
+                        return null;
+                    }
+                    return [row._key, EMPTY_VALIDATION_READY_SUMMARY, EMPTY_HOST_COUNT_SUMMARY] as const;
+                }
+            })
+        );
+
+        if (signal.aborted) {
+            return;
+        }
+
+        const resolvedReadyCounts = { ...nextReadyCounts };
+        const resolvedHostCounts = { ...nextHostCounts };
+        entries.forEach((entry) => {
+            if (!entry) {
+                return;
+            }
+            const [key, summary, hostCountSummary] = entry;
+            resolvedReadyCounts[key] = summary;
+            resolvedHostCounts[key] = hostCountSummary;
+        });
+        setRackValidationReadyByKey(resolvedReadyCounts);
+        setRackHostCountByKey(resolvedHostCounts);
+    };
+
+    useEffect(() => {
+        const ac = new AbortController();
+
+        void refreshHostReadiness(ac.signal);
+
+        return () => ac.abort();
+    }, [allProjectData, props.project, props.region, showOnlyGpuRacks]);
+
+    const handleRefreshHostReadiness = async () => {
+        const ac = new AbortController();
+        setIsRefreshingHostReadiness(true);
+        try {
+            await refreshHostReadiness(ac.signal);
+        } finally {
+            setIsRefreshingHostReadiness(false);
+            ac.abort();
+        }
+    };
+
     const filteredRows = useMemo((): ProjectRackRow[] => {
         if (activeBlocks.length === 0) {
             return [];
@@ -603,8 +845,19 @@ const ProjectDetailsContainer = (props: Props) => {
             }
         }
 
-        return rows;
-    }, [activeBlocks, allProjectData, hideMissingSerial, searchText, includeInServiceRacks, showOnlyGpuRacks]);
+        return rows.map((row) => ({
+            ...row,
+            _validationReady: rackValidationReadyByKey[row._key]?.readyCount ?? 0,
+        }));
+    }, [
+        activeBlocks,
+        allProjectData,
+        hideMissingSerial,
+        searchText,
+        includeInServiceRacks,
+        showOnlyGpuRacks,
+        rackValidationReadyByKey,
+    ]);
 
     const baseDataProvider = useMemo(
         () => new ArrayDataProvider(filteredRows, { keyAttributes: "_key" }),
@@ -642,6 +895,108 @@ const ProjectDetailsContainer = (props: Props) => {
         const row = (context?.item && context.item.data) || {};
         return renderRackStatus(rackStatusByKey[row._key]);
     };
+
+    const validationReadyTemplate = (context: any) => {
+        const row = (context?.item && context.item.data) || {};
+        const summary = rackValidationReadyByKey[row._key];
+        if (summary === undefined) {
+            return <span class="rack-status-text muted">Loading...</span>;
+        }
+        return <span>{summary.readyCount}</span>;
+    };
+
+    const hostCountTemplate = (context: any) => {
+        const row = (context?.item && context.item.data) || {};
+        const summary = rackHostCountByKey[row._key];
+        if (summary === undefined) {
+            return <span class="rack-status-text muted">Loading...</span>;
+        }
+
+        const chips = [
+            summary.hopsCount > 0 ? {
+                className: "rack-status-chip host-count-hops",
+                label: `HOPS:${summary.hopsCount}`,
+                title: `${summary.hopsCount} host${summary.hopsCount === 1 ? "" : "s"} in HOPS state`,
+            } : null,
+            summary.lvvCount > 0 ? {
+                className: "rack-status-chip host-count-lvv",
+                label: `LVV:${summary.lvvCount}`,
+                title: `${summary.lvvCount} host${summary.lvvCount === 1 ? "" : "s"} in LVV state`,
+            } : null,
+            summary.cpvCount > 0 ? {
+                className: "rack-status-chip host-count-cpv",
+                label: `CPV:${summary.cpvCount}`,
+                title: `${summary.cpvCount} host${summary.cpvCount === 1 ? "" : "s"} in CPV state`,
+            } : null,
+            summary.customerCount > 0 ? {
+                className: "rack-status-chip host-count-customer",
+                label: `CUSTOMER:${summary.customerCount}`,
+                title: `${summary.customerCount} host${summary.customerCount === 1 ? "" : "s"} in CUSTOMER state`,
+            } : null,
+        ].filter((chip): chip is RackStatusToken => chip !== null);
+
+        if (chips.length === 0) {
+            return <span class="rack-status-text muted">-</span>;
+        }
+
+        return (
+            <span class="rack-status-cell">
+                {chips.map((chip) => (
+                    <span key={chip.label} class={chip.className} title={chip.title}>
+                        {chip.label}
+                    </span>
+                ))}
+            </span>
+        );
+    };
+
+    const validationReadyRefreshButton = (
+        <button
+            type="button"
+            class="validation-ready-refresh-button"
+            onClick={() => void handleRefreshHostReadiness()}
+            disabled={isRefreshingHostReadiness || allProjectData.length === 0}
+            title="Refresh Validation Ready and Host Count"
+            aria-label="Refresh Validation Ready and Host Count"
+        >
+            ↻
+        </button>
+    );
+
+    const rackColumns = useMemo(() => {
+        if (!showOnlyGpuRacks) {
+            return BASE_RACK_COLUMNS;
+        }
+
+        const validationReadyColumn = {
+            headerText: "Validation Ready",
+            field: "_validationReady",
+            id: "validationReady",
+            resizable: "enabled" as const,
+            sortable: 'enabled' as const,
+            template: "validationReadyTemplate"
+        };
+
+        const hostCountColumn = {
+            headerText: "Host Count",
+            field: "_hostCount",
+            id: "hostCount",
+            resizable: "enabled" as const,
+            template: "hostCountTemplate"
+        };
+
+        const rackStateIndex = BASE_RACK_COLUMNS.findIndex((column) => column.id === "rackState");
+        if (rackStateIndex === -1) {
+            return [...BASE_RACK_COLUMNS, validationReadyColumn, hostCountColumn];
+        }
+
+        return [
+            ...BASE_RACK_COLUMNS.slice(0, rackStateIndex + 1),
+            validationReadyColumn,
+            hostCountColumn,
+            ...BASE_RACK_COLUMNS.slice(rackStateIndex + 1),
+        ];
+    }, [showOnlyGpuRacks]);
 
     return (
         <div id="parentContainer2" class="oj-flex-item oj-md-8 oj-sm-12 oj-reflow">
@@ -774,6 +1129,15 @@ const ProjectDetailsContainer = (props: Props) => {
                 </div>
             ) : (
                 <div>
+                    {showOnlyGpuRacks && (
+                        <div class="project-details-header-action-row" aria-hidden="true">
+                            <div class="project-details-header-action-spacer project-details-header-action-spacer-wide"></div>
+                            <div class="project-details-header-action-cell">
+                                {validationReadyRefreshButton}
+                            </div>
+                            <div class="project-details-header-action-spacer project-details-header-action-spacer-tail"></div>
+                        </div>
+                    )}
                     <oj-table
                         selectionMode={INIT_SELECTION_MODE}
                         selected={{ row: selectedRowKeySet, column: emptyColumnKeySet }}
@@ -781,10 +1145,12 @@ const ProjectDetailsContainer = (props: Props) => {
                         class="selectable-table oj-table oj-table-hover oj-table-responsive"
                         aria-label="Projects Details Table"
                         id="projectDetailsTable"
-                        columns={RACK_COLUMNS}
+                        columns={rackColumns}
                         data={pagingDataProvider as any}
                         accessibility={ACC}
                     >
+                        <template slot="validationReadyTemplate" render={validationReadyTemplate} />
+                        <template slot="hostCountTemplate" render={hostCountTemplate} />
                         <template slot="validationStatusTemplate" render={validationStatusTemplate} />
                     </oj-table>
                     <div style="margin-top: 10px; display: flex; justify-content: flex-end;">

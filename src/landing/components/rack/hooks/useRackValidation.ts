@@ -4,6 +4,7 @@ import {
     DeviceValidationFailures,
     FanFailureRow,
     FecBerFailureRow,
+    HostReadinessItem,
     InterfaceFailureRow,
     JobErrorDetails,
     LldpFailureRow,
@@ -149,6 +150,88 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
         patchPanelPrefetchPromiseRef.current = new Map();
         setPatchPanelRackRows([]);
     }, [rackContextReady, props.region, props.rack_serial, props.rack, props.building]);
+
+    const refreshRackHostReadiness = useCallback(async (signal?: AbortSignal): Promise<void> => {
+        if (!rackContextReady || !props.isGpuRack) {
+            setDeviceStatuses((prev) => prev.map((device) => {
+                if (device.hostReadinessStatus === undefined && device.hostSerial === undefined && device.hostTicketIds === undefined) {
+                    return device;
+                }
+                const { hostReadinessStatus, hostSerial, hostTicketIds, ...rest } = device;
+                return rest;
+            }));
+            return;
+        }
+
+        const items = await fetchRackHostReadiness(
+            props.rack_serial,
+            props.region,
+            signal
+        );
+
+        const readinessByHostName = new Map(
+            items.map((item) => [normalizeLookupKey(item.hostName), item])
+        );
+
+        setDeviceStatuses((prev) => prev.map((device) => {
+            const readiness = readinessByHostName.get(normalizeLookupKey(device.deviceName));
+            const readinessStatus = readiness?.status;
+            const hostSerial = readiness?.hostSerial;
+            const hostInstanceId = readiness?.instanceId ?? null;
+            const hostHopsState = readiness?.hopsState;
+            const hostComputeState = readiness?.computeState;
+            const hostComputePool = readiness?.computePool;
+            const hostTicketIds = readiness?.ticketIds ?? [];
+            const hasSameTicketIds =
+                (device.hostTicketIds ?? []).length === hostTicketIds.length &&
+                (device.hostTicketIds ?? []).every((ticketId, index) => ticketId === hostTicketIds[index]);
+
+            if (
+                readinessStatus === device.hostReadinessStatus &&
+                hostSerial === device.hostSerial &&
+                hostInstanceId === (device.hostInstanceId ?? null) &&
+                hostHopsState === device.hostHopsState &&
+                hostComputeState === device.hostComputeState &&
+                hostComputePool === device.hostComputePool &&
+                hasSameTicketIds
+            ) {
+                return device;
+            }
+
+            return {
+                ...device,
+                hostReadinessStatus: readinessStatus,
+                hostSerial,
+                hostInstanceId,
+                hostHopsState,
+                hostComputeState,
+                hostComputePool,
+                hostTicketIds,
+            };
+        }));
+    }, [rackContextReady, props.isGpuRack, props.rack_serial, props.region]);
+
+    useEffect(() => {
+        const signal = pageAbortRef.current?.signal as AbortSignal | undefined;
+        let active = true;
+
+        void refreshRackHostReadiness(signal)
+            .then(() => {
+                if (!active) return;
+            })
+            .catch((e: any) => {
+                if (!active || e?.name === "AbortError") return;
+                console.warn("[RackValidation] rackHostCableValidationReadiness query failed", {
+                    message: e?.message || String(e),
+                    rackSerial: props.rack_serial,
+                    region: props.region,
+                });
+            });
+
+        return () => {
+            active = false;
+        };
+    }, [refreshRackHostReadiness]);
 
     // clear job error banner on rack context changes
     useEffect(() => {
@@ -692,6 +775,7 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
                 return;
             }
             const completed = await pollValidationJob(headers);
+            await refreshRackHostReadiness(pageAbortRef.current?.signal as AbortSignal | undefined);
             if (
                 completed &&
                 validationMeasurementRef.current &&
@@ -719,7 +803,8 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
         selectedLinkKeys,
         eligibleDeviceNameSet,
         eligibleDeviceNames,
-        rackValidationAllowed
+        rackValidationAllowed,
+        refreshRackHostReadiness
     ]);
 
     const resolve = useCallback(async (): Promise<{ ok: true } | { ok: false; message: string }> => {
@@ -1044,6 +1129,10 @@ function toInteger(value: unknown): number | undefined {
 
 function asArray(value: unknown): unknown[] {
     return Array.isArray(value) ? value : [];
+}
+
+function normalizeLookupKey(value: unknown): string {
+    return String(value || "").trim().toLowerCase();
 }
 
 function text(value: unknown, fallback: string = "Unknown"): string {
@@ -1385,4 +1474,74 @@ async function fetchPatchPanelRowsByRack(
         payload = [];
     }
     return normalizeIdeCutsheetRows(payload);
+}
+
+function normalizeHostReadinessPayload(payload: unknown): HostReadinessItem[] {
+    const record = asRecord(payload);
+    if (!record) return [];
+
+    return asArray(record["hostReadiness"])
+        .map((item) => asRecord(item))
+        .filter((item): item is RowRecord => item !== null)
+        .map((item) => ({
+            hostSerial: textOrEmpty(item["hostSerial"]),
+            hostName: textOrEmpty(item["hostName"]),
+            instanceId: item["instanceId"] == null ? null : String(item["instanceId"]),
+            hopsState: textOrEmpty(item["hopsState"]),
+            computeState: textOrEmpty(item["computeState"]),
+            computePool: textOrEmpty(item["computePool"]),
+            status: textOrEmpty(item["status"]),
+            ticketId: item["ticketId"] == null ? null : String(item["ticketId"]),
+            ticketIds: asArray(item["ticketIds"]).map((ticketId) => String(ticketId)).filter((ticketId) => ticketId.trim() !== ""),
+        }))
+        .filter((item) => item.hostName !== "");
+}
+
+async function fetchRackHostReadiness(
+    rackSerialNumber: string,
+    regionName: string,
+    signal?: AbortSignal
+): Promise<HostReadinessItem[]> {
+    const availabilityDomains = [1, 2, 3].map((adNumber) => `${regionName}-ad-${adNumber}`);
+    let lastError: Error | null = null;
+
+    for (const availabilityDomain of availabilityDomains) {
+        try {
+            const readinessUrl = new URL(`${LVV_API}/rackHostCableValidationReadiness`);
+            readinessUrl.searchParams.set("rackSerialNumber", rackSerialNumber);
+            readinessUrl.searchParams.set("regionName", regionName);
+            readinessUrl.searchParams.set("availabilityDomain", availabilityDomain);
+
+            const response = await fetchWithRetry(readinessUrl.href, {
+                method: "GET",
+                signal,
+            });
+            if (!response.ok) {
+                throw new Error(`rackHostCableValidationReadiness query failed (${response.status} ${response.statusText})`);
+            }
+
+            let payload: unknown;
+            try {
+                payload = await response.json();
+            } catch {
+                payload = {};
+            }
+
+            const normalized = normalizeHostReadinessPayload(payload);
+            if (normalized.length > 0) {
+                return normalized;
+            }
+        } catch (error: any) {
+            if (error?.name === "AbortError") {
+                throw error;
+            }
+            lastError = error instanceof Error ? error : new Error(String(error));
+        }
+    }
+
+    if (lastError) {
+        throw lastError;
+    }
+
+    return [];
 }

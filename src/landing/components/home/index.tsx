@@ -25,6 +25,7 @@ type RackMetadata = {
     ticket?: string;
     rackSerialNumber?: string;
     isGpuRack?: boolean;
+    availabilityDomain?: string;
     resolveEnabled?: boolean;
     resolveDisabledReason?: string;
 }
@@ -140,6 +141,7 @@ const HomeContainer = (props: Props) => {
             ticket: value.ticketId,
             rackSerialNumber: value.rackSerialNumber,
             isGpuRack: value.isGpuRack,
+            availabilityDomain: value.availabilityDomain,
             resolveEnabled: value.resolveEnabled !== false,
             resolveDisabledReason: value.resolveDisabledReason || ""
         }

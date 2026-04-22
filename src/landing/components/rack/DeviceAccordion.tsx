@@ -505,6 +505,181 @@ function getPsuStatusLabel(jobStatus: string, hasPsuFailure: boolean): "UP" | "D
   return hasPsuFailure ? "DOWN" : "UP";
 }
 
+function toAvailabilityDomain(region: string): string {
+  const normalizedRegion = String(region || "").trim();
+  return normalizedRegion ? `${normalizedRegion}-ad-1` : "";
+}
+
+function buildComputeAdminHostUrl(hostSerial: string, region: string): string {
+  const availabilityDomain = toAvailabilityDomain(region);
+  if (!hostSerial || !availabilityDomain) return "#";
+  return `https://devops.oci.oraclecorp.com/compute-admin/hosts/${encodeURIComponent(hostSerial)}?region=${encodeURIComponent(availabilityDomain)}&region=${encodeURIComponent(availabilityDomain)}`;
+}
+
+function buildCerebroHostUrl(hostSerial: string, region: string): string {
+  const availabilityDomain = toAvailabilityDomain(region);
+  if (!hostSerial || !availabilityDomain) return "#";
+  return `https://devops.oci.oraclecorp.com/cerebro-ui/HostDetails/${encodeURIComponent(hostSerial)}?region=${encodeURIComponent(availabilityDomain)}`;
+}
+
+function buildHopsDeviceUrl(hostSerial: string, region: string): string {
+  const normalizedRegion = String(region || "").trim();
+  if (!hostSerial || !normalizedRegion) return "#";
+  return `https://hops.svc.ad1.${normalizedRegion}/ui/deviceview?serial=${encodeURIComponent(hostSerial)}`;
+}
+
+function buildTicketUrl(ticketId: string): string {
+  const normalizedTicketId = String(ticketId || "").trim();
+  if (!normalizedTicketId) return "#";
+  return `https://jira-sd.mc1.oracleiaas.com/projects/LVV/queues/custom/31341/${encodeURIComponent(normalizedTicketId)}`;
+}
+
+const HOST_STATE_LEGEND_ITEMS = [
+  { state: "HOPS-NEW", description: "Host has not started ingestion", className: "status-error" },
+  { state: "HOPS-TESTING", description: "HOPS is actively ingesting this host", className: "status-error" },
+  { state: "HOPS-REPAIR", description: "HOPS has cut a repair ticket and is waiting on the repair", className: "status-error" },
+  { state: "CPV-EMPTY", description: "Host is ready for CPV, but no instance is launched.", className: "status-cpv" },
+  { state: "CPV-INIT", description: "Host has started CPV", className: "status-cpv" },
+  { state: "LVV", description: "Host is waiting for LVV validation to complete on the deployment group", className: "status-completed" },
+  { state: "CPV-TESTING", description: "CPV is running tests", className: "status-cpv" },
+  { state: "CPV-REPAIR", description: "CPV is waiting on a repair ticket", className: "status-cpv" },
+  { state: "CUSTOMER-EMPTY", description: "Host is ready for a customer, but no instance is launched", className: "status-customer" },
+  { state: "CUSTOMER", description: "Customer is running an instance on the host.", className: "status-customer" },
+];
+
+const HOST_STATE_LEGEND_ARIA_LABEL = HOST_STATE_LEGEND_ITEMS
+  .map((item) => `${item.state}: ${item.description}`)
+  .join(". ");
+
+const LAST_VALIDATED_LEGEND_ITEMS = [
+  { label: "Green", description: "Up to 10 minutes", className: "green" },
+  { label: "Orange", description: "Up to 1 hour", className: "orange" },
+  { label: "Red", description: "Greater than 1 hour", className: "red" },
+  { label: "N/A", description: "Not eligible for validation", className: "na" },
+];
+
+const LAST_VALIDATED_LEGEND_ARIA_LABEL = LAST_VALIDATED_LEGEND_ITEMS
+  .map((item) => `${item.label}: ${item.description}`)
+  .join(". ");
+
+function renderDeviceInformationSection(
+  device: DeviceStatus,
+  idx: number,
+  accessibility: typeof VALIDATION_TABLE_ACCESSIBILITY,
+  region: string
+) {
+  const readinessStatus = String(device.hostReadinessStatus || "").trim().toUpperCase();
+  const deviceName = String(device.deviceName || "").trim() || "-";
+  const hostSerial = String(device.hostSerial || "").trim();
+  const instanceId = device.hostInstanceId == null ? "-" : String(device.hostInstanceId).trim() || "-";
+  const hopsState = String(device.hostHopsState || "").trim() || "-";
+  const computeState = String(device.hostComputeState || "").trim() || "-";
+  const computePool = String(device.hostComputePool || "").trim() || "-";
+  const ticketIds = Array.isArray(device.hostTicketIds) ? device.hostTicketIds.filter((ticketId) => String(ticketId).trim() !== "") : [];
+  const lvvTicketIds = ticketIds.filter((ticketId) => String(ticketId).trim().toUpperCase().startsWith("LVV"));
+  const repairTicketIds = ticketIds.filter((ticketId) => !String(ticketId).trim().toUpperCase().startsWith("LVV"));
+
+  if (!readinessStatus || !hostSerial) {
+    return null;
+  }
+
+  const showTicketIds = readinessStatus === "LVV";
+  const rows = [
+    {
+      label: "Device Name",
+      value: hostSerial ? (
+        <a href={buildCerebroHostUrl(hostSerial, region)} target="_blank" rel="noopener noreferrer">
+          {deviceName}
+        </a>
+      ) : deviceName,
+    },
+    {
+      label: "Host Serial",
+      value: hostSerial ? (
+        <a href={buildComputeAdminHostUrl(hostSerial, region)} target="_blank" rel="noopener noreferrer">
+          {hostSerial}
+        </a>
+      ) : "-",
+    },
+    {
+      label: "Instance ID",
+      value: hostSerial && instanceId !== "-" ? (
+        <a href={buildComputeAdminHostUrl(hostSerial, region)} target="_blank" rel="noopener noreferrer">
+          {instanceId}
+        </a>
+      ) : instanceId,
+    },
+    {
+      label: "Hops State",
+      value: hostSerial && hopsState !== "-" ? (
+        <a href={buildHopsDeviceUrl(hostSerial, region)} target="_blank" rel="noopener noreferrer">
+          {hopsState}
+        </a>
+      ) : hopsState,
+    },
+    { label: "Compute State", value: computeState },
+    { label: "Compute Pool", value: computePool },
+    ...(showTicketIds && lvvTicketIds.length > 0
+      ? [{
+          label: "LVV Tickets",
+          value: (
+            <span>
+              {lvvTicketIds.map((ticketId, index) => (
+                <span key={ticketId}>
+                  <a href={buildTicketUrl(ticketId)} target="_blank" rel="noopener noreferrer">
+                    {ticketId}
+                  </a>
+                  {index < lvvTicketIds.length - 1 ? ", " : ""}
+                </span>
+              ))}
+            </span>
+          ),
+        }]
+      : []),
+    ...(showTicketIds && repairTicketIds.length > 0
+      ? [{
+          label: "Repair Tickets",
+          value: (
+            <span>
+              {repairTicketIds.map((ticketId, index) => (
+                <span key={ticketId}>
+                  <a href={buildTicketUrl(ticketId)} target="_blank" rel="noopener noreferrer">
+                    {ticketId}
+                  </a>
+                  {index < repairTicketIds.length - 1 ? ", " : ""}
+                </span>
+              ))}
+            </span>
+          ),
+        }]
+      : []),
+  ];
+
+  return (
+    <oj-collapsible
+      id={`device-${idx}-device-information`}
+      key={`${device.deviceName}-device-information`}
+      expanded={false}
+    >
+      <h4 slot="header" className="test-section-header">
+        <span>Device Information</span>
+      </h4>
+      <div className="oj-flex device-information-section-body">
+        <div className="oj-flex-item rack-panel table-wrapper-full device-information-section-panel">
+          <div className="device-information-list" aria-label="Device Information" role="table">
+            {rows.map((row) => (
+              <div className="device-information-row" key={`${device.deviceName}-${row.label}`} role="row">
+                <div className="device-information-label" role="rowheader">{row.label} :</div>
+                <div className="device-information-value" role="cell">{row.value}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </oj-collapsible>
+  );
+}
+
 const DeviceAccordion = (props: Props) => {
   const ACC = VALIDATION_TABLE_ACCESSIBILITY;
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
@@ -776,6 +951,31 @@ const DeviceAccordion = (props: Props) => {
     );
   };
 
+  const renderValidationState = (device: DeviceStatus, isGpuCompute: boolean) => {
+    if (!isGpuCompute) {
+      return <span className="device-last-validated-na">N/A</span>;
+    }
+
+    const readinessStatus = String(device.hostReadinessStatus || "").trim();
+    const readinessStatusUpper = readinessStatus.toUpperCase();
+    if (readinessStatus !== "") {
+      const readinessClass =
+        readinessStatusUpper.startsWith("HOPS-")
+          ? "status-error"
+          : readinessStatusUpper.startsWith("CPV-")
+          ? "status-cpv"
+          : readinessStatusUpper === "LVV"
+          ? "status-completed"
+          : readinessStatusUpper.startsWith("CUSTOMER-") || readinessStatusUpper === "CUSTOMER"
+          ? "status-customer"
+          : "status-not-triggered";
+
+      return <span className={`device-accordion-status ${readinessClass}`}>{readinessStatus}</span>;
+    }
+
+    return <span className="device-accordion-unknown">-</span>;
+  };
+
   return (
       <div class="rack-page">
         {props.loading ? (
@@ -837,24 +1037,7 @@ const DeviceAccordion = (props: Props) => {
                     }
                   })()}
 
-              <div class="device-last-validated-legend full-bleed">
-                <span className="device-accordion-legend-title">Last Validated Legend</span>
-                <span className="device-accordion-legend-item">
-                  <span className="device-last-validated-pill green legend">Up to 10 minutes</span>
-                </span>
-                <span className="device-accordion-legend-item">
-                  <span className="device-last-validated-pill orange legend">Up to 1 hour</span>
-                </span>
-                <span className="device-accordion-legend-item">
-                  <span className="device-last-validated-pill red legend">Greater than 1 hour</span>
-                </span>
-                <span className="device-accordion-legend-item">
-                  <span className="device-last-validated-na">N/A</span>
-                  Not eligible for validation
-                </span>
-              </div>
-
-              <div class="device-accordion-columns-header full-bleed device-table-columns-header">
+              <div class={`device-accordion-columns-header full-bleed device-table-columns-header ${props.isGpuRack ? "gpu" : ""}`}>
             <span class="device-col select">
               <input
                   ref={selectAllRef}
@@ -877,7 +1060,54 @@ const DeviceAccordion = (props: Props) => {
                 <span>Elevation</span>
                 <span>Errors</span>
                 <span>PSU Status</span>
-                <span>Last Validated</span>
+                <span className="device-last-validated-header">
+                  <span>Last Validated</span>
+                  <span className="device-tooltip-container">
+                    <span
+                      className="device-last-validated-tooltip-trigger"
+                      aria-label={`Last validated legend: ${LAST_VALIDATED_LEGEND_ARIA_LABEL}`}
+                      tabIndex={0}
+                    >
+                      ?
+                    </span>
+                    <span className="device-state-legend-tooltip device-last-validated-legend-tooltip" role="tooltip">
+                      {LAST_VALIDATED_LEGEND_ITEMS.map((item) => (
+                        <span className="device-state-legend-row" key={item.label}>
+                          {item.className === "na" ? (
+                            <span className="device-last-validated-na">{item.label}</span>
+                          ) : (
+                            <span className={`device-last-validated-pill legend ${item.className}`}>{item.label}</span>
+                          )}
+                          <span className="device-state-legend-description">{item.description}</span>
+                        </span>
+                      ))}
+                    </span>
+                  </span>
+                </span>
+                {props.isGpuRack && (
+                  <span className="device-last-validated-header">
+                    <span>Host State</span>
+                    <span className="device-tooltip-container">
+                      <span
+                        className="device-last-validated-tooltip-trigger"
+                        aria-label={`Host State legend: ${HOST_STATE_LEGEND_ARIA_LABEL}`}
+                        tabIndex={0}
+                      >
+                        ?
+                      </span>
+                      <span className="device-state-legend-tooltip" role="tooltip">
+                        {HOST_STATE_LEGEND_ITEMS.map((item) => (
+                          <span className="device-state-legend-row" key={item.state}>
+                            <span className={`device-accordion-status ${item.className}`}>
+                              {item.state}
+                            </span>
+                            <span className="device-state-legend-description">{item.description}</span>
+                          </span>
+                        ))}
+                      </span>
+                    </span>
+                  </span>
+                )}
                 <span>Status</span>
               </div>
               <oj-accordion id="deviceAccordion" key={accordionNonce} multiple={true}>
@@ -885,7 +1115,9 @@ const DeviceAccordion = (props: Props) => {
                   const deviceFailures =
                       filteredFailuresByDevice[device.deviceName] || buildDeviceFailuresFallback(device.deviceName);
                   const isGpuCompute = isGpuComputeDevice(device.deviceName, props.isGpuRack);
+                  const hasDeviceInformation = Boolean(isGpuCompute && device.hostReadinessStatus && device.hostSerial);
                   const hasDeviceFailures = deviceFailures.counts.nonPowerTotal > 0;
+                  const hasExpandableContent = hasDeviceFailures || hasDeviceInformation;
                   const psuStatus = isGpuCompute
                       ? "-"
                       : getPsuStatusLabel(device.jobStatus, deviceFailures.hasPsuFailure);
@@ -906,12 +1138,12 @@ const DeviceAccordion = (props: Props) => {
                           id={`deviceCollapsible-${idx}`}
                           key={device._key}
                           expanded={isExpanded}
-                          onoj-before-expand={() => handleToggle(device._key, true, hasDeviceFailures)}
-                          onoj-before-collapse={() => handleToggle(device._key, false, hasDeviceFailures)}
-                          disabled={!hasDeviceFailures}
+                          onoj-before-expand={() => handleToggle(device._key, true, hasExpandableContent)}
+                          onoj-before-collapse={() => handleToggle(device._key, false, hasExpandableContent)}
+                          disabled={!hasExpandableContent}
                       >
                         <h3 slot="header" style={{ padding: 0, margin: 0, width: "100%" }}>
-                          <div className="device-accordion-header-row">
+                          <div className={`device-accordion-header-row ${props.isGpuRack ? "gpu" : ""}`}>
                             {/* Selection checkbox */}
                             <span
                                 className="device-col select"
@@ -953,6 +1185,12 @@ const DeviceAccordion = (props: Props) => {
 
                             <span className="device-col last-validated">{renderLastValidated(device, deviceFailures)}</span>
 
+                            {props.isGpuRack && (
+                              <span className="device-col validation-state">
+                                {renderValidationState(device, isGpuCompute)}
+                              </span>
+                            )}
+
                             {/* Status */}
                             <span className="device-col status">
                         <span className={`device-accordion-status ${getStatusClass(statusToRender)}`}>
@@ -963,9 +1201,10 @@ const DeviceAccordion = (props: Props) => {
                         </h3>
 
                         {/* Collapsible content */}
-                        {hasDeviceFailures ? (
+                        {hasExpandableContent ? (
                             <div style={{ padding: "8px 24px", background: "#fff" }}>
                               <oj-accordion id={`testAccordion-${idx}`} multiple={true}>
+                                {isGpuCompute && renderDeviceInformationSection(device, idx, ACC, props.region)}
                                 {(isGpuCompute
                                     ? TEST_SECTIONS.filter((section) => section.id !== "fans")
                                     : TEST_SECTIONS
