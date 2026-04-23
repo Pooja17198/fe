@@ -1246,8 +1246,9 @@ function mapOpticRow(raw: unknown, deviceName: string, idx: number): OpticFailur
         _key: `${deviceName}|optics|${idx}|${pick(row, ["Device Port", "devicePort"], "")}`,
         deviceName: pick(row, ["Device Name", "deviceName", "Device A Name", "deviceAName"], deviceName),
         devicePort: pick(row, ["Device Port", "devicePort", "Device A Port", "deviceAPort"]),
-        txPower: pick(row, ["Tx Power", "TX Power", "txPower"]),
-        rxPower: pick(row, ["Rx Power", "RX Power", "rxPower"]),
+        transceiver: textOrEmpty(row["Transciever"] ?? row["Transceiver"] ?? row["transceiver"]),
+        txPower: pick(row, ["Tx Power", "TX Power", "txPower"], ""),
+        rxPower: pick(row, ["Rx Power", "RX Power", "rxPower"], ""),
         sourceDeviceName: pick(row, ["Source Device Name", "sourceDeviceName"], deviceName),
         sourceDevicePort: pick(row, ["Source Device Port", "sourceDevicePort"]),
         sourceDeviceLocation: pick(row, ["Source Device Location", "sourceDeviceLocation"]),
@@ -1338,8 +1339,8 @@ function normalizeLegacyValidationRows(rows: ValidationFailure[]): ValidationFai
                 _key: `${deviceName}|legacy-optics|${idx}|${textOrEmpty(row.deviceAPort)}`,
                 deviceName,
                 devicePort: text(row.deviceAPort),
-                txPower: text(row.txPower),
-                rxPower: text(row.rxPower),
+                txPower: textOrEmpty(row.txPower),
+                rxPower: textOrEmpty(row.rxPower),
             });
         }
 

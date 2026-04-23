@@ -35,6 +35,7 @@ import {
   lldpStatusTemplate,
   patchPanelMatrixTemplate,
   psuStatusTemplate,
+  txPowerTemplate,
   rxPowerTemplate,
   sourceDeviceLocationTemplate,
 } from "./templates";
@@ -322,6 +323,10 @@ function getSectionColumns(
   sectionRows: any[],
   isGpuCompute: boolean,
 ): any[] {
+  const hasTransceiver = sectionRows.some((row) => {
+    const transceiver = row?.transceiver;
+    return typeof transceiver === "string" && transceiver.trim() !== "";
+  });
   const hasErrorMessage = sectionRows.some((row) => {
     const errorMessage = row?.errorMessage;
     return typeof errorMessage === "string" && errorMessage.trim() !== "";
@@ -334,13 +339,22 @@ function getSectionColumns(
   }
 
   if (isGpuCompute && section.id === "optics") {
-    return hasErrorMessage
+    const columns = hasErrorMessage
       ? [...GPU_COMPUTE_OPTIC_FAILURE_COLUMNS]
       : GPU_COMPUTE_OPTIC_FAILURE_COLUMNS.filter((column) => column.id !== "errorMessage");
+    return hasTransceiver
+      ? columns
+      : columns.filter((column) => column.id !== "transceiver");
   }
 
   if (isGpuCompute && section.id === "interfaces") {
     return [...GPU_COMPUTE_INTERFACE_FAILURE_COLUMNS];
+  }
+
+  if (section.id === "optics") {
+    return hasTransceiver
+      ? [...section.columns]
+      : section.columns.filter((column) => column.id !== "transceiver");
   }
 
   if (section.id !== "fecBer") {
@@ -1249,6 +1263,7 @@ const DeviceAccordion = (props: Props) => {
                                               <template slot="lldpStatusTemplate" render={lldpStatusTemplate} />
                                               <template slot="booleanStatusTemplate" render={booleanStatusTemplate} />
                                               <template slot="patchPanelMatrixTemplate" render={patchPanelMatrixTemplate} />
+                                              <template slot="txPowerTemplate" render={txPowerTemplate} />
                                               <template slot="rxPowerTemplate" render={rxPowerTemplate} />
                                               <template slot="deviceALocationTemplate" render={deviceALocationTemplate} />
                                               <template slot="currentBLocationTemplate" render={currentBLocationTemplate} />

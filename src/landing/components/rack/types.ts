@@ -81,6 +81,7 @@ export interface OpticFailureRow {
   _key: string;
   deviceName: string;
   devicePort: string;
+  transceiver?: string;
   txPower: string;
   rxPower: string;
   errorMessage?: string;

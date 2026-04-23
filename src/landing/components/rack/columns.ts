@@ -98,8 +98,9 @@ export const GPU_COMPUTE_LLDP_FAILURE_COLUMNS: any[] = [
 export const OPTIC_FAILURE_COLUMNS: any[] = [
   { headerText: "Device Name", field: "deviceName", id: "deviceName", ...DEFAULT_COLUMN_SETTINGS },
   { headerText: "Device Port", field: "devicePort", id: "devicePort", ...DEFAULT_COLUMN_SETTINGS },
-  { headerText: "Tx Power", field: "txPower", id: "txPower", ...DEFAULT_COLUMN_SETTINGS },
-  { headerText: "Rx Power", field: "rxPower", id: "rxPower", ...DEFAULT_COLUMN_SETTINGS },
+  { headerText: "Transceiver", field: "transceiver", id: "transceiver", ...DEFAULT_COLUMN_SETTINGS },
+  { headerText: "Tx Power", field: "txPower", id: "txPower", template: "txPowerTemplate", ...DEFAULT_COLUMN_SETTINGS },
+  { headerText: "Rx Power", field: "rxPower", id: "rxPower", template: "rxPowerTemplate", ...DEFAULT_COLUMN_SETTINGS },
   {
     headerText: "Patch Panel Matrix",
     field: "patchPanelMatrix",
@@ -121,6 +122,7 @@ export const GPU_COMPUTE_OPTIC_FAILURE_COLUMNS: any[] = [
   },
   { headerText: "Remote Device Name", field: "remoteDeviceName", id: "remoteDeviceName", ...DEFAULT_COLUMN_SETTINGS },
   { headerText: "Remote Device Port", field: "remoteDevicePort", id: "remoteDevicePort", ...DEFAULT_COLUMN_SETTINGS },
+  { headerText: "Transceiver", field: "transceiver", id: "transceiver", ...DEFAULT_COLUMN_SETTINGS },
   {
    headerText: "Rx Power",
    field: "rxPower",

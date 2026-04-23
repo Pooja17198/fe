@@ -65,21 +65,34 @@ export const patchPanelMatrixTemplate = (context: any) => {
 function formatRxPowerValue(rawValue: unknown): string {
   const value = `${rawValue ?? ""}`.trim().replace(/\\n/g, "\n");
   if (!value) {
-    return "Not Available";
+    return "";
   }
 
   return value
     .replace(/\s*\|\s*/g, "\n")
     .replace(/\s*;\s*/g, "\n")
+    .replace(/\s*,\s*/g, "\n")
     .replace(/,\s*(?=channel\.)/gi, "\n")
     .replace(/\s+(?=channel\.\d+\.input_power\.instant:)/gi, "\n");
 }
 
-export const rxPowerTemplate = (context: any) => {
+const createPowerValueTemplate = (field: "txPower" | "rxPower") => (context: any) => {
   const row = (context?.item && context.item.data) || {};
-  const value = formatRxPowerValue(row.rxPower);
+  const value = formatRxPowerValue(row[field]);
+  if (!value) {
+    return (
+      <div class="gpu-multiline-value-cell">
+        <span class="oj-text-color-success" aria-label={`${field} empty`}>
+          ✓
+        </span>
+      </div>
+    );
+  }
   return <div class="gpu-multiline-value-cell">{value}</div>;
 };
+
+export const txPowerTemplate = createPowerValueTemplate("txPower");
+export const rxPowerTemplate = createPowerValueTemplate("rxPower");
 
 const renderGpuMultilineValue = (value: unknown) => {
   const text = formatLocationValue(value).replace(/\\n/g, "\n") || "Not Available";
