@@ -299,7 +299,6 @@
     max-width: 620px;
     padding: 12px;
     border: 1px solid #cfd8e3;
-    border-radius: 8px;
     background: #ffffff;
     box-shadow: 0 8px 24px rgba(37, 67, 105, 0.16);
     text-align: left;
@@ -866,6 +865,14 @@
 
 .device-accordion-psu-label {
     color: #334155;
+}
+
+.device-host-state-loading {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 32px;
+    min-height: 24px;
 }
 
 .device-accordion-unknown {

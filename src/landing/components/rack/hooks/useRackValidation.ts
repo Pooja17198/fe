@@ -51,6 +51,8 @@ type UseRackValidationResult = {
     downloadExcel: () => Promise<void>;
 };
 
+type HostReadinessByName = Record<string, HostReadinessItem>;
+
 export function useRackValidation(props: RackProps): UseRackValidationResult {
     // refs for lifecycle and cross-attempt state
     const previousStatusesRef = useRef<Map<string, string>>(new Map());
@@ -69,6 +71,8 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
     // core state
     const [deviceStatuses, setDeviceStatuses] = useState<DeviceStatus[]>([]);
     const [devicesLoading, setDevicesLoading] = useState<boolean>(false);
+    const [hostReadinessByName, setHostReadinessByName] = useState<HostReadinessByName>({});
+    const [hostReadinessLoading, setHostReadinessLoading] = useState<boolean>(false);
     const [validationFailuresByDevice, setValidationFailuresByDevice] =
         useState<ValidationFailuresByDevice>({});
     const [patchPanelRackRows, setPatchPanelRackRows] = useState<PatchPanelRackRows>([]);
@@ -148,68 +152,70 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
         previousStatusesRef.current = new Map();
         patchPanelRackRowsCacheRef.current = new Map();
         patchPanelPrefetchPromiseRef.current = new Map();
+        setHostReadinessByName({});
+        setHostReadinessLoading(false);
         setPatchPanelRackRows([]);
     }, [rackContextReady, props.region, props.rack_serial, props.rack, props.building]);
 
     const refreshRackHostReadiness = useCallback(async (signal?: AbortSignal): Promise<void> => {
         if (!rackContextReady || !props.isGpuRack) {
-            setDeviceStatuses((prev) => prev.map((device) => {
-                if (device.hostReadinessStatus === undefined && device.hostSerial === undefined && device.hostTicketIds === undefined) {
-                    return device;
-                }
-                const { hostReadinessStatus, hostSerial, hostTicketIds, ...rest } = device;
-                return rest;
-            }));
+            setHostReadinessByName({});
+            setHostReadinessLoading(false);
             return;
         }
 
-        const items = await fetchRackHostReadiness(
-            props.rack_serial,
-            props.region,
-            signal
-        );
+        setHostReadinessLoading(true);
+        try {
+            const items = await fetchRackHostReadiness(
+                props.rack_serial,
+                props.region,
+                signal
+            );
 
-        const readinessByHostName = new Map(
-            items.map((item) => [normalizeLookupKey(item.hostName), item])
-        );
+            const nextReadinessByName = items.reduce((acc, item) => {
+                acc[normalizeLookupKey(item.hostName)] = item;
+                return acc;
+            }, {} as HostReadinessByName);
 
-        setDeviceStatuses((prev) => prev.map((device) => {
-            const readiness = readinessByHostName.get(normalizeLookupKey(device.deviceName));
-            const readinessStatus = readiness?.status;
-            const hostSerial = readiness?.hostSerial;
-            const hostInstanceId = readiness?.instanceId ?? null;
-            const hostHopsState = readiness?.hopsState;
-            const hostComputeState = readiness?.computeState;
-            const hostComputePool = readiness?.computePool;
-            const hostTicketIds = readiness?.ticketIds ?? [];
-            const hasSameTicketIds =
-                (device.hostTicketIds ?? []).length === hostTicketIds.length &&
-                (device.hostTicketIds ?? []).every((ticketId, index) => ticketId === hostTicketIds[index]);
+            setHostReadinessByName(nextReadinessByName);
+        } finally {
+            setHostReadinessLoading(false);
+        }
+    }, [rackContextReady, props.isGpuRack, props.rack_serial, props.region]);
 
-            if (
-                readinessStatus === device.hostReadinessStatus &&
-                hostSerial === device.hostSerial &&
-                hostInstanceId === (device.hostInstanceId ?? null) &&
-                hostHopsState === device.hostHopsState &&
-                hostComputeState === device.hostComputeState &&
-                hostComputePool === device.hostComputePool &&
-                hasSameTicketIds
-            ) {
-                return device;
+    const mergedDeviceStatuses = useMemo(() => {
+        return deviceStatuses.map((device) => {
+            const readiness = hostReadinessByName[normalizeLookupKey(device.deviceName)];
+            const isGpuCompute = isGpuComputeDevice(device.deviceName, props.isGpuRack);
+
+            if (!isGpuCompute) {
+                const {
+                    hostReadinessLoading: _hostReadinessLoading,
+                    hostReadinessStatus,
+                    hostSerial,
+                    hostInstanceId,
+                    hostHopsState,
+                    hostComputeState,
+                    hostComputePool,
+                    hostTicketIds,
+                    ...rest
+                } = device;
+                return rest;
             }
 
             return {
                 ...device,
-                hostReadinessStatus: readinessStatus,
-                hostSerial,
-                hostInstanceId,
-                hostHopsState,
-                hostComputeState,
-                hostComputePool,
-                hostTicketIds,
+                hostReadinessLoading: hostReadinessLoading && !readiness,
+                hostReadinessStatus: readiness?.status,
+                hostSerial: readiness?.hostSerial,
+                hostInstanceId: readiness?.instanceId ?? null,
+                hostHopsState: readiness?.hopsState,
+                hostComputeState: readiness?.computeState,
+                hostComputePool: readiness?.computePool,
+                hostTicketIds: readiness?.ticketIds ?? [],
             };
-        }));
-    }, [rackContextReady, props.isGpuRack, props.rack_serial, props.region]);
+        });
+    }, [deviceStatuses, hostReadinessByName, hostReadinessLoading, props.isGpuRack]);
 
     useEffect(() => {
         const signal = pageAbortRef.current?.signal as AbortSignal | undefined;
@@ -893,7 +899,7 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
     }, [validationFailuresByDevice]);
 
     return {
-        deviceStatuses,
+        deviceStatuses: mergedDeviceStatuses,
         devicesLoading,
         validationFailuresByDevice,
         patchPanelRackRows,

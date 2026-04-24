@@ -4,6 +4,7 @@ export type DeviceStatus = {
   elevation?: number;
   validationEligible?: boolean;
   validationEligibilityReason?: string;
+  hostReadinessLoading?: boolean;
   hostReadinessStatus?: string;
   hostSerial?: string;
   hostInstanceId?: string | null;

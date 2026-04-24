@@ -970,6 +970,14 @@ const DeviceAccordion = (props: Props) => {
       return <span className="device-last-validated-na">N/A</span>;
     }
 
+    if (device.hostReadinessLoading) {
+      return (
+        <span className="device-host-state-loading" aria-label="Host state loading" title="Host state loading">
+          <oj-progress-circle size="sm" value={-1} />
+        </span>
+      );
+    }
+
     const readinessStatus = String(device.hostReadinessStatus || "").trim();
     const readinessStatusUpper = readinessStatus.toUpperCase();
     if (readinessStatus !== "") {

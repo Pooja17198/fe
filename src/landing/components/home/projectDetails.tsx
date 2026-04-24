@@ -708,8 +708,8 @@ const ProjectDetailsContainer = (props: Props) => {
         setRackValidationReadyByKey(nextReadyCounts);
         setRackHostCountByKey(nextHostCounts);
 
-        const entries = await Promise.all(
-            gpuRows.map(async (row) => {
+        gpuRows.forEach((row) => {
+            void (async () => {
                 try {
                     const availabilityDomains = [1, 2, 3].map((adNumber) => `${props.region}-ad-${adNumber}`);
                     let lastError: unknown = null;
@@ -734,50 +734,76 @@ const ProjectDetailsContainer = (props: Props) => {
                             const payload: unknown = JSON.parse(body);
                             const hasHostReadiness = asArray(asRecord(payload)?.["hostReadiness"]).length > 0;
                             if (hasHostReadiness) {
-                                return [
-                                    row._key,
-                                    summarizeHostReadinessPayload(payload),
-                                    summarizeHostCountPayload(payload)
-                                ] as const;
+                                if (signal.aborted) {
+                                    return;
+                                }
+
+                                const readySummary = summarizeHostReadinessPayload(payload);
+                                const hostCountSummary = summarizeHostCountPayload(payload);
+
+                                setRackValidationReadyByKey((prev) => ({
+                                    ...prev,
+                                    [row._key]: readySummary,
+                                }));
+                                setRackHostCountByKey((prev) => ({
+                                    ...prev,
+                                    [row._key]: hostCountSummary,
+                                }));
+                                return;
                             }
                         } catch (e) {
                             if ((e as any)?.name === "AbortError") {
-                                return null;
+                                return;
                             }
                             lastError = e;
                         }
                     }
 
-                    if (lastError) {
-                        return [row._key, EMPTY_VALIDATION_READY_SUMMARY, EMPTY_HOST_COUNT_SUMMARY] as const;
+                    if (signal.aborted) {
+                        return;
                     }
 
-                    return [row._key, EMPTY_VALIDATION_READY_SUMMARY, EMPTY_HOST_COUNT_SUMMARY] as const;
+                    const emptyReadySummary = EMPTY_VALIDATION_READY_SUMMARY;
+                    const emptyHostCountSummary = EMPTY_HOST_COUNT_SUMMARY;
+                    if (lastError) {
+                        setRackValidationReadyByKey((prev) => ({
+                            ...prev,
+                            [row._key]: emptyReadySummary,
+                        }));
+                        setRackHostCountByKey((prev) => ({
+                            ...prev,
+                            [row._key]: emptyHostCountSummary,
+                        }));
+                        return;
+                    }
+
+                    setRackValidationReadyByKey((prev) => ({
+                        ...prev,
+                        [row._key]: emptyReadySummary,
+                    }));
+                    setRackHostCountByKey((prev) => ({
+                        ...prev,
+                        [row._key]: emptyHostCountSummary,
+                    }));
                 } catch (e) {
                     if ((e as any)?.name === "AbortError") {
-                        return null;
+                        return;
                     }
-                    return [row._key, EMPTY_VALIDATION_READY_SUMMARY, EMPTY_HOST_COUNT_SUMMARY] as const;
+                    if (signal.aborted) {
+                        return;
+                    }
+
+                    setRackValidationReadyByKey((prev) => ({
+                        ...prev,
+                        [row._key]: EMPTY_VALIDATION_READY_SUMMARY,
+                    }));
+                    setRackHostCountByKey((prev) => ({
+                        ...prev,
+                        [row._key]: EMPTY_HOST_COUNT_SUMMARY,
+                    }));
                 }
-            })
-        );
-
-        if (signal.aborted) {
-            return;
-        }
-
-        const resolvedReadyCounts = { ...nextReadyCounts };
-        const resolvedHostCounts = { ...nextHostCounts };
-        entries.forEach((entry) => {
-            if (!entry) {
-                return;
-            }
-            const [key, summary, hostCountSummary] = entry;
-            resolvedReadyCounts[key] = summary;
-            resolvedHostCounts[key] = hostCountSummary;
+            })();
         });
-        setRackValidationReadyByKey(resolvedReadyCounts);
-        setRackHostCountByKey(resolvedHostCounts);
     };
 
     useEffect(() => {
