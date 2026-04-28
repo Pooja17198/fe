@@ -1,5 +1,6 @@
 import { h } from "preact";
-import { useMemo, useState, useEffect, useRef } from "preact/hooks";
+import { memo } from "preact/compat";
+import { useMemo, useState, useEffect, useRef, useCallback, useLayoutEffect } from "preact/hooks";
 import "ojs/ojaccordion";
 import "ojs/ojcollapsible";
 import "ojs/ojtable";
@@ -9,53 +10,52 @@ import ArrayDataProvider = require("ojs/ojarraydataprovider");
 import {
   DeviceStatus,
   DeviceValidationFailures,
-  PatchPanelRackRows,
+  PatchPanelByDevicePort,
   PatchPanelRow,
+  RackValidationViewMode,
+  ValidationSection,
   ValidationFailuresByDevice,
+  ValidationTableRow,
 } from "./types";
-import { VALIDATION_TABLE_ACCESSIBILITY } from "./constants";
 import {
-  FAN_FAILURE_COLUMNS,
-  FEC_BER_FAILURE_COLUMNS,
-  GPU_COMPUTE_INTERFACE_FAILURE_COLUMNS,
   GPU_COMPUTE_LLDP_FAILURE_COLUMNS,
   GPU_COMPUTE_OPTIC_FAILURE_COLUMNS,
-  INTERFACE_FAILURE_COLUMNS,
-  LLDP_FAILURE_COLUMNS,
-  OPTIC_FAILURE_COLUMNS,
+  PATCH_PANEL_COLUMN_SETTINGS,
+  RAW_BER_COLUMN_SETTINGS,
+  RX_POWER_COLUMN_SETTINGS,
 } from "./columns";
+import { VALIDATION_TABLE_ACCESSIBILITY } from "./constants";
+import { orderValidationSectionKeys, VALIDATION_COLUMN_ORDER_BY_SECTION } from "./columnOrder";
 import {
   booleanStatusTemplate,
   currentBLocationTemplate,
-  deviceALocationTemplate,
   errorMessageClampTemplate,
   expectedBLocationTemplate,
   gpuLldpErrorDetailsTemplate,
   gpuMultilineErrorMessageTemplate,
   lldpStatusTemplate,
+  opticalRawBerTemplate,
   patchPanelMatrixTemplate,
   psuStatusTemplate,
+  relativeTimestampTemplate,
   txPowerTemplate,
   rxPowerTemplate,
   sourceDeviceLocationTemplate,
 } from "./templates";
-import { formatStatusLabel, getStatusClass, isDeviceStatusCompleted, isGpuComputeDevice } from "./utils";
+import {
+  formatStatusLabel,
+  formatValidationTimestamp,
+  getStatusClass,
+  isDeviceStatusCompleted,
+  isGpuComputeDevice
+} from "./utils";
 type ValidationAgeColor = "green" | "orange" | "red";
 
 const VALIDATION_AGE_THRESHOLDS_MS = {
-  // when currentTime - lastValidated <= GREEN_MAX then display green color
-  // else when currentTime - lastValidated <= ORANGE_MAX then display orange color
-  // else display red color
-  GREEN_MAX: 10 * 60 * 1000,
-  ORANGE_MAX: 60 * 60 * 1000,
+  GREEN_MAX: 2 * 60 * 1000,
+  RED_MIN: 10 * 60 * 1000,
 } as const;
-
-const RELATIVE_TIME_UNITS = {
-  minute: 60 * 1000,
-  hour: 60 * 60 * 1000,
-  day: 24 * 60 * 60 * 1000,
-  week: 7 * 24 * 60 * 60 * 1000,
-} as const;
+const VALIDATION_TIMESTAMP_REFRESH_INTERVAL_MS = 5 * 1000;
 
 function parseLastValidatedTimestampMs(lastValidatedAt?: string | null): number | null {
   if (!lastValidatedAt || lastValidatedAt.trim() === "") return null;
@@ -72,42 +72,8 @@ function resolveValidationAgeColor(
 
   const elapsedSinceValidationMs = Math.max(0, referenceTimeMs - lastValidatedTimestampMs);
   if (elapsedSinceValidationMs <= VALIDATION_AGE_THRESHOLDS_MS.GREEN_MAX) return "green";
-  if (elapsedSinceValidationMs <= VALIDATION_AGE_THRESHOLDS_MS.ORANGE_MAX) return "orange";
-  return "red";
-}
-
-function formatRelativeValidationAge(
-    lastValidatedAt: string | null | undefined,
-    referenceTimeMs: number
-): string {
-  const lastValidatedTimestampMs = parseLastValidatedTimestampMs(lastValidatedAt);
-  if (lastValidatedTimestampMs === null) return "Unknown";
-
-  const elapsedSinceValidationMs = Math.max(0, referenceTimeMs - lastValidatedTimestampMs);
-  const elapsedSeconds = Math.floor(elapsedSinceValidationMs / 1000);
-
-  if (elapsedSinceValidationMs < RELATIVE_TIME_UNITS.minute) {
-    const seconds = Math.max(1, elapsedSeconds);
-    return `${seconds} second${seconds === 1 ? "" : "s"} ago`;
-  }
-
-  if (elapsedSinceValidationMs < RELATIVE_TIME_UNITS.hour) {
-    const minutes = Math.floor(elapsedSinceValidationMs / RELATIVE_TIME_UNITS.minute);
-    return `${minutes} minute${minutes === 1 ? "" : "s"} ago`;
-  }
-
-  if (elapsedSinceValidationMs < RELATIVE_TIME_UNITS.day) {
-    const hours = Math.floor(elapsedSinceValidationMs / RELATIVE_TIME_UNITS.hour);
-    return `${hours} hour${hours === 1 ? "" : "s"} ago`;
-  }
-
-  if (elapsedSinceValidationMs < RELATIVE_TIME_UNITS.week) {
-    const days = Math.floor(elapsedSinceValidationMs / RELATIVE_TIME_UNITS.day);
-    return `${days} day${days === 1 ? "" : "s"} ago`;
-  }
-
-  const weeks = Math.floor(elapsedSinceValidationMs / RELATIVE_TIME_UNITS.week);
-  return `${weeks} week${weeks === 1 ? "" : "s"} ago`;
+  if (elapsedSinceValidationMs >= VALIDATION_AGE_THRESHOLDS_MS.RED_MIN) return "red";
+  return "orange";
 }
 
 function getNextValidationColorTransitionAtMs(
@@ -121,18 +87,60 @@ function getNextValidationColorTransitionAtMs(
   if (elapsedSinceValidationMs <= VALIDATION_AGE_THRESHOLDS_MS.GREEN_MAX) {
     return lastValidatedTimestampMs + VALIDATION_AGE_THRESHOLDS_MS.GREEN_MAX + 50;
   }
-  if (elapsedSinceValidationMs < VALIDATION_AGE_THRESHOLDS_MS.ORANGE_MAX) {
-    return lastValidatedTimestampMs + VALIDATION_AGE_THRESHOLDS_MS.ORANGE_MAX + 50;
+  if (elapsedSinceValidationMs < VALIDATION_AGE_THRESHOLDS_MS.RED_MIN) {
+    return lastValidatedTimestampMs + VALIDATION_AGE_THRESHOLDS_MS.RED_MIN + 50;
   }
   return null;
+}
+
+function syncExpandedCollapsibleLayout(root: HTMLDivElement | null, expandedKeys: Set<string>): void {
+  if (!root) {
+    return;
+  }
+
+  const collapsibles = Array.from(
+    root.querySelectorAll<HTMLElement>("oj-collapsible[data-device-key]")
+  );
+
+  collapsibles.forEach((collapsible) => {
+    const deviceKey = collapsible.getAttribute("data-device-key") || "";
+    const wrapper = Array.from(collapsible.children).find(
+      (child): child is HTMLElement =>
+        child instanceof HTMLElement && child.classList.contains("oj-collapsible-wrapper")
+    );
+    const content = wrapper
+      ? Array.from(wrapper.children).find(
+          (child): child is HTMLElement =>
+            child instanceof HTMLElement && child.classList.contains("oj-collapsible-content")
+        )
+      : null;
+
+    if (!wrapper) {
+      return;
+    }
+
+    if (expandedKeys.has(deviceKey)) {
+      // Keep expanded rows fully visible when nested validation content grows after open.
+      wrapper.style.maxHeight = "none";
+      wrapper.style.overflow = "visible";
+      if (content) {
+        content.style.overflow = "visible";
+      }
+      return;
+    }
+
+    wrapper.style.removeProperty("max-height");
+    wrapper.style.removeProperty("overflow");
+    if (content) {
+      content.style.removeProperty("overflow");
+    }
+  });
 }
 
 function isDeviceNotEligibleForValidation(
     device: DeviceStatus,
     _deviceFailures: DeviceValidationFailures
 ): boolean {
-  // Eligibility is computed upstream in useRackValidation and attached on DeviceStatus.
-  // Treat explicit false as not eligible; undefined stays backward-compatible as eligible.
   return device.validationEligible === false;
 }
 
@@ -145,8 +153,14 @@ type Props = {
   rack_serial: string;
   isGpuRack?: boolean;
   region: string;
+  periodicValidationDeviceNames: Set<string>;
+  isPeriodicValidationRefreshing: boolean;
+  onRefreshPeriodicValidation: (
+      deviceNames?: Iterable<string>
+  ) => Promise<{ ok: true } | { ok: false; message: string }>;
   validationFailuresByDevice: ValidationFailuresByDevice;
-  patchPanelRackRows: PatchPanelRackRows;
+  deviceRefreshTimestampsByName: Record<string, string | null>;
+  patchPanelByDevicePort: PatchPanelByDevicePort;
   totalFailureRows: number;
   totalLinkFailureRows: number;
   powerFailureDevices: number;
@@ -157,9 +171,167 @@ type Props = {
   hideUnsupported: boolean;
   rackValidationAllowed: boolean;
   rackValidationTooltip: string;
+  periodicValidationEnabled: boolean;
+  viewMode?: RackValidationViewMode;
+  showSelection?: boolean;
   externalExpandedKeys?: Set<string>;
   externalExpandedKeysNonce?: number;
 };
+
+type ValidationSectionTableProps = {
+  deviceIndex: number;
+  deviceName: string;
+  isGpuRack?: boolean;
+  section: ValidationSection;
+};
+
+function areStringArraysEqual(left: string[] | undefined, right: string[] | undefined): boolean {
+  const leftValues = left || [];
+  const rightValues = right || [];
+  if (leftValues.length !== rightValues.length) {
+    return false;
+  }
+
+  return leftValues.every((value, index) => value === rightValues[index]);
+}
+
+function areUnknownValuesEqual(left: unknown, right: unknown): boolean {
+  if (Object.is(left, right)) {
+    return true;
+  }
+
+  if (Array.isArray(left) || Array.isArray(right)) {
+    if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) {
+      return false;
+    }
+
+    return left.every((value, index) => areUnknownValuesEqual(value, right[index]));
+  }
+
+  if (left && right && typeof left === "object" && typeof right === "object") {
+    const leftRecord = left as Record<string, unknown>;
+    const rightRecord = right as Record<string, unknown>;
+    const leftKeys = Object.keys(leftRecord).sort();
+    const rightKeys = Object.keys(rightRecord).sort();
+
+    if (!areStringArraysEqual(leftKeys, rightKeys)) {
+      return false;
+    }
+
+    return leftKeys.every((key) => areUnknownValuesEqual(leftRecord[key], rightRecord[key]));
+  }
+
+  return false;
+}
+
+function areValidationTableRowsEqual(
+  leftRows: ValidationTableRow[],
+  rightRows: ValidationTableRow[]
+): boolean {
+  if (leftRows.length !== rightRows.length) {
+    return false;
+  }
+
+  return leftRows.every((row, index) => areUnknownValuesEqual(row, rightRows[index]));
+}
+
+function ValidationSectionRowsTable(
+  props: Pick<ValidationSectionTableProps, "deviceIndex" | "section" | "isGpuRack">
+) {
+  const { deviceIndex, section, isGpuRack } = props;
+  const stableRowsRef = useRef<ValidationTableRow[]>(section.rows);
+
+  if (!areValidationTableRowsEqual(stableRowsRef.current, section.rows)) {
+    stableRowsRef.current = section.rows;
+  }
+
+  const stableRows = stableRowsRef.current;
+  const sectionColumns = useMemo(
+    () => getSectionColumns(section.title, stableRows, isGpuRack),
+    [section.title, stableRows, isGpuRack]
+  );
+  const sectionDataProvider = useMemo(
+    () => new ArrayDataProvider(stableRows, { keyAttributes: "_key" }),
+    [stableRows]
+  );
+
+  return (
+    <oj-table
+      class="selectable-table table-full"
+      display="grid"
+      horizontal-grid-visible="enabled"
+      layout="contents"
+      vertical-grid-visible="enabled"
+      aria-label={`${section.title} Action Items`}
+      id={`ValidationFailureItemsTable-${deviceIndex}-${section.key}`}
+      accessibility={VALIDATION_TABLE_ACCESSIBILITY}
+      scroll-policy="loadAll"
+      columns={sectionColumns}
+      data={sectionDataProvider}
+    >
+      <template slot="lldpStatusTemplate" render={lldpStatusTemplate} />
+      <template slot="booleanStatusTemplate" render={booleanStatusTemplate} />
+      <template slot="patchPanelMatrixTemplate" render={patchPanelMatrixTemplate} />
+      <template slot="txPowerTemplate" render={txPowerTemplate} />
+      <template slot="rxPowerTemplate" render={rxPowerTemplate} />
+      <template slot="relativeTimestampTemplate" render={relativeTimestampTemplate} />
+      <template slot="sourceDeviceLocationTemplate" render={sourceDeviceLocationTemplate} />
+      <template slot="currentBLocationTemplate" render={currentBLocationTemplate} />
+      <template slot="expectedBLocationTemplate" render={expectedBLocationTemplate} />
+      <template slot="gpuLldpErrorDetailsTemplate" render={gpuLldpErrorDetailsTemplate} />
+      <template slot="gpuMultilineErrorMessageTemplate" render={gpuMultilineErrorMessageTemplate} />
+      <template slot="opticalRawBerTemplate" render={opticalRawBerTemplate} />
+      <template slot="errorMessageClampTemplate" render={errorMessageClampTemplate} />
+    </oj-table>
+  );
+}
+
+const MemoizedValidationSectionRowsTable = memo(
+  ValidationSectionRowsTable,
+  (previousProps, nextProps) =>
+    previousProps.deviceIndex === nextProps.deviceIndex &&
+    previousProps.isGpuRack === nextProps.isGpuRack &&
+    previousProps.section.title === nextProps.section.title &&
+    previousProps.section.key === nextProps.section.key &&
+    areValidationTableRowsEqual(previousProps.section.rows, nextProps.section.rows)
+);
+
+function ValidationSectionTable(props: ValidationSectionTableProps) {
+  const { deviceIndex, deviceName, isGpuRack, section } = props;
+
+  return (
+    <oj-collapsible
+      id={`device-${deviceIndex}-${section.key}`}
+      key={`${deviceName}-${section.key}`}
+      expanded={false}
+    >
+      <h4 slot="header" className="test-section-header">
+        <span>{section.title}</span>
+        <span className="test-section-count">{section.rows.length}</span>
+      </h4>
+      <div className="oj-flex">
+        <div className="oj-flex-item rack-panel table-wrapper-full">
+          <MemoizedValidationSectionRowsTable
+            deviceIndex={deviceIndex}
+            isGpuRack={isGpuRack}
+            section={section}
+          />
+        </div>
+      </div>
+    </oj-collapsible>
+  );
+}
+
+const MemoizedValidationSectionTable = memo(
+  ValidationSectionTable,
+  (previousProps, nextProps) =>
+    previousProps.deviceIndex === nextProps.deviceIndex &&
+    previousProps.deviceName === nextProps.deviceName &&
+    previousProps.isGpuRack === nextProps.isGpuRack &&
+    previousProps.section.title === nextProps.section.title &&
+    previousProps.section.key === nextProps.section.key &&
+    areValidationTableRowsEqual(previousProps.section.rows, nextProps.section.rows)
+);
 
 function normalizeDeviceName(value: string | undefined | null): string {
   return String(value || "").trim().toLowerCase();
@@ -277,39 +449,174 @@ function buildPatchPanelLookupKeys(
   return Array.from(lookupKeys);
 }
 
-type PatchPanelLookupMap = Record<string, PatchPanelRow[]>;
+function normalizeSectionTitle(value: string | undefined | null): string {
+  return String(value || "").trim().toLowerCase();
+}
 
-type TestSectionConfig = {
-  id: "lldp" | "optics" | "interfaces" | "fecBer" | "fans";
-  title: string;
-  columns: any[];
-};
+const INTERNAL_RENDER_ALIAS_FIELDS = new Set<string>([
+  "deviceARack",
+  "deviceAName",
+  "deviceAPort",
+  "deviceALocation",
+  "currentDeviceBRack",
+  "currentDeviceBName",
+  "currentDeviceBPort",
+  "currentBLocation",
+  "expectedDeviceBRack",
+  "expectedDeviceBName",
+  "expectedDeviceBPort",
+  "expectedBLocation",
+  "linkStatus",
+  "sourceDeviceName",
+  "sourceDevicePort",
+  "sourceDeviceLocation",
+  "remoteDeviceName",
+  "remoteDevicePort",
+  "deviceName",
+  "devicePort",
+  "txPower",
+  "rxPower",
+  "opticalRawBer",
+  "preFecBer",
+  "lockStatus",
+  "remoteDevice",
+  "remoteInterface",
+  "fanName",
+  "fanSlot",
+  "status",
+  "issue",
+  "errorMessage",
+]);
 
-const TEST_SECTIONS: TestSectionConfig[] = [
-  { id: "interfaces", title: "Interface Errors", columns: INTERFACE_FAILURE_COLUMNS },
-  { id: "lldp", title: "LLDP Errors", columns: LLDP_FAILURE_COLUMNS },
-  { id: "optics", title: "Optic Errors", columns: OPTIC_FAILURE_COLUMNS },
-  { id: "fecBer", title: "FEC_BER Errors", columns: FEC_BER_FAILURE_COLUMNS },
-  { id: "fans", title: "Fan Errors", columns: FAN_FAILURE_COLUMNS },
-];
+function isLldpSection(sectionTitle: string): boolean {
+  return normalizeSectionTitle(sectionTitle) === "lldp errors";
+}
+
+function isFanSection(sectionTitle: string): boolean {
+  return normalizeSectionTitle(sectionTitle) === "fan errors";
+}
+
+function isFecBerSection(sectionTitle: string): boolean {
+  return normalizeSectionTitle(sectionTitle) === "fec_ber errors";
+}
+
+function isGpuLldpSection(sectionTitle: string, sectionRows: ValidationTableRow[]): boolean {
+  if (!isLldpSection(sectionTitle)) {
+    return false;
+  }
+
+  return sectionRows.some((row) =>
+    [
+      row.deviceALocation,
+      row.currentBLocation,
+      row.expectedBLocation,
+      row.currentDeviceBName,
+      row.currentDeviceBPort,
+      row.expectedDeviceBName,
+      row.expectedDeviceBPort,
+    ].some((value) => typeof value === "string" && value.trim() !== "")
+  );
+}
+
+function isGpuOpticSection(sectionTitle: string, sectionRows: ValidationTableRow[]): boolean {
+  if (normalizeSectionTitle(sectionTitle) !== "optic errors") {
+    return false;
+  }
+
+  return sectionRows.some((row) =>
+    [
+      row.sourceDeviceName,
+      row.sourceDevicePort,
+      row.sourceDeviceLocation,
+      row.remoteDeviceName,
+      row.remoteDevicePort,
+    ].some((value) => typeof value === "string" && value.trim() !== "")
+  );
+}
+
+function hasRenderableValue(value: unknown): boolean {
+  if (typeof value === "string") {
+    return value.trim() !== "";
+  }
+
+  return value !== null && value !== undefined;
+}
+
+function buildGpuLldpColumns(sectionRows: ValidationTableRow[]): any[] {
+  const shouldShowLastExecuted = sectionRows.some((row) =>
+    hasRenderableValue(row["Last Executed"] ?? row.lastExecuted)
+  );
+  const shouldShowErrorMessage = sectionRows.some((row) =>
+    hasRenderableValue(row.errorMessage ?? row["Error Message"])
+  );
+
+  const columns = [...GPU_COMPUTE_LLDP_FAILURE_COLUMNS];
+
+  if (!shouldShowErrorMessage) {
+    return shouldShowLastExecuted
+      ? [
+          ...columns.slice(0, 2),
+          {
+            headerText: "Last Executed",
+            field: "Last Executed",
+            id: "Last Executed",
+            template: "relativeTimestampTemplate",
+            resizable: "enabled",
+            sortable: "enabled",
+          },
+        ]
+      : columns.slice(0, 2);
+  }
+
+  if (!shouldShowLastExecuted) {
+    return columns;
+  }
+
+  return [
+    ...columns.slice(0, 2),
+    {
+      headerText: "Last Executed",
+      field: "Last Executed",
+      id: "Last Executed",
+      template: "relativeTimestampTemplate",
+      resizable: "enabled",
+      sortable: "enabled",
+    },
+    columns[2],
+  ];
+}
+
+function getChipLabel(sectionTitle: string): string {
+  const normalized = normalizeSectionTitle(sectionTitle);
+  if (normalized === "lldp errors") return "LLDP";
+  if (normalized === "optic errors") return "OPT";
+  if (normalized === "interface errors") return "INT";
+  if (normalized === "fec_ber errors") return "FEC";
+  if (normalized === "fan errors") return "FAN";
+  if (normalized === "raw ber errors") return "BER";
+  return sectionTitle.replace(/\s+errors$/i, "").slice(0, 4).toUpperCase();
+}
+
+function getChipClass(sectionTitle: string): string {
+  const normalized = normalizeSectionTitle(sectionTitle);
+  if (normalized === "lldp errors") return "chip-lldp";
+  if (normalized === "optic errors") return "chip-opt";
+  if (normalized === "interface errors") return "chip-int";
+  if (normalized === "fec_ber errors") return "chip-fec";
+  if (normalized === "fan errors") return "chip-fan";
+  if (normalized === "raw ber errors") return "chip-raw-ber";
+  return "";
+}
 
 const EMPTY_DEVICE_FAILURES: DeviceValidationFailures = {
   deviceName: "",
   lastValidated: null,
-  tests: {
-    lldp: [],
-    optics: [],
-    interfaces: [],
-    fecBer: [],
-    fans: [],
-    power: [],
-  },
+  reachability: null,
+  sections: {},
+  sectionOrder: [],
+  powerRows: [],
   counts: {
-    lldp: 0,
-    optics: 0,
-    interfaces: 0,
-    fecBer: 0,
-    fans: 0,
+    bySection: {},
     power: 0,
     nonPowerTotal: 0,
     overallTotal: 0,
@@ -318,205 +625,11 @@ const EMPTY_DEVICE_FAILURES: DeviceValidationFailures = {
 };
 
 
-function getSectionColumns(
-  section: TestSectionConfig,
-  sectionRows: any[],
-  isGpuCompute: boolean,
-): any[] {
-  const hasTransceiver = sectionRows.some((row) => {
-    const transceiver = row?.transceiver;
-    return typeof transceiver === "string" && transceiver.trim() !== "";
-  });
-  const hasErrorMessage = sectionRows.some((row) => {
-    const errorMessage = row?.errorMessage;
-    return typeof errorMessage === "string" && errorMessage.trim() !== "";
-  });
-
-  if (isGpuCompute && section.id === "lldp") {
-    return hasErrorMessage
-      ? [...GPU_COMPUTE_LLDP_FAILURE_COLUMNS]
-      : GPU_COMPUTE_LLDP_FAILURE_COLUMNS.filter((column) => column.id !== "errorMessage");
-  }
-
-  if (isGpuCompute && section.id === "optics") {
-    const columns = hasErrorMessage
-      ? [...GPU_COMPUTE_OPTIC_FAILURE_COLUMNS]
-      : GPU_COMPUTE_OPTIC_FAILURE_COLUMNS.filter((column) => column.id !== "errorMessage");
-    return hasTransceiver
-      ? columns
-      : columns.filter((column) => column.id !== "transceiver");
-  }
-
-  if (isGpuCompute && section.id === "interfaces") {
-    return [...GPU_COMPUTE_INTERFACE_FAILURE_COLUMNS];
-  }
-
-  if (section.id === "optics") {
-    return hasTransceiver
-      ? [...section.columns]
-      : section.columns.filter((column) => column.id !== "transceiver");
-  }
-
-  if (section.id !== "fecBer") {
-    return [...section.columns];
-  }
-
-  if (hasErrorMessage) {
-    return [...section.columns];
-  }
-
-  return section.columns.filter((column) => column.id !== "errorMessage");
-}
-
 function buildDeviceFailuresFallback(deviceName: string): DeviceValidationFailures {
   return {
     ...EMPTY_DEVICE_FAILURES,
     deviceName,
   };
-}
-
-function getRowsForSection(
-    deviceFailures: DeviceValidationFailures,
-    section: TestSectionConfig["id"]
-): any[] {
-  switch (section) {
-    case "lldp":
-      return deviceFailures.tests.lldp;
-    case "optics":
-      return deviceFailures.tests.optics;
-    case "interfaces":
-      return deviceFailures.tests.interfaces;
-    case "fecBer":
-      return deviceFailures.tests.fecBer;
-    case "fans":
-      return deviceFailures.tests.fans;
-    default:
-      return [];
-  }
-}
-
-function renderPatchPanelValue(rows: PatchPanelRow[]): string {
-  if (!rows.length) return "Not Available";
-
-  return rows
-    .map((row, idx) => {
-      const easyMark = Array.isArray(row.easyMark) ? row.easyMark : [];
-      if (easyMark.length > 0) {
-        const lines = easyMark.map((v) => `• ${v}`);
-        return rows.length > 1
-          ? `Entry ${idx + 1}\n${lines.join("\n")}`
-          : lines.join("\n");
-      }
-      return JSON.stringify(row, null, 2);
-    })
-    .join("\n\n");
-}
-
-function isMissingPatchPanelValue(value: unknown): boolean {
-  return String(value || "").trim() === "" || String(value || "").trim() === "Not Available";
-}
-
-function getRowDeviceAndPort(sectionId: TestSectionConfig["id"], row: any): { deviceName: string; devicePort: string } {
-  if (sectionId === "lldp") {
-    return {
-      deviceName: getLookupValue(row.expectedDeviceBName, row.currentDeviceBName),
-      devicePort: getLookupValue(row.expectedDeviceBPort, row.currentDeviceBPort),
-    };
-  }
-
-  if (sectionId === "optics" || sectionId === "interfaces") {
-    return {
-      deviceName: getLookupValue(row.remoteDeviceName, row.sourceDeviceName ?? row.deviceName),
-      devicePort: getLookupValue(row.remoteDevicePort, row.sourceDevicePort ?? row.devicePort),
-    };
-  }
-
-  if (sectionId === "fecBer") {
-    return {
-      deviceName: getLookupValue(row.remoteDevice, row.deviceName),
-      devicePort: getLookupValue(row.remoteInterface, row.devicePort),
-    };
-  }
-
-  return {
-    deviceName: getLookupValue(row.remoteDeviceName ?? row.remoteDevice, row.deviceName),
-    devicePort: getLookupValue(row.remoteDevicePort ?? row.remoteInterface, row.devicePort),
-  };
-}
-
-function toLogicalPortFamily(devicePort: string | undefined | null): string {
-  const normalizedPort = String(devicePort || "").trim();
-  if (!normalizedPort) return "";
-
-  const membership = normalizePortMembership(normalizedPort);
-  if (!membership) {
-    return normalizedPort.toLowerCase();
-  }
-
-  if (membership.members.length > 1) {
-    return `${membership.basePort}[${membership.members.join("+")}]`;
-  }
-
-  const member = membership.members[0];
-  const pairStart = member % 2 === 0 ? member - 1 : member;
-  if (pairStart <= 0) {
-    return normalizedPort.toLowerCase();
-  }
-
-  return `${membership.basePort}[${pairStart}+${pairStart + 1}]`;
-}
-
-function addPatchPanelToSectionRows(
-  sectionId: TestSectionConfig["id"],
-  rows: any[],
-  patchPanelByDevicePort: PatchPanelLookupMap
-): any[] {
-  if (sectionId === "fans") return rows;
-
-  return rows.map((row) => {
-    let patchPanelRows: PatchPanelRow[] = [];
-
-    if (sectionId === "lldp") {
-      const primaryName = getLookupValue(row.deviceAName);
-      const primaryPort = getLookupValue(row.deviceAPort);
-
-      const hasUsablePrimary =
-        isUsableLookupValue(primaryName) && isUsableLookupValue(primaryPort);
-
-      if (hasUsablePrimary) {
-        const primaryKey = toDevicePortKey(primaryName, primaryPort);
-        patchPanelRows = patchPanelByDevicePort[primaryKey] ?? [];
-
-        if (patchPanelRows.length === 0) {
-          const expectedName = getLookupValue(row.expectedDeviceBName);
-          const expectedPort = getLookupValue(row.expectedDeviceBPort);
-
-          if (isUsableLookupValue(expectedName) && isUsableLookupValue(expectedPort)) {
-            const fallbackKey = toDevicePortKey(expectedName, expectedPort);
-            patchPanelRows = patchPanelByDevicePort[fallbackKey] ?? [];
-          }
-        }
-      }
-    } else {
-      const deviceName = getLookupValue(row.deviceName, row.remoteDeviceName ?? row.remoteDevice);
-      const devicePort = getLookupValue(row.devicePort, row.remoteDevicePort ?? row.remoteInterface);
-      const key = toDevicePortKey(deviceName, devicePort);
-      patchPanelRows = patchPanelByDevicePort[key] ?? [];
-    }
-
-    return {
-      ...row,
-      patchPanelMatrix: renderPatchPanelValue(patchPanelRows),
-    };
-  });
-}
-
-function getPsuStatusLabel(jobStatus: string, hasPsuFailure: boolean): "UP" | "DOWN" | "-" {
-  const normalized = (jobStatus || "").toUpperCase();
-  if (normalized !== "COMPLETED" && normalized !== "DEVICE_UNREACHABLE") {
-    return "-";
-  }
-  return hasPsuFailure ? "DOWN" : "UP";
 }
 
 function toAvailabilityDomain(region: string): string {
@@ -548,7 +661,7 @@ function buildTicketUrl(ticketId: string): string {
   return `https://jira-sd.mc1.oracleiaas.com/projects/LVV/queues/custom/31341/${encodeURIComponent(normalizedTicketId)}`;
 }
 
-const HOST_STATE_LEGEND_ITEMS = [
+const VALIDATION_STATE_LEGEND_ITEMS = [
   { state: "HOPS-NEW", description: "Host has not started ingestion", className: "status-error" },
   { state: "HOPS-TESTING", description: "HOPS is actively ingesting this host", className: "status-error" },
   { state: "HOPS-REPAIR", description: "HOPS has cut a repair ticket and is waiting on the repair", className: "status-error" },
@@ -561,25 +674,14 @@ const HOST_STATE_LEGEND_ITEMS = [
   { state: "CUSTOMER", description: "Customer is running an instance on the host.", className: "status-customer" },
 ];
 
-const HOST_STATE_LEGEND_ARIA_LABEL = HOST_STATE_LEGEND_ITEMS
+const VALIDATION_STATE_LEGEND_ARIA_LABEL = VALIDATION_STATE_LEGEND_ITEMS
   .map((item) => `${item.state}: ${item.description}`)
-  .join(". ");
-
-const LAST_VALIDATED_LEGEND_ITEMS = [
-  { label: "Green", description: "Up to 10 minutes", className: "green" },
-  { label: "Orange", description: "Up to 1 hour", className: "orange" },
-  { label: "Red", description: "Greater than 1 hour", className: "red" },
-  { label: "N/A", description: "Not eligible for validation", className: "na" },
-];
-
-const LAST_VALIDATED_LEGEND_ARIA_LABEL = LAST_VALIDATED_LEGEND_ITEMS
-  .map((item) => `${item.label}: ${item.description}`)
   .join(". ");
 
 function renderDeviceInformationSection(
   device: DeviceStatus,
   idx: number,
-  accessibility: typeof VALIDATION_TABLE_ACCESSIBILITY,
+  _accessibility: typeof VALIDATION_TABLE_ACCESSIBILITY,
   region: string
 ) {
   const readinessStatus = String(device.hostReadinessStatus || "").trim().toUpperCase();
@@ -589,7 +691,9 @@ function renderDeviceInformationSection(
   const hopsState = String(device.hostHopsState || "").trim() || "-";
   const computeState = String(device.hostComputeState || "").trim() || "-";
   const computePool = String(device.hostComputePool || "").trim() || "-";
-  const ticketIds = Array.isArray(device.hostTicketIds) ? device.hostTicketIds.filter((ticketId) => String(ticketId).trim() !== "") : [];
+  const ticketIds = Array.isArray(device.hostTicketIds)
+    ? device.hostTicketIds.filter((ticketId) => String(ticketId).trim() !== "")
+    : [];
   const lvvTicketIds = ticketIds.filter((ticketId) => String(ticketId).trim().toUpperCase().startsWith("LVV"));
   const repairTicketIds = ticketIds.filter((ticketId) => !String(ticketId).trim().toUpperCase().startsWith("LVV"));
 
@@ -694,11 +798,224 @@ function renderDeviceInformationSection(
   );
 }
 
+function getColumnTemplate(sectionTitle: string, field: string): string | undefined {
+  const normalizedSectionTitle = normalizeSectionTitle(sectionTitle);
+
+  if (field === "linkStatus" || field === "LLDP Status") return "lldpStatusTemplate";
+  if (field === "status" || field === "lockStatus" || field === "Status" || field === "Lock Status") {
+    return "booleanStatusTemplate";
+  }
+  if (field === "patchPanelMatrix") return "patchPanelMatrixTemplate";
+  if (field === "txPower" || field === "Tx Power") return "txPowerTemplate";
+  if (field === "rxPower" || field === "Rx Power") return "rxPowerTemplate";
+  if (field === "opticalRawBer" || field === "Optical RawBer") return "opticalRawBerTemplate";
+  if (field === "lastExecuted" || field === "Last Executed") return "relativeTimestampTemplate";
+
+  if (field === "sourceDeviceLocation" || field === "Source Device Location") {
+    return "sourceDeviceLocationTemplate";
+  }
+
+  if (field === "errorMessage") {
+    return normalizedSectionTitle === "optic errors"
+      ? "gpuMultilineErrorMessageTemplate"
+      : "errorMessageClampTemplate";
+  }
+  if (field === "Error Message") {
+    return normalizedSectionTitle === "optic errors"
+      ? "gpuMultilineErrorMessageTemplate"
+      : "errorMessageClampTemplate";
+  }
+
+  return undefined;
+}
+
+function getSectionColumns(
+  sectionTitle: string,
+  sectionRows: ValidationTableRow[],
+  isGpuRack?: boolean
+): any[] {
+  if (Boolean(isGpuRack) && isGpuLldpSection(sectionTitle, sectionRows)) {
+    return buildGpuLldpColumns(sectionRows);
+  }
+
+  const fieldOrder: string[] = [];
+  const seen = new Set<string>();
+
+  sectionRows.forEach((row) => {
+    Object.keys(row).forEach((key) => {
+      if (key === "_key" || INTERNAL_RENDER_ALIAS_FIELDS.has(key) || seen.has(key)) return;
+      seen.add(key);
+      fieldOrder.push(key);
+    });
+  });
+
+  const shouldHideErrorMessage =
+      isFecBerSection(sectionTitle) &&
+      !sectionRows.some((row) => {
+        const errorMessage = row?.errorMessage;
+        return typeof errorMessage === "string" && errorMessage.trim() !== "";
+      });
+
+  const configuredOrder = VALIDATION_COLUMN_ORDER_BY_SECTION[sectionTitle] || [];
+  const orderedFields = [
+    ...configuredOrder.filter((field) => fieldOrder.includes(field)),
+    ...fieldOrder.filter((field) => !configuredOrder.includes(field)),
+  ];
+
+  return orderedFields
+      .filter((field) => !(shouldHideErrorMessage && field === "errorMessage"))
+      .map((field) => {
+        const template = getColumnTemplate(sectionTitle, field);
+        const widthOverrides =
+          field === "rxPower" || field === "Rx Power"
+            ? RX_POWER_COLUMN_SETTINGS
+            : field === "opticalRawBer" || field === "Optical RawBer"
+              ? RAW_BER_COLUMN_SETTINGS
+            : field === "patchPanelMatrix"
+              ? PATCH_PANEL_COLUMN_SETTINGS
+              : {};
+        return {
+          headerText: field,
+          field,
+          id: field,
+          resizable: "enabled",
+          sortable: "enabled",
+          ...widthOverrides,
+          ...(template ? { template } : {}),
+        };
+      });
+}
+
+function renderPatchPanelValue(rows: PatchPanelRow[]): string {
+  if (!rows.length) return "Not Available";
+
+  return rows
+    .map((row, idx) => {
+      const easyMark = Array.isArray(row.easyMark) ? row.easyMark : [];
+      if (easyMark.length > 0) {
+        const lines = easyMark.map((v) => `• ${v}`);
+        return rows.length > 1
+          ? `Entry ${idx + 1}\n${lines.join("\n")}`
+          : lines.join("\n");
+      }
+      return JSON.stringify(row, null, 2);
+    })
+    .join("\n\n");
+}
+
+function addPatchPanelToSectionRows(
+    sectionTitle: string,
+    rows: ValidationTableRow[],
+    patchPanelByDevicePort: PatchPanelByDevicePort
+): ValidationTableRow[] {
+  if (isFanSection(sectionTitle)) {
+    return rows;
+  }
+
+  return rows.map((row) => {
+    let patchPanelRows: PatchPanelRow[] = [];
+    const lookupKeys = (() => {
+      if (isLldpSection(sectionTitle)) {
+        const keys: string[] = [];
+        const primaryName = getLookupValue(String(row.deviceAName ?? ""));
+        const primaryPort = getLookupValue(String(row.deviceAPort ?? ""));
+
+        if (isUsableLookupValue(primaryName) && isUsableLookupValue(primaryPort)) {
+          keys.push(...buildPatchPanelLookupKeys(primaryName, primaryPort));
+        }
+
+        const expectedName = getLookupValue(String(row.expectedDeviceBName ?? ""));
+        const expectedPort = getLookupValue(String(row.expectedDeviceBPort ?? ""));
+        if (isUsableLookupValue(expectedName) && isUsableLookupValue(expectedPort)) {
+          keys.push(...buildPatchPanelLookupKeys(expectedName, expectedPort));
+        }
+
+        return keys;
+      }
+
+      const normalizedSectionTitle = normalizeSectionTitle(sectionTitle);
+      if (normalizedSectionTitle === "optic errors" || normalizedSectionTitle === "interface errors") {
+        return buildPatchPanelLookupKeys(
+          getLookupValue(
+            String(row.deviceName ?? ""),
+            String(row.remoteDeviceName ?? row.sourceDeviceName ?? "")
+          ),
+          getLookupValue(
+            String(row.devicePort ?? ""),
+            String(row.remoteDevicePort ?? row.sourceDevicePort ?? "")
+          )
+        );
+      }
+
+      if (isFecBerSection(sectionTitle)) {
+        return buildPatchPanelLookupKeys(
+          getLookupValue(String(row.deviceName ?? ""), String(row.remoteDevice ?? "")),
+          getLookupValue(String(row.devicePort ?? ""), String(row.remoteInterface ?? ""))
+        );
+      }
+
+      return buildPatchPanelLookupKeys(
+        getLookupValue(
+          String(row.deviceName ?? ""),
+          String(row.remoteDeviceName ?? row.remoteDevice ?? "")
+        ),
+        getLookupValue(
+          String(row.devicePort ?? ""),
+          String(row.remoteDevicePort ?? row.remoteInterface ?? "")
+        )
+      );
+    })();
+
+    for (const key of lookupKeys) {
+      const matches = patchPanelByDevicePort[key] || [];
+      if (matches.length > 0) {
+        patchPanelRows = matches;
+        break;
+      }
+    }
+
+    return {
+      ...row,
+      patchPanelMatrix: renderPatchPanelValue(patchPanelRows),
+    };
+  });
+}
+
+function getPsuStatusLabel(jobStatus: string, hasPsuFailure: boolean): "UP" | "DOWN" | "-" {
+  const normalized = (jobStatus || "").toUpperCase();
+  if (normalized !== "COMPLETED" && normalized !== "DEVICE_UNREACHABLE") {
+    return "-";
+  }
+  return hasPsuFailure ? "DOWN" : "UP";
+}
+
+function getDisplayValidationTimestamp(
+  deviceName: string,
+  deviceFailures: DeviceValidationFailures,
+  deviceRefreshTimestampsByName: Record<string, string | null>
+): string | null | undefined {
+  if (Object.prototype.hasOwnProperty.call(deviceRefreshTimestampsByName, deviceName)) {
+    return deviceRefreshTimestampsByName[deviceName];
+  }
+
+  return deviceFailures.lastValidated;
+}
+
 const DeviceAccordion = (props: Props) => {
-  const ACC = VALIDATION_TABLE_ACCESSIBILITY;
   const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set());
   const [accordionNonce, setAccordionNonce] = useState(0);
   const [validationReferenceTimeMs, setValidationReferenceTimeMs] = useState<number>(Date.now());
+  const previousFilteredFailuresRef = useRef<ValidationFailuresByDevice>({});
+  const accordionRootRef = useRef<HTMLDivElement | null>(null);
+  const pendingViewportAnchorRef = useRef<{ deviceKey: string; topOffset: number } | null>(null);
+  const viewMode: RackValidationViewMode = props.viewMode || "ncp";
+  const validationServiceView = viewMode === "validationService";
+  const showSelection = props.showSelection !== false;
+
+  const isPeriodicValidationDevice = useCallback(
+      (deviceName: string): boolean => props.periodicValidationDeviceNames.has(deviceName),
+      [props.periodicValidationDeviceNames]
+  );
 
   useEffect(() => {
     if (typeof props.externalExpandedKeysNonce === "number") {
@@ -709,67 +1026,213 @@ const DeviceAccordion = (props: Props) => {
   }, [props.externalExpandedKeysNonce, props.externalExpandedKeys]);
 
   const filteredFailuresByDevice = useMemo(() => {
+    const previousFilteredFailures = previousFilteredFailuresRef.current;
     const filtered: ValidationFailuresByDevice = {};
     Object.entries(props.validationFailuresByDevice).forEach(([deviceName, deviceFailures]) => {
-      const filteredLldp = props.hideUnsupported
-          ? deviceFailures.tests.lldp.filter(
-              (row) => String(row.linkStatus).toUpperCase() !== "UNSUPPORTED"
-          )
-          : deviceFailures.tests.lldp;
+      const previousDeviceFailures = previousFilteredFailures[deviceName];
+      const sections: Record<string, ValidationSection> = {};
+      const countsBySection: Record<string, number> = {};
+      let nonPowerTotal = 0;
+      const orderedSectionKeys = orderValidationSectionKeys(
+        deviceFailures.sectionOrder,
+        (sectionKey) => deviceFailures.sections[sectionKey]?.title
+      );
 
-      const counts = {
-        lldp: filteredLldp.length,
-        optics: deviceFailures.tests.optics.length,
-        interfaces: deviceFailures.tests.interfaces.length,
-        fecBer: deviceFailures.tests.fecBer.length,
-        fans: deviceFailures.tests.fans.length,
-        power: deviceFailures.tests.power.length,
-        nonPowerTotal:
-            filteredLldp.length +
-            deviceFailures.tests.optics.length +
-            deviceFailures.tests.interfaces.length +
-            deviceFailures.tests.fecBer.length +
-            deviceFailures.tests.fans.length,
-        overallTotal:
-            filteredLldp.length +
-            deviceFailures.tests.optics.length +
-            deviceFailures.tests.interfaces.length +
-            deviceFailures.tests.fecBer.length +
-            deviceFailures.tests.fans.length +
-            deviceFailures.tests.power.length,
-      };
+      orderedSectionKeys.forEach((sectionKey) => {
+        const section = deviceFailures.sections[sectionKey];
+        if (!section) return;
 
-      filtered[deviceName] = {
+        const filteredRows = props.hideUnsupported && isLldpSection(section.title)
+            ? section.rows.filter((row) => String(row.linkStatus).toUpperCase() !== "UNSUPPORTED")
+            : section.rows;
+        const enrichedRows = addPatchPanelToSectionRows(
+            section.title,
+            filteredRows,
+            props.patchPanelByDevicePort
+        );
+
+        const nextSection: ValidationSection = {
+          ...section,
+          rows: enrichedRows,
+        };
+        const previousSection = previousDeviceFailures?.sections?.[sectionKey];
+        sections[sectionKey] =
+          previousSection &&
+          previousSection.title === nextSection.title &&
+          areValidationTableRowsEqual(previousSection.rows, nextSection.rows)
+            ? previousSection
+            : nextSection;
+        countsBySection[sectionKey] = enrichedRows.length;
+        nonPowerTotal += enrichedRows.length;
+      });
+
+      const nextDeviceFailures: DeviceValidationFailures = {
         ...deviceFailures,
-        tests: {
-          ...deviceFailures.tests,
-          lldp: filteredLldp,
+        sections,
+        sectionOrder: orderedSectionKeys,
+        counts: {
+          bySection: countsBySection,
+          power: deviceFailures.powerRows.length,
+          nonPowerTotal,
+          overallTotal: nonPowerTotal + deviceFailures.powerRows.length,
         },
-        counts,
-        hasPsuFailure: deviceFailures.tests.power.length > 0,
+        hasPsuFailure: deviceFailures.powerRows.length > 0,
       };
+      filtered[deviceName] =
+        previousDeviceFailures &&
+        previousDeviceFailures.lastValidated === nextDeviceFailures.lastValidated &&
+        previousDeviceFailures.reachability === nextDeviceFailures.reachability &&
+        previousDeviceFailures.hasPsuFailure === nextDeviceFailures.hasPsuFailure &&
+        areStringArraysEqual(previousDeviceFailures.sectionOrder, nextDeviceFailures.sectionOrder) &&
+        areStringArraysEqual(previousDeviceFailures.presentSectionKeys, nextDeviceFailures.presentSectionKeys) &&
+        areStringArraysEqual(previousDeviceFailures.periodicSectionKeys, nextDeviceFailures.periodicSectionKeys) &&
+        previousDeviceFailures.powerRows === nextDeviceFailures.powerRows &&
+        areStringArraysEqual(Object.keys(previousDeviceFailures.sections).sort(), Object.keys(sections).sort()) &&
+        orderedSectionKeys.every((sectionKey) => previousDeviceFailures.sections[sectionKey] === sections[sectionKey])
+          ? previousDeviceFailures
+          : nextDeviceFailures;
     });
 
-    return filtered;
-  }, [props.validationFailuresByDevice, props.hideUnsupported]);
+    const filteredDeviceNames = Object.keys(filtered).sort();
+    const previousDeviceNames = Object.keys(previousFilteredFailures).sort();
+    const nextFilteredFailures =
+      areStringArraysEqual(filteredDeviceNames, previousDeviceNames) &&
+      filteredDeviceNames.every((deviceName) => previousFilteredFailures[deviceName] === filtered[deviceName])
+        ? previousFilteredFailures
+        : filtered;
 
- const patchPanelByDevicePort = useMemo(() => {
-   return props.patchPanelRackRows.reduce((acc, panelRow) => {
-     const keys = buildPatchPanelLookupKeys(panelRow.deviceName, panelRow.devicePort);
-     keys.forEach((key) => {
-       if (!acc[key]) acc[key] = [];
-       if (!acc[key].includes(panelRow)) {
-         acc[key].push(panelRow);
-       }
-     });
-     return acc;
-   }, {} as PatchPanelLookupMap);
- }, [props.patchPanelRackRows]);
+    previousFilteredFailuresRef.current = nextFilteredFailures;
 
-  const selectTemplate = (context: any, disabled: boolean = false, disabledReason: string = "") => {
+    return nextFilteredFailures;
+  }, [props.validationFailuresByDevice, props.hideUnsupported, props.patchPanelByDevicePort]);
+
+  const captureViewportAnchor = useCallback(() => {
+    if (typeof window === "undefined") {
+      return null;
+    }
+
+    const root = accordionRootRef.current;
+    if (!root) {
+      return null;
+    }
+
+    const deviceRows = Array.from(root.querySelectorAll<HTMLElement>("[data-device-key]"));
+    if (deviceRows.length === 0) {
+      return null;
+    }
+
+    const firstVisibleRow = deviceRows.find((row) => row.getBoundingClientRect().bottom > 0);
+    if (!firstVisibleRow) {
+      return null;
+    }
+
+    return {
+      deviceKey: firstVisibleRow.getAttribute("data-device-key") || "",
+      topOffset: firstVisibleRow.getBoundingClientRect().top,
+    };
+  }, []);
+
+  useLayoutEffect(() => {
+    const pendingAnchor = pendingViewportAnchorRef.current;
+    if (!pendingAnchor || typeof window === "undefined") {
+      return;
+    }
+
+    pendingViewportAnchorRef.current = null;
+    const root = accordionRootRef.current;
+    if (!root) {
+      return;
+    }
+
+    const restoreViewportAnchor = () => {
+      const targetRow = Array.from(root.querySelectorAll<HTMLElement>("[data-device-key]")).find(
+        (row) => row.getAttribute("data-device-key") === pendingAnchor.deviceKey
+      );
+      if (!targetRow) {
+        return;
+      }
+
+      const deltaY = targetRow.getBoundingClientRect().top - pendingAnchor.topOffset;
+      if (Math.abs(deltaY) > 1) {
+        window.scrollBy({
+          left: 0,
+          top: deltaY,
+          behavior: "auto",
+        });
+      }
+    };
+
+    restoreViewportAnchor();
+    let secondFrameId = 0;
+    let thirdFrameId = 0;
+    const firstFrameId = window.requestAnimationFrame(() => {
+      restoreViewportAnchor();
+      secondFrameId = window.requestAnimationFrame(() => {
+        restoreViewportAnchor();
+        thirdFrameId = window.requestAnimationFrame(restoreViewportAnchor);
+      });
+    });
+    const delayedRestoreId = window.setTimeout(restoreViewportAnchor, 80);
+    const finalRestoreId = window.setTimeout(restoreViewportAnchor, 180);
+
+    return () => {
+      window.cancelAnimationFrame(firstFrameId);
+      if (secondFrameId) {
+        window.cancelAnimationFrame(secondFrameId);
+      }
+      if (thirdFrameId) {
+        window.cancelAnimationFrame(thirdFrameId);
+      }
+      window.clearTimeout(delayedRestoreId);
+      window.clearTimeout(finalRestoreId);
+    };
+  }, [filteredFailuresByDevice]);
+
+  useLayoutEffect(() => {
+    return () => {
+      pendingViewportAnchorRef.current = captureViewportAnchor();
+    };
+  }, [captureViewportAnchor, filteredFailuresByDevice]);
+
+  useLayoutEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const syncLayout = () => {
+      syncExpandedCollapsibleLayout(accordionRootRef.current, expandedKeys);
+    };
+
+    syncLayout();
+    let thirdFrameId = 0;
+    const firstFrameId = window.requestAnimationFrame(syncLayout);
+    const secondFrameId = window.requestAnimationFrame(() => {
+      thirdFrameId = window.requestAnimationFrame(syncLayout);
+    });
+    const timeoutId = window.setTimeout(syncLayout, 120);
+
+    return () => {
+      window.cancelAnimationFrame(firstFrameId);
+      window.cancelAnimationFrame(secondFrameId);
+      if (thirdFrameId) {
+        window.cancelAnimationFrame(thirdFrameId);
+      }
+      window.clearTimeout(timeoutId);
+    };
+  }, [expandedKeys, filteredFailuresByDevice]);
+
+  const selectTemplate = (
+      context: any,
+      disabled: boolean = false,
+      disabledReason: string = "",
+      hidden: boolean = false
+  ) => {
     const row = (context?.item && context.item.data) || {};
     const key = row._key;
     const isChecked = props.selectedLinkKeys.has(key);
+    if (hidden) {
+      return <span className="device-selection-placeholder" title={disabledReason}>-</span>;
+    }
     const onChange = (e: any) => {
       const checked = (e.target as HTMLInputElement).checked;
       props.setSelectedLinkKeys((prev) => {
@@ -824,7 +1287,14 @@ const DeviceAccordion = (props: Props) => {
           if (!isDeviceStatusCompleted(device.jobStatus)) {
             return null;
           }
-          return getNextValidationColorTransitionAtMs(deviceFailures.lastValidated ?? null, currentTimeMs);
+          return getNextValidationColorTransitionAtMs(
+            getDisplayValidationTimestamp(
+              device.deviceName,
+              deviceFailures,
+              props.deviceRefreshTimestampsByName
+            ) ?? null,
+            currentTimeMs
+          );
         })
         .filter((value): value is number => typeof value === "number" && Number.isFinite(value));
 
@@ -832,9 +1302,7 @@ const DeviceAccordion = (props: Props) => {
       return;
     }
 
-    // Schedule only the nearest upcoming transition time across all devices.
     const earliestTransitionTimeMs = Math.min(...upcomingColorTransitionTimesMs);
-    // Keep a minimum 1s delay to avoid immediate/negative timer jitter near boundary.
     const waitDurationMs = Math.max(1000, earliestTransitionTimeMs - currentTimeMs);
     const transitionTimeoutId = window.setTimeout(() => {
       setValidationReferenceTimeMs(Date.now());
@@ -843,7 +1311,39 @@ const DeviceAccordion = (props: Props) => {
     return () => {
       window.clearTimeout(transitionTimeoutId);
     };
-  }, [sortedDevices, filteredFailuresByDevice, validationReferenceTimeMs]);
+  }, [sortedDevices, filteredFailuresByDevice, validationReferenceTimeMs, props.deviceRefreshTimestampsByName]);
+
+  useEffect(() => {
+    if (props.periodicValidationDeviceNames.size === 0) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      setValidationReferenceTimeMs(Date.now());
+    }, VALIDATION_TIMESTAMP_REFRESH_INTERVAL_MS);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [props.periodicValidationDeviceNames]);
+
+  const showReachabilityColumn = props.periodicValidationEnabled;
+  const showPsuColumn = !validationServiceView;
+  const showValidationStateColumn = props.isGpuRack;
+  const deviceAccordionColumns = [
+    ...(showSelection ? ["minmax(24px, 28px)"] : []),
+    "minmax(260px, 1.45fr)",
+    "minmax(64px, 96px)",
+    "minmax(210px, 1.7fr)",
+    ...(showReachabilityColumn ? ["minmax(92px, 118px)"] : []),
+    ...(showPsuColumn ? ["minmax(92px, 126px)"] : []),
+    "minmax(128px, 168px)",
+    ...(showValidationStateColumn ? ["minmax(148px, 188px)"] : []),
+    "minmax(136px, 176px)",
+  ].join(" ");
+  const deviceAccordionColumnStyle = {
+    "--device-accordion-cols": deviceAccordionColumns,
+  };
 
   // Compute selection helpers for "Select All" behavior
   const eligibleDeviceKeys = useMemo(
@@ -894,22 +1394,21 @@ const DeviceAccordion = (props: Props) => {
     return { linkFailures, powerFailures };
   }, [filteredFailuresByDevice, props.isGpuRack]);
 
-  const renderErrorCount = (device: DeviceStatus, deviceFailures: DeviceValidationFailures) => {
-    const isGpuCompute = isGpuComputeDevice(device.deviceName, props.isGpuRack);
-    const chips = isGpuCompute
-        ? [
-          { label: "INT", count: deviceFailures.counts.interfaces },
-          { label: "LLDP", count: deviceFailures.counts.lldp },
-          { label: "OPT", count: deviceFailures.counts.optics },
-          { label: "FEC", count: deviceFailures.counts.fecBer },
-        ].filter((entry) => entry.count > 0)
-        : [
-          { label: "INT", count: deviceFailures.counts.interfaces },
-          { label: "LLDP", count: deviceFailures.counts.lldp },
-          { label: "OPT", count: deviceFailures.counts.optics },
-          { label: "FEC", count: deviceFailures.counts.fecBer },
-          { label: "FAN", count: deviceFailures.counts.fans },
-        ].filter((entry) => entry.count > 0);
+  const renderErrorCount = (deviceFailures: DeviceValidationFailures) => {
+    const isGpuCompute = isGpuComputeDevice(deviceFailures.deviceName, props.isGpuRack);
+    const chips = deviceFailures.sectionOrder
+        .map((sectionKey) => {
+          const section = deviceFailures.sections[sectionKey];
+          if (!section) return null;
+          return {
+            label: getChipLabel(section.title),
+            count: deviceFailures.counts.bySection[sectionKey] || 0,
+            typeClass: getChipClass(section.title),
+          };
+        })
+        .filter((entry): entry is { label: string; count: number; typeClass: string } =>
+            Boolean(entry && entry.count > 0)
+        );
 
     if (chips.length === 0) {
       const zeroClass = `device-accordion-failure-count ${
@@ -923,16 +1422,10 @@ const DeviceAccordion = (props: Props) => {
     return (
         <span className="device-accordion-error-breakdown">
          {chips.map((chip) => {
-           const typeClass =
-               chip.label === "LLDP" ? "chip-lldp" :
-                   chip.label === "OPT"  ? "chip-opt"  :
-                       chip.label === "INT"  ? "chip-int"  :
-                           chip.label === "FEC"  ? "chip-fec"  :
-                               chip.label === "FAN"  ? "chip-fan"  : "";
            return (
                <span
                    key={chip.label}
-                   className={`device-accordion-error-chip ${typeClass}`}
+                   className={`device-accordion-error-chip ${chip.typeClass}`}
                    title={`${chip.label}: ${chip.count}`}
                >
                 {chip.label}:{chip.count}
@@ -944,6 +1437,14 @@ const DeviceAccordion = (props: Props) => {
   };
 
   const renderLastValidated = (device: DeviceStatus, deviceFailures: DeviceValidationFailures) => {
+    if (validationServiceView) {
+      return <span className="device-last-validated-na">N/A</span>;
+    }
+
+    if (isPeriodicValidationDevice(device.deviceName)) {
+      return <span className="device-last-validated-na">N/A</span>;
+    }
+
     if (isDeviceNotEligibleForValidation(device, deviceFailures)) {
       return <span className="device-last-validated-na">N/A</span>;
     }
@@ -952,8 +1453,13 @@ const DeviceAccordion = (props: Props) => {
       return null;
     }
 
-    const validationColor = resolveValidationAgeColor(deviceFailures.lastValidated, validationReferenceTimeMs);
-    const relativeValidationAge = formatRelativeValidationAge(deviceFailures.lastValidated, validationReferenceTimeMs);
+    const displayTimestamp = getDisplayValidationTimestamp(
+      device.deviceName,
+      deviceFailures,
+      props.deviceRefreshTimestampsByName
+    );
+    const validationColor = resolveValidationAgeColor(displayTimestamp, validationReferenceTimeMs);
+    const relativeValidationAge = formatValidationTimestamp(displayTimestamp, validationReferenceTimeMs);
     return (
         <span
             className={`device-last-validated-pill ${validationColor}`}
@@ -965,6 +1471,50 @@ const DeviceAccordion = (props: Props) => {
     );
   };
 
+  const renderReachability = (device: DeviceStatus, deviceFailures: DeviceValidationFailures) => {
+    if (!showReachabilityColumn) {
+      return null;
+    }
+
+    if (isGpuComputeDevice(device.deviceName, props.isGpuRack)) {
+      return <span className="device-last-validated-na">N/A</span>;
+    }
+
+    if (!isPeriodicValidationDevice(device.deviceName)) {
+      return <span className="device-last-validated-na">N/A</span>;
+    }
+
+    if (deviceFailures.reachability === true) {
+      return (
+        <span className="device-reachability-indicator reachable" title="Reachable" aria-label="Reachable">
+          ✓
+        </span>
+      );
+    }
+
+    if (deviceFailures.reachability === null || deviceFailures.reachability === undefined) {
+      return (
+        <span className="device-reachability-indicator unknown" title="Unknown" aria-label="Reachability unknown">
+          ?
+        </span>
+      );
+    }
+
+    return (
+      <span className="device-reachability-indicator unreachable" title="Unreachable" aria-label="Unreachable">
+        ✗
+      </span>
+    );
+  };
+
+  const renderStatusCell = (statusToRender: string) => {
+    return (
+        <span className={`device-accordion-status ${getStatusClass(statusToRender)}`}>
+          {formatStatusLabel(statusToRender)}
+        </span>
+    );
+  };
+
   const renderValidationState = (device: DeviceStatus, isGpuCompute: boolean) => {
     if (!isGpuCompute) {
       return <span className="device-last-validated-na">N/A</span>;
@@ -972,7 +1522,7 @@ const DeviceAccordion = (props: Props) => {
 
     if (device.hostReadinessLoading) {
       return (
-        <span className="device-host-state-loading" aria-label="Host state loading" title="Host state loading">
+        <span className="device-host-state-loading" aria-label="Validation state loading" title="Validation state loading">
           <oj-progress-circle size="sm" value={-1} />
         </span>
       );
@@ -1009,14 +1559,51 @@ const DeviceAccordion = (props: Props) => {
               {/*Validation summary*/}
               {!props.isValidating &&
                   (() => {
+                    if (validationServiceView) {
+                      const enabledCount = props.devices.filter((d) =>
+                        isPeriodicValidationDevice(d.deviceName)
+                      ).length;
+                      const notEnabledCount = Math.max(0, props.devices.length - enabledCount);
+
+                      return (
+                        <div class="device-accordion-summary-card info">
+                          <div>
+                            <span class="device-accordion-message-title">
+                              Validation Service is enabled for {enabledCount} device(s).
+                            </span>
+                            <span class="device-accordion-message-title">
+                              {notEnabledCount} device(s) are Not Enabled for Validation Service.
+                            </span>
+                          </div>
+                        </div>
+                      );
+                    }
+
                     const eligibleDevices = props.devices.filter((d) =>
                         props.eligibleDeviceNames.has(d.deviceName)
+                    );
+                    const periodicDevices = props.devices.filter((d) =>
+                        isPeriodicValidationDevice(d.deviceName)
                     );
                     const hasEligibleDevices = eligibleDevices.length > 0;
                     const numUnreachable = eligibleDevices.filter((d) => d.jobStatus === "DEVICE_UNREACHABLE").length;
                     const hasAnyValidated = eligibleDevices.some(
                         (d) => d.jobStatus !== "NOT_TRIGGERED" && d.jobStatus !== "IN_PROGRESS"
                     );
+                    if (!hasEligibleDevices && periodicDevices.length > 0) {
+                      return (
+                          <div class="device-accordion-summary-card info">
+                            <div>
+                              <span class="device-accordion-message-title">
+                                Devices use Periodic Check in this rack.
+                              </span>
+                              <span class="device-accordion-message-title">
+                                Those devices show a Periodic Check chip in the Status column.
+                              </span>
+                            </div>
+                          </div>
+                      );
+                    }
                     if (!hasEligibleDevices) {
                       return (
                           <div class="device-accordion-summary-card info">
@@ -1042,6 +1629,11 @@ const DeviceAccordion = (props: Props) => {
                               <span class="device-accordion-message-title">
                         {summaryCounts.powerFailures} device(s) have PSU failure(s)
                       </span>
+                              {periodicDevices.length > 0 && (
+                              <span class="device-accordion-message-title">
+                        {periodicDevices.length} device(s) use Periodic Check.
+                      </span>
+                              )}
                             </div>
                           </div>
                       );
@@ -1059,7 +1651,30 @@ const DeviceAccordion = (props: Props) => {
                     }
                   })()}
 
-              <div class={`device-accordion-columns-header full-bleed device-table-columns-header ${props.isGpuRack ? "gpu" : ""}`}>
+              {!validationServiceView && (
+              <div class="device-last-validated-legend full-bleed">
+                <span className="device-accordion-legend-title">Last Validated Legend</span>
+                <span className="device-accordion-legend-item">
+                  <span className="device-last-validated-pill green legend">Up to 2 minutes</span>
+                </span>
+                <span className="device-accordion-legend-item">
+                  <span className="device-last-validated-pill orange legend">Up to 10 minutes</span>
+                </span>
+                <span className="device-accordion-legend-item">
+                  <span className="device-last-validated-pill red legend">Greater than 10 minutes</span>
+                </span>
+                <span className="device-accordion-legend-item">
+                  <span className="device-last-validated-na">N/A</span>
+                  Periodic Check devices and devices not eligible for validation
+                </span>
+              </div>
+              )}
+
+              <div
+                class="device-accordion-columns-header full-bleed device-table-columns-header"
+                style={deviceAccordionColumnStyle as any}
+              >
+            {showSelection ? (
             <span class="device-col select">
               <input
                   ref={selectAllRef}
@@ -1078,95 +1693,94 @@ const DeviceAccordion = (props: Props) => {
                   }
               />
             </span>
-                <span>Device</span>
-                <span>Elevation</span>
-                <span>Errors</span>
-                <span>PSU Status</span>
-                <span className="device-last-validated-header">
-                  <span>Last Validated</span>
-                  <span className="device-tooltip-container">
-                    <span
-                      className="device-last-validated-tooltip-trigger"
-                      aria-label={`Last validated legend: ${LAST_VALIDATED_LEGEND_ARIA_LABEL}`}
-                      tabIndex={0}
-                    >
-                      ?
-                    </span>
-                    <span className="device-state-legend-tooltip device-last-validated-legend-tooltip" role="tooltip">
-                      {LAST_VALIDATED_LEGEND_ITEMS.map((item) => (
-                        <span className="device-state-legend-row" key={item.label}>
-                          {item.className === "na" ? (
-                            <span className="device-last-validated-na">{item.label}</span>
-                          ) : (
-                            <span className={`device-last-validated-pill legend ${item.className}`}>{item.label}</span>
-                          )}
-                          <span className="device-state-legend-description">{item.description}</span>
+            ) : null}
+                <span class="device-col name">Device</span>
+                <span class="device-col elevation">Elevation</span>
+                <span class="device-col errors">Errors</span>
+                {showReachabilityColumn ? (
+                  <span class="device-col reachability">Reachability</span>
+                ) : null}
+                {showPsuColumn ? (
+                  <span class="device-col psu-status">PSU Status</span>
+                ) : null}
+                <span class="device-col last-validated">Last Validated</span>
+                {showValidationStateColumn ? (
+                  <span class="device-col validation-state">
+                    <span className="device-last-validated-header">
+                      <span>Validation State</span>
+                      <span className="device-tooltip-container">
+                        <span
+                          className="device-last-validated-tooltip-trigger"
+                          aria-label={`Validation State legend: ${VALIDATION_STATE_LEGEND_ARIA_LABEL}`}
+                          tabIndex={0}
+                        >
+                          ?
                         </span>
-                      ))}
-                    </span>
-                  </span>
-                </span>
-                {props.isGpuRack && (
-                  <span className="device-last-validated-header">
-                    <span>Host State</span>
-                    <span className="device-tooltip-container">
-                      <span
-                        className="device-last-validated-tooltip-trigger"
-                        aria-label={`Host State legend: ${HOST_STATE_LEGEND_ARIA_LABEL}`}
-                        tabIndex={0}
-                      >
-                        ?
-                      </span>
-                      <span className="device-state-legend-tooltip" role="tooltip">
-                        {HOST_STATE_LEGEND_ITEMS.map((item) => (
-                          <span className="device-state-legend-row" key={item.state}>
-                            <span className={`device-accordion-status ${item.className}`}>
-                              {item.state}
+                        <span className="device-state-legend-tooltip" role="tooltip">
+                          {VALIDATION_STATE_LEGEND_ITEMS.map((item) => (
+                            <span className="device-state-legend-row" key={item.state}>
+                              <span className={`device-accordion-status ${item.className}`}>
+                                {item.state}
+                              </span>
+                              <span className="device-state-legend-description">{item.description}</span>
                             </span>
-                            <span className="device-state-legend-description">{item.description}</span>
-                          </span>
-                        ))}
+                          ))}
+                        </span>
                       </span>
                     </span>
                   </span>
-                )}
-                <span>Status</span>
+                ) : null}
+                <span class="device-col status">Status</span>
               </div>
+              <div ref={accordionRootRef}>
               <oj-accordion id="deviceAccordion" key={accordionNonce} multiple={true}>
                 {sortedDevices.map((device, idx) => {
                   const deviceFailures =
                       filteredFailuresByDevice[device.deviceName] || buildDeviceFailuresFallback(device.deviceName);
+                  const visibleSections = deviceFailures.sectionOrder
+                      .map((sectionKey) => deviceFailures.sections[sectionKey])
+                      .filter((section): section is ValidationSection => Boolean(section && section.rows.length > 0));
                   const isGpuCompute = isGpuComputeDevice(device.deviceName, props.isGpuRack);
-                  const hasDeviceInformation = Boolean(isGpuCompute && device.hostReadinessStatus && device.hostSerial);
+                  const isPeriodicValidation = isPeriodicValidationDevice(device.deviceName);
                   const hasDeviceFailures = deviceFailures.counts.nonPowerTotal > 0;
+                  const hasDeviceInformation = Boolean(isGpuCompute && device.hostReadinessStatus && device.hostSerial);
                   const hasExpandableContent = hasDeviceFailures || hasDeviceInformation;
                   const psuStatus = isGpuCompute
                       ? "-"
                       : getPsuStatusLabel(device.jobStatus, deviceFailures.hasPsuFailure);
                   const isExpanded = expandedKeys.has(device._key);
                   const isValidationEligible = props.eligibleDeviceNames.has(device.deviceName);
-                  const statusToRender = isValidationEligible ? device.jobStatus : "NOT_ELIGIBLE";
+                  const statusToRender = validationServiceView
+                      ? (isPeriodicValidation ? "PERIODIC_CHECK" : "NOT_ENABLED")
+                      : (isValidationEligible ? device.jobStatus : "NOT_ELIGIBLE");
                   const rowSelectionDisabled = gpuRackSelectionDisabled || !props.rackValidationAllowed || !isValidationEligible;
                   const disabledReason =
                       gpuRackSelectionDisabled
                           ? gpuRackSelectionDisabledReason
                           : !props.rackValidationAllowed
                           ? props.rackValidationTooltip
-                          : (device.validationEligibilityReason ||
-                              "Validation is available only for monitored and deployed devices.");
+                          : (
+                              device.validationEligibilityReason ||
+                              "Validation is available only for monitored and deployed devices."
+                          );
+                  const validationStateContent = props.isGpuRack
+                      ? renderValidationState(device, isGpuCompute)
+                      : null;
 
                   return (
                       <oj-collapsible
                           id={`deviceCollapsible-${idx}`}
                           key={device._key}
+                          data-device-key={device._key}
                           expanded={isExpanded}
                           onoj-before-expand={() => handleToggle(device._key, true, hasExpandableContent)}
                           onoj-before-collapse={() => handleToggle(device._key, false, hasExpandableContent)}
                           disabled={!hasExpandableContent}
                       >
                         <h3 slot="header" style={{ padding: 0, margin: 0, width: "100%" }}>
-                          <div className={`device-accordion-header-row ${props.isGpuRack ? "gpu" : ""}`}>
+                          <div className="device-accordion-header-row" style={deviceAccordionColumnStyle as any}>
                             {/* Selection checkbox */}
+                            {showSelection ? (
                             <span
                                 className="device-col select"
                                 onClick={(e) => e.stopPropagation()}
@@ -1178,6 +1792,7 @@ const DeviceAccordion = (props: Props) => {
                             disabledReason
                         )}
                       </span>
+                            ) : null}
 
                             {/* Device name */}
                             <span className="device-col name">
@@ -1191,33 +1806,38 @@ const DeviceAccordion = (props: Props) => {
                         {typeof device.elevation === "number" ? device.elevation : "-"}
                       </span>
 
-                            <span className="device-col errors">{renderErrorCount(device, deviceFailures)}</span>
+                            <span className="device-col errors">{renderErrorCount(deviceFailures)}</span>
 
-                            {/* PSU status */}
-                            <span className="device-col psu-status">
-                        {psuStatus === "-" ? (
-                            <span className="device-accordion-unknown">-</span>
-                        ) : (
-                            <span className="device-accordion-psu-chip">
-                            {psuStatusTemplate(psuStatus === "DOWN")}
-                              <span className="device-accordion-psu-label">{psuStatus}</span>
-                          </span>
-                        )}
-                      </span>
+                            {showReachabilityColumn ? (
+                              <span className="device-col reachability">
+                                {renderReachability(device, deviceFailures)}
+                              </span>
+                            ) : null}
+
+                            {showPsuColumn ? (
+                              <span className="device-col psu-status">
+                                {psuStatus === "-" ? (
+                                  <span className="device-accordion-unknown">-</span>
+                                ) : (
+                                  <span className="device-accordion-psu-chip">
+                                    {psuStatusTemplate(psuStatus === "DOWN")}
+                                    <span className="device-accordion-psu-label">{psuStatus}</span>
+                                  </span>
+                                )}
+                              </span>
+                            ) : null}
 
                             <span className="device-col last-validated">{renderLastValidated(device, deviceFailures)}</span>
 
-                            {props.isGpuRack && (
+                            {validationStateContent && (
                               <span className="device-col validation-state">
-                                {renderValidationState(device, isGpuCompute)}
+                                {validationStateContent}
                               </span>
                             )}
 
                             {/* Status */}
                             <span className="device-col status">
-                        <span className={`device-accordion-status ${getStatusClass(statusToRender)}`}>
-                          {formatStatusLabel(statusToRender)}
-                        </span>
+                        {renderStatusCell(statusToRender)}
                       </span>
                           </div>
                         </h3>
@@ -1226,64 +1846,22 @@ const DeviceAccordion = (props: Props) => {
                         {hasExpandableContent ? (
                             <div style={{ padding: "8px 24px", background: "#fff" }}>
                               <oj-accordion id={`testAccordion-${idx}`} multiple={true}>
-                                {isGpuCompute && renderDeviceInformationSection(device, idx, ACC, props.region)}
-                                {(isGpuCompute
-                                    ? TEST_SECTIONS.filter((section) => section.id !== "fans")
-                                    : TEST_SECTIONS
-                                ).map((section) => {
-                                  const sectionRows = addPatchPanelToSectionRows(
-                                    section.id,
-                                    getRowsForSection(deviceFailures, section.id),
-                                    patchPanelByDevicePort
-                                  );
-                                  if (!sectionRows.length) return null;
-                                  const sectionColumns = getSectionColumns(section, sectionRows, isGpuCompute);
-                                  const sectionDataProvider = new ArrayDataProvider(sectionRows, {
-                                    keyAttributes: "_key",
-                                  });
-
+                                {isGpuCompute &&
+                                  renderDeviceInformationSection(
+                                    device,
+                                    idx,
+                                    VALIDATION_TABLE_ACCESSIBILITY,
+                                    props.region
+                                  )}
+                                {visibleSections.map((section) => {
                                   return (
-                                      <oj-collapsible
-                                          id={`device-${idx}-${section.id}`}
-                                          key={`${device.deviceName}-${section.id}`}
-                                          expanded={false}
-                                      >
-                                        <h4 slot="header" className="test-section-header">
-                                          <span>{section.title}</span>
-                                          <span className="test-section-count">{sectionRows.length}</span>
-                                        </h4>
-                                        <div className="oj-flex">
-                                          <div className="oj-flex-item rack-panel table-wrapper-full">
-                                            <oj-table
-                                                class="selectable-table table-full"
-                                                display="grid"
-                                                horizontal-grid-visible="enabled"
-                                                layout="contents"
-                                                vertical-grid-visible="enabled"
-                                                aria-label={`${section.title} Action Items`}
-                                                id={`ValidationFailureItemsTable-${idx}-${section.id}`}
-                                                accessibility={ACC}
-                                                scroll-policy="loadMoreOnScroll"
-                                                scroll-policy-options='{"fetchSize": 10}'
-                                                columns={sectionColumns}
-                                                data={sectionDataProvider}
-                                            >
-                                              <template slot="lldpStatusTemplate" render={lldpStatusTemplate} />
-                                              <template slot="booleanStatusTemplate" render={booleanStatusTemplate} />
-                                              <template slot="patchPanelMatrixTemplate" render={patchPanelMatrixTemplate} />
-                                              <template slot="txPowerTemplate" render={txPowerTemplate} />
-                                              <template slot="rxPowerTemplate" render={rxPowerTemplate} />
-                                              <template slot="deviceALocationTemplate" render={deviceALocationTemplate} />
-                                              <template slot="currentBLocationTemplate" render={currentBLocationTemplate} />
-                                              <template slot="expectedBLocationTemplate" render={expectedBLocationTemplate} />
-                                              <template slot="sourceDeviceLocationTemplate" render={sourceDeviceLocationTemplate} />
-                                              <template slot="gpuLldpErrorDetailsTemplate" render={gpuLldpErrorDetailsTemplate} />
-                                              <template slot="gpuMultilineErrorMessageTemplate" render={gpuMultilineErrorMessageTemplate} />
-                                              <template slot="errorMessageClampTemplate" render={errorMessageClampTemplate} />
-                                            </oj-table>
-                                          </div>
-                                        </div>
-                                      </oj-collapsible>
+                                      <MemoizedValidationSectionTable
+                                          key={`${device.deviceName}-${section.key}`}
+                                          deviceIndex={idx}
+                                          deviceName={device.deviceName}
+                                          isGpuRack={props.isGpuRack}
+                                          section={section}
+                                      />
                                   );
                                 })}
                               </oj-accordion>
@@ -1293,6 +1871,7 @@ const DeviceAccordion = (props: Props) => {
                   );
                 })}
               </oj-accordion>
+              </div>
             </div>
         ) : (
             <div class="device-accordion-empty-state">

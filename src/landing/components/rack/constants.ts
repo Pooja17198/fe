@@ -1,6 +1,7 @@
-import { getLvvApiBase } from "../../config/api";
+import { getIdeApiBase, getLvvApiBase } from "../../config/api";
 
 export const LVV_API = getLvvApiBase();
+export const IDE_API = getIdeApiBase();
 
 export const VALIDATION_TABLE_ACCESSIBILITY = { rowHeader: "ActionItems" } as const;
 

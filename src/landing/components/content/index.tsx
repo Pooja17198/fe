@@ -42,6 +42,16 @@ type RackMetadata = {
   availabilityDomain?: string;
   resolveEnabled?: boolean;
   resolveDisabledReason?: string;
+  userType?: "master" | "vendor";
+}
+
+function getStoredVendorName(): string {
+  const storedVendor = sessionStorage.getItem("X-Oracle-Vendor") || "";
+  if (storedVendor.trim() !== "") {
+    return storedVendor;
+  }
+
+  return "";
 }
 
 function decodeRackUrlContext(): Partial<RackMetadata> {
@@ -60,6 +70,8 @@ function decodeRackUrlContext(): Partial<RackMetadata> {
   const availabilityDomain = params.get("availabilityDomain")
     ? decodeURIComponent(params.get("availabilityDomain") as string)
     : "";
+  const userTypeParam = params.get("userType");
+  const userType = userTypeParam === "master" ? "master" : "vendor";
   const ticketParam = params.get("ticket");
   const ticket = ticketParam && ticketParam.trim() !== "" ? decodeURIComponent(ticketParam) : undefined;
 
@@ -74,6 +86,7 @@ function decodeRackUrlContext(): Partial<RackMetadata> {
     rackState,
     isGpuRack,
     availabilityDomain,
+    userType,
   };
 
   if (ticket) {
@@ -104,6 +117,7 @@ const Content = (props: Props) => {
   const [selectedIsGpuRack, setSelectedIsGpuRack] = useState<boolean>(false);
   const [selectedAvailabilityDomain, setSelectedAvailabilityDomain] = useState(INIT_DEFAULT);
   const [selectedVendor, setSelectedVendor] = useState(INIT_DEFAULT);
+  const [selectedUserType, setSelectedUserType] = useState<"master" | "vendor">("vendor");
   const [selectedResolveEnabled, setSelectedResolveEnabled] = useState<boolean>(false);
   const [selectedResolveDisabledReason, setSelectedResolveDisabledReason] = useState<string>("");
   const [rackReady, setRackReady] = useState<boolean>(false);
@@ -113,7 +127,8 @@ const Content = (props: Props) => {
   useEffect(() => {
     Context.getPageContext().getBusyContext().applicationBootstrapComplete();
     setSelectedPage(props.page as string)
-    setSelectedVendor(sessionStorage.getItem("X-Oracle-Vendor") || "");
+    setSelectedVendor(getStoredVendorName());
+    setSelectedUserType(sessionStorage.getItem("LVV_USER_TYPE") === "master" ? "master" : "vendor");
   }, [selectedVendor]);
 
   // Hydrate rack context from URL when user refreshes /rack/{id}
@@ -136,6 +151,7 @@ const Content = (props: Props) => {
     if (typeof ctx.isGpuRack === "boolean") setSelectedIsGpuRack(Boolean(ctx.isGpuRack));
     if (typeof ctx.availabilityDomain === "string") setSelectedAvailabilityDomain(ctx.availabilityDomain);
     if (typeof ctx.ticket === "string") setSelectedTicket(ctx.ticket);
+    if (ctx.userType) setSelectedUserType(ctx.userType);
     if (typeof ctx.resolveEnabled === "boolean") setSelectedResolveEnabled(Boolean(ctx.resolveEnabled));
     if (typeof ctx.resolveDisabledReason === "string") setSelectedResolveDisabledReason(String(ctx.resolveDisabledReason || ""));
 
@@ -153,9 +169,11 @@ const Content = (props: Props) => {
     setSelectedIsGpuRack(Boolean(value.isGpuRack));
     setSelectedAvailabilityDomain(String(value.availabilityDomain || ""));
     setSelectedTicket(value.ticket);
+    setSelectedUserType(value.userType === "master" ? "master" : "vendor");
     setSelectedResolveEnabled(value.resolveEnabled !== false);
     setSelectedResolveDisabledReason(String(value.resolveDisabledReason || ""));
     setSelectedRackSerialNumber(value.rackSerialNumber);
+    sessionStorage.setItem("LVV_USER_TYPE", value.userType === "master" ? "master" : "vendor");
 
     // If re-selecting the same serial number, also bump:
     setRackSNVersion(v => v + 1);
@@ -184,6 +202,7 @@ const Content = (props: Props) => {
         rackState: String(selectedRackState || ""),
         isGpuRack: String(Boolean(selectedIsGpuRack)),
         availabilityDomain: String(selectedAvailabilityDomain || ""),
+        userType: String(selectedUserType || "vendor"),
       };
       if (hasTicket) {
         queryObj.ticket = String(selectedTicket);
@@ -224,6 +243,7 @@ const Content = (props: Props) => {
                 rack_serial={selectedRackSerialNumber}
                 isGpuRack={selectedIsGpuRack}
                 availabilityDomain={selectedAvailabilityDomain}
+                userType={selectedUserType}
                 resolveEnabled={selectedResolveEnabled}
                 resolveDisabledReason={selectedResolveDisabledReason}
                 region={props.region}

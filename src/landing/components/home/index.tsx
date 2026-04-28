@@ -28,6 +28,7 @@ type RackMetadata = {
     availabilityDomain?: string;
     resolveEnabled?: boolean;
     resolveDisabledReason?: string;
+    userType?: "master" | "vendor";
 }
 
 type ProjectMetadata = {
@@ -41,6 +42,7 @@ const API_URL = getLvvApiBase();
 const HomeContainer = (props: Props) => {
 
     const [projectList, setProjectList] = useState<any[]>([]);
+    const [userType, setUserType] = useState<"master" | "vendor">("vendor");
 
     //This gets updated every time the projectList changes
     let projectListProvider = new MutableArrayDataProvider<any, any>(projectList, { keyAttributes: "projectId" })
@@ -61,11 +63,17 @@ const HomeContainer = (props: Props) => {
 
             let projects = [];
             let vendorResponse;
+            let resolvedUserType: "master" | "vendor" = "vendor";
 
             try {
                 if (!props.vendor && isLocalDesktop) {
                     const masterFetch = await fetch(masterUrl);
-                    projects = masterFetch.ok ? await masterFetch.json() : [];
+                    if (masterFetch.ok) {
+                        projects = await masterFetch.json();
+                        resolvedUserType = "master";
+                    } else {
+                        projects = [];
+                    }
                 } else {
                     // Fetch from vendorUrl
                     const vendorFetch = await fetch(vendorUrl);
@@ -79,8 +87,11 @@ const HomeContainer = (props: Props) => {
                             if (masterFetch.status === 404) {
                                 // masterUrl returns 404: fallback to vendorResponse
                                 projects = vendorResponse;
-                            } else {
+                            } else if (masterFetch.ok) {
                                 projects = await masterFetch.json();
+                                resolvedUserType = "master";
+                            } else {
+                                projects = vendorResponse;
                             }
                         } catch (error) {
                             // Error fetching masterUrl: fallback to vendorResponse
@@ -96,6 +107,8 @@ const HomeContainer = (props: Props) => {
                 projects = []; // or handle error as needed
             }
 
+            sessionStorage.setItem("LVV_USER_TYPE", resolvedUserType);
+            setUserType(resolvedUserType);
             setProjectList(projects);
             setIsLoading(false);
         };
@@ -143,7 +156,8 @@ const HomeContainer = (props: Props) => {
             isGpuRack: value.isGpuRack,
             availabilityDomain: value.availabilityDomain,
             resolveEnabled: value.resolveEnabled !== false,
-            resolveDisabledReason: value.resolveDisabledReason || ""
+            resolveDisabledReason: value.resolveDisabledReason || "",
+            userType,
         }
         console.log("Info passed ", info);
         props.onRackChanged(info)

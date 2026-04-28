@@ -1,6 +1,7 @@
+import { getLvvApiBase } from "../../config/api";
 import { createCsrfHeaders, fetchWithRetry } from "../rack/api";
 
-const LVV_API = window.location.host.includes('localhost') ? "http://localhost:21000/lvv" : `https://${window.location.host}/lvv`;
+const LVV_API = getLvvApiBase();
 
 export const TELEMETRY_METRICS = {
     PROJECT_DETAILS_TABLE_LOAD_LATENCY: "project_details_table_load_latency",

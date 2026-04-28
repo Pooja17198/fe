@@ -167,8 +167,9 @@
     padding: 2px 8px;
     margin-left: 0 !important;
     flex-shrink: 0;
-    min-width: 74px;
-    text-align: right;
+    min-width: max-content;
+    text-align: center;
+    white-space: nowrap;
 }
 
 /* DeviceAccordion styling rework */
@@ -181,16 +182,33 @@
 .device-accordion-toolbar {
     display: flex;
     align-items: center;
+    flex-wrap: wrap;
     margin-bottom: 10px;
     gap: 16px;
     width: 100%;
 }
 .device-accordion-toolbar .flex-spacer {
     flex: 1;
+    min-width: 24px;
+}
+.device-accordion-toolbar-group {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+.device-accordion-toolbar-group-primary {
+    justify-content: flex-end;
+}
+.device-accordion-toolbar-group-secondary {
+    justify-content: flex-end;
 }
 .device-accordion-toolbar label {
     margin: 0;
-    padding: 8px;
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: #f8fafc;
+    border: 1px solid #dbe7f3;
     min-width: fit-content;
     display: flex;
     align-items: center;
@@ -199,8 +217,33 @@
     margin-right: 8px;
 }
 .device-accordion-toolbar .action-btn {
-    margin-left: 6px;
+    margin-left: 0;
     margin-right: 0;
+}
+
+.device-periodic-refresh-interval {
+    width: 84px;
+    min-width: 84px;
+    flex: 0 0 84px;
+}
+
+.device-periodic-refresh-native {
+    width: 100%;
+    height: 32px;
+    padding: 0 28px 0 10px;
+    border: 1px solid #c7d2e3;
+    border-radius: 6px;
+    background: #ffffff;
+    color: #1f2937;
+    font-size: 0.9rem;
+    font-weight: 600;
+    line-height: 1.2;
+    box-sizing: border-box;
+}
+
+.device-periodic-refresh-native:focus {
+    outline: 2px solid #0ea5e9;
+    outline-offset: 1px;
 }
 
 .device-accordion-summary-card {
@@ -446,6 +489,19 @@
 }
 
 /* Device status chips (moved from inline styles) */
+.device-accordion-status {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+    line-height: 1;
+    border-radius: 999px;
+    padding: 6px 10px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    text-align: center;
+}
+
 .device-accordion-status.status-in-progress {
     background: #e3f2fd;
     color: #1565c0;
@@ -461,6 +517,14 @@
 .device-accordion-status.status-not-eligible {
     background: #f1f5f9;
     color: #64748b;
+}
+.device-accordion-status.status-not-enabled {
+    background: #fef3c7;
+    color: #92400e;
+}
+.device-accordion-status.status-periodic-check {
+    background: #ecfeff;
+    color: #0f766e;
 }
 .device-accordion-status.status-error {
     background: #ffe7e7;
@@ -643,7 +707,7 @@
 /* DeviceAccordion columns layout */
 .rack-page .device-accordion-columns-header {
     display: grid;
-    grid-template-columns: var(--device-accordion-cols, minmax(24px, 28px) minmax(300px, 1.5fr) minmax(64px, 120px) minmax(220px, 2fr) minmax(96px, 140px) minmax(90px, 140px) minmax(120px, 220px));
+    grid-template-columns: var(--device-accordion-cols, minmax(24px, 28px) minmax(300px, 1.5fr) minmax(64px, 120px) minmax(220px, 2fr) minmax(96px, 140px) minmax(150px, 220px) minmax(190px, 320px));
     gap: 12px;
     align-items: center;
     padding: 6px 12px;
@@ -662,22 +726,26 @@
 }
 
 /* Align column labels in header grid */
-.rack-page .device-accordion-columns-header span:nth-child(1) { justify-self: center; }
-.rack-page .device-accordion-columns-header span:nth-child(2) { justify-self: start; }
-.rack-page .device-accordion-columns-header span:nth-child(3) { justify-self: start; }
-.rack-page .device-accordion-columns-header span:nth-child(4) { justify-self: start; }
-.rack-page .device-accordion-columns-header span:nth-child(5) { justify-self: center; }
-.rack-page .device-accordion-columns-header span:nth-child(6) { justify-self: center; }
-.rack-page .device-accordion-columns-header span:nth-child(7) { justify-self: end; text-align: right; }
-.rack-page .device-accordion-columns-header.gpu span:nth-child(7) { justify-self: center; text-align: center; }
-.rack-page .device-accordion-columns-header.gpu span:nth-child(8) { justify-self: end; text-align: right; }
+.rack-page .device-accordion-columns-header .device-col.select { justify-self: center; }
+.rack-page .device-accordion-columns-header .device-col.name { justify-self: start; }
+.rack-page .device-accordion-columns-header .device-col.elevation { justify-self: start; }
+.rack-page .device-accordion-columns-header .device-col.errors { justify-self: start; }
+.rack-page .device-accordion-columns-header .device-col.reachability { justify-self: center; }
+.rack-page .device-accordion-columns-header .device-col.psu-status { justify-self: center; }
+.rack-page .device-accordion-columns-header .device-col.last-validated { justify-self: center; }
+.rack-page .device-accordion-columns-header .device-col.status { justify-self: end; text-align: right; }
 
 .rack-page .device-accordion-header-row {
     display: grid !important;
-    grid-template-columns: var(--device-accordion-cols, minmax(24px, 28px) minmax(300px, 1.5fr) minmax(64px, 120px) minmax(220px, 2fr) minmax(96px, 140px) minmax(90px, 140px) minmax(120px, 220px)) !important;
+    grid-template-columns: var(--device-accordion-cols, minmax(24px, 28px) minmax(300px, 1.5fr) minmax(64px, 120px) minmax(220px, 2fr) minmax(96px, 140px) minmax(150px, 220px) minmax(190px, 320px)) !important;
     gap: 12px;
     align-items: center !important;
     width: 100%;
+}
+
+.rack-page .device-accordion-header-row .device-col,
+.rack-page .device-accordion-columns-header .device-col {
+    min-width: 0;
 }
 
 /* Per-column alignment and truncation */
@@ -697,6 +765,11 @@
     opacity: 0.5;
 }
 
+.device-selection-placeholder {
+    color: #94a3b8;
+    font-weight: 600;
+}
+
 .rack-page .device-accordion-header-row .device-col.name {
     display: inline-flex;
     align-items: center;
@@ -707,10 +780,15 @@
 .rack-page .device-accordion-header-row .device-col.last-validated {
     justify-self: center;
     min-width: 0;
+    text-align: center;
 }
 
 .rack-page .device-accordion-header-row .device-col.errors {
     justify-self: start;
+}
+
+.rack-page .device-accordion-header-row .device-col.reachability {
+    justify-self: center;
 }
 
 .rack-page .device-accordion-header-row .device-col.psu-status {
@@ -719,10 +797,31 @@
 
 .rack-page .device-accordion-header-row .device-col.status {
     justify-self: end;
+    text-align: right;
+    white-space: nowrap;
+    min-width: 0;
+}
+
+.rack-page .device-accordion-header-row .device-col.status .device-accordion-status {
+    min-width: max-content;
+    white-space: nowrap;
 }
 
 .rack-page .device-accordion-header-row .device-col.validation-state {
     justify-self: center;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.rack-page .device-accordion-header-row .device-col.validation-state .device-accordion-status,
+.rack-page .device-accordion-header-row .device-col.validation-state .device-last-validated-na {
+    white-space: nowrap;
+}
+
+.rack-page .device-accordion-columns-header .device-col.validation-state {
+    justify-self: center;
+    text-align: center;
+    white-space: nowrap;
 }
 
 .gpu-multiline-value-cell {
@@ -760,6 +859,20 @@
     color: #36506f;
     font-size: 0.88rem;
     white-space: nowrap;
+}
+
+.rack-tabbar-wrap {
+    display: flex;
+    justify-content: flex-start;
+    margin: 12px 0 4px;
+}
+
+.rack-tabbar {
+    background: transparent;
+    width: auto;
+    min-width: 0;
+    inline-size: fit-content;
+    max-inline-size: 100%;
 }
 
 @media (max-width: 1320px) {
@@ -821,6 +934,91 @@
     line-height: 1;
 }
 
+.device-last-validated-time {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 22px;
+    color: #0f172a;
+    font-size: 0.82rem;
+    font-weight: 600;
+    text-align: center;
+}
+
+.device-reachability-indicator {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 999px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    line-height: 1;
+}
+
+.device-reachability-indicator.reachable {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.device-reachability-indicator.unreachable {
+    background: #fee2e2;
+    color: #b91c1c;
+}
+
+.device-reachability-indicator.unknown {
+    background: #e2e8f0;
+    color: #475569;
+}
+
+.device-periodic-status-wrap {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.device-periodic-refresh-btn {
+    border: 1px solid #0f766e;
+    background: #ffffff;
+    color: #0f766e;
+    border-radius: 999px;
+    padding: 2px 8px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.device-periodic-refresh-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.device-optic-periodic-banner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin: 10px 0 12px;
+    padding: 10px 12px;
+    background: #f8fafc;
+    border: 1px solid #d8e1ed;
+    border-radius: 10px;
+}
+
+.device-optic-periodic-label {
+    color: #2a3f5f;
+    font-size: 0.85rem;
+    font-weight: 700;
+    margin-right: 2px;
+}
+
+.device-optic-periodic-status {
+    margin-right: 2px;
+}
+
 /* Optional: better truncation for long device names in the name column */
 .rack-page .device-accordion-devicename {
     max-width: 100%;
@@ -831,8 +1029,11 @@
 
 .device-accordion-error-breakdown {
     display: inline-flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 6px;
+    max-width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
 }
 
 .device-accordion-error-chip {
@@ -841,6 +1042,8 @@
     font-size: 0.75rem;
     font-weight: 600;
     border: 1px solid transparent;
+    white-space: nowrap;
+    flex: 0 0 auto;
 }
 
 /* Per-type chip colors */
@@ -854,6 +1057,8 @@
 .device-accordion-error-chip.chip-fec  { background: #fff7ed; color: #c2410c; border-color: #fed7aa; }
 /* FAN = brown */
 .device-accordion-error-chip.chip-fan  { background: #f5efe6; color: #5d4037; border-color: #e8d8c3; }
+/* BER = teal */
+.device-accordion-error-chip.chip-raw-ber { background: #ecfeff; color: #0f766e; border-color: #a5f3fc; }
 
 .device-accordion-psu-chip {
     display: inline-flex;
@@ -890,6 +1095,65 @@
   white-space: pre-wrap;
   line-height: 1.35;
   word-break: break-word;
+}
+
+.raw-ber-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.raw-ber-cell-empty {
+  color: #64748b;
+}
+
+.raw-ber-entry {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.raw-ber-token-key {
+  color: #475569;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.raw-ber-token-value {
+  color: #0f172a;
+  font-family: Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+.raw-ber-token-value-status-pass,
+.raw-ber-token-value-status-fail,
+.raw-ber-token-value-status-neutral {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-family: inherit;
+}
+
+.raw-ber-token-value-status-pass {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.raw-ber-token-value-status-fail {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.raw-ber-token-value-status-neutral {
+  background: #e2e8f0;
+  color: #334155;
 }
 
 .gpu-lldp-error-details-cell {
@@ -936,23 +1200,25 @@
 .test-section-header {
     margin: 0;
     padding: 0;
-    display: inline-flex;
+    display: flex;
     width: 100%;
     justify-content: space-between;
     align-items: center;
+    gap: 12px;
+    min-width: 0;
     font-size: 0.95rem;
     color: #1e3a5f;
     font-weight: 600;
 }
 
-.device-information-section-body,
-.device-information-section-panel,
-.device-information-list {
-    padding-left: 0 !important;
-    margin-left: 0 !important;
+.test-section-header > span:first-child {
+    flex: 1 1 auto;
+    min-width: 0;
 }
 
 .test-section-count {
+    flex: 0 0 auto;
+    margin-left: auto;
     background: #eff6ff;
     border: 1px solid #bfdbfe;
     color: #1d4ed8;

@@ -30,5 +30,5 @@ if (document.cookie) {
   console.log(cookies);
 }
 // For Dev: Add Session Storage Here for Dev purposes
-// sessionStorage.setItem("X-Oracle-Vendor", "vendor2")
+// sessionStorage.setItem("X-Oracle-Vendor", "")
 // sessionStorage.setItem("X-Oracle-Vendor-Email", "rakshit.viswanatham@oracle.com")

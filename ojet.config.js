@@ -44,6 +44,10 @@ module.exports = {
    * @returns {object|undefined}
    */
   webpack: ({ context, config }) => {
+      const requestedDevServerPort = Number.parseInt(
+        process.env.OJET_DEV_SERVER_PORT || process.env.PORT || "",
+        10
+      );
       config.output.path = path.resolve(__dirname, './web');
       config.output.publicPath = '';
       config.output.clean = false;
@@ -81,6 +85,12 @@ module.exports = {
       // config.plugins.push(new HTMLInlineCSSWebpackPlugin())
     } else {
       // update config with development options
+      if (Number.isFinite(requestedDevServerPort) && requestedDevServerPort > 0) {
+        config.devServer = {
+          ...(config.devServer || {}),
+          port: requestedDevServerPort,
+        };
+      }
     }
     // only have to return if new config object was created but
     // since it doesn't matter always returning the config is good

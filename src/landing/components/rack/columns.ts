@@ -3,13 +3,19 @@ const DEFAULT_COLUMN_SETTINGS = {
   sortable: "enabled",
 } as const;
 
-const RX_POWER_COLUMN_SETTINGS = {
+export const RX_POWER_COLUMN_SETTINGS = {
   ...DEFAULT_COLUMN_SETTINGS,
   headerStyle: "min-width: 289px; width: 289px;",
   style: "min-width: 289px; width: 289px;",
 } as const;
 
-const PATCH_PANEL_COLUMN_SETTINGS = {
+export const RAW_BER_COLUMN_SETTINGS = {
+  ...DEFAULT_COLUMN_SETTINGS,
+  headerStyle: "min-width: 420px; width: 420px;",
+  style: "min-width: 420px; width: 420px;",
+} as const;
+
+export const PATCH_PANEL_COLUMN_SETTINGS = {
   ...DEFAULT_COLUMN_SETTINGS,
   headerStyle: "min-width: 300px; width: 300px;",
   style: "min-width: 300px; width: 300px;",

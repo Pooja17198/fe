@@ -2,31 +2,65 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "preact/hooks"
 import {
     DeviceStatus,
     DeviceValidationFailures,
-    FanFailureRow,
-    FecBerFailureRow,
     HostReadinessItem,
-    InterfaceFailureRow,
     JobErrorDetails,
-    LldpFailureRow,
-    OpticFailureRow,
-    PowerFailureRow,
-    PatchPanelRackRows,
+    PatchPanelByDevicePort,
     PatchPanelRow,
     RackProps,
-    ValidationFailure,
+    RackValidationViewMode,
     ValidationFailuresByDevice,
+    ValidationSection,
+    ValidationTableRow,
 } from "../types";
 import { LVV_API, POLLING } from "../constants";
 import { fetchWithRetry, createCsrfHeaders } from "../api";
-import { anyJobInProgress, isGpuComputeDevice, isRackValidationAllowed, parseContentDispositionFilename } from "../utils";
+import {
+    anyJobInProgress,
+    isGpuComputeDevice,
+    isRackValidationAllowed,
+    parseContentDispositionFilename,
+} from "../utils";
 import { emitMetric, TELEMETRY_METRICS } from "../../telemetry/api";
+import {
+    isPeriodicValidationRefreshEnabledForRack,
+} from "../../../config/configUtils";
+import {
+    getLocalRackStubDeviceStatuses,
+    getLocalRackStubValidationPayload,
+    isLocalRackStubMatch,
+} from "../../../localRackStub";
+import {
+    asArray,
+    asRecord,
+    finalizeCounts,
+    getPeriodicRefreshDeviceNames,
+    normalizeDeviceStatusesPayload,
+    normalizeSectionKey,
+    normalizeValidationFailuresPayload,
+} from "../validationShared";
+
+const VALIDATION_SERVICE_REFRESH_INTERVAL_MS = 10_000;
+
+type ValidationServiceDeviceRequest = {
+    deviceName: string;
+    isGpuDevice: boolean;
+};
+
+type ValidationServiceResultsRequestPayload = {
+    regionName: string;
+    buildingName: string;
+    rackSerialNumber: string;
+    rackNumber: string;
+    devices: ValidationServiceDeviceRequest[];
+};
 
 type UseRackValidationResult = {
     // state
     deviceStatuses: DeviceStatus[];
     devicesLoading: boolean;
     validationFailuresByDevice: ValidationFailuresByDevice;
-    patchPanelRackRows: PatchPanelRackRows;
+    deviceRefreshTimestampsByName: Record<string, string | null>;
+    patchPanelByDevicePort: PatchPanelByDevicePort;
     totalFailureRows: number;
     totalLinkFailureRows: number;
     powerFailureDevices: number;
@@ -34,12 +68,17 @@ type UseRackValidationResult = {
     isValidating: boolean;
     jobErrorDetails: JobErrorDetails;
     isDownloading: boolean;
+    isPeriodicValidationRefreshing: boolean;
 
     // derived
     eligibleDeviceNames: Set<string>;
     eligibleDeviceCount: number;
     rackValidationAllowed: boolean;
     rackValidationTooltip: string;
+    periodicValidationEnabled: boolean;
+    periodicValidationDeviceNames: Set<string>;
+    periodicValidationDeviceCount: number;
+    periodicRefreshIntervalMs: number;
     resolveFeatureEnabled: boolean;
     resolveAllowed: boolean;
     resolveTooltip: string;
@@ -48,18 +87,32 @@ type UseRackValidationResult = {
     setSelectedLinkKeys: (value: Set<string> | ((prev: Set<string>) => Set<string>)) => void;
     validate: () => Promise<void>;
     resolve: () => Promise<{ ok: true } | { ok: false; message: string }>;
-    downloadExcel: () => Promise<void>;
+    downloadCsv: () => Promise<void>;
+    setPeriodicRefreshIntervalMs: (value: number) => void;
+    refreshPeriodicValidationResults: (
+        deviceNames?: Iterable<string>
+    ) => Promise<{ ok: true } | { ok: false; message: string }>;
 };
 
 type HostReadinessByName = Record<string, HostReadinessItem>;
 
-export function useRackValidation(props: RackProps): UseRackValidationResult {
+type UseRackValidationOptions = {
+    viewMode?: RackValidationViewMode;
+};
+
+export function useRackValidation(props: RackProps, options?: UseRackValidationOptions): UseRackValidationResult {
+    const viewMode: RackValidationViewMode = options?.viewMode || "ncp";
+    const validationServiceView = viewMode === "validationService";
+
     // refs for lifecycle and cross-attempt state
     const previousStatusesRef = useRef<Map<string, string>>(new Map());
     const currentRackKeyRef = useRef<string>("");
     const pageAbortRef = useRef<AbortController | null>(null);
-    const patchPanelRackRowsCacheRef = useRef<Map<string, PatchPanelRow[]>>(new Map());
+    const validationFailuresByDeviceRef = useRef<ValidationFailuresByDevice>({});
+    const patchPanelRowsCacheRef = useRef<Map<string, PatchPanelRow[]>>(new Map());
     const patchPanelPrefetchPromiseRef = useRef<Map<string, Promise<PatchPanelRow[]>>>(new Map());
+    const patchPanelLookupKeysRef = useRef<Set<string>>(new Set());
+    const periodicValidationRefreshInFlightRef = useRef(false);
     const validationMeasurementRef = useRef<null | {
         measurementId: number;
         startedAt: number;
@@ -75,17 +128,27 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
     const [hostReadinessLoading, setHostReadinessLoading] = useState<boolean>(false);
     const [validationFailuresByDevice, setValidationFailuresByDevice] =
         useState<ValidationFailuresByDevice>({});
-    const [patchPanelRackRows, setPatchPanelRackRows] = useState<PatchPanelRackRows>([]);
+    const [deviceRefreshTimestampsByName, setDeviceRefreshTimestampsByName] =
+        useState<Record<string, string | null>>({});
+    const [patchPanelByDevicePort, setPatchPanelByDevicePort] = useState<PatchPanelByDevicePort>({});
     const [selectedLinkKeys, setSelectedLinkKeys] = useState<Set<string>>(new Set());
     const [isValidating, setIsValidating] = useState(false);
     const [jobErrorDetails, setJobErrorDetails] = useState<JobErrorDetails>(null);
     const [isDownloading, setIsDownloading] = useState(false);
+    const [isPeriodicValidationRefreshing, setIsPeriodicValidationRefreshing] = useState(false);
+    const [periodicRefreshIntervalMs, setPeriodicRefreshIntervalMs] = useState<number>(
+        VALIDATION_SERVICE_REFRESH_INTERVAL_MS
+    );
     const [completedValidationMeasurement, setCompletedValidationMeasurement] = useState<null | {
         measurementId: number;
         startedAt: number;
         selectedDeviceCount: number;
         rackKey: string;
     }>(null);
+
+    useEffect(() => {
+        validationFailuresByDeviceRef.current = validationFailuresByDevice;
+    }, [validationFailuresByDevice]);
 
     // derived
     const rackValidationAllowed = isRackValidationAllowed(props.isGpuRack, props.rackState);
@@ -101,14 +164,65 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
         : Boolean(props.ticket)
             ? ""
             : "No open ticket";
-    const eligibleDeviceNames = useMemo(
+    const validationEligibleDeviceNames = useMemo(
         () => deviceStatuses.filter(isDeviceValidationEligible).map((device) => device.deviceName),
         [deviceStatuses]
+    );
+    const periodicValidationRefreshEnabled = useMemo(
+        () =>
+            validationServiceView &&
+            isPeriodicValidationRefreshEnabledForRack({
+                region: props.region,
+                building: props.building,
+                block: props.block,
+                rackSerial: props.rack_serial,
+                isGpuRack: props.isGpuRack,
+            }),
+        [validationServiceView, props.region, props.building, props.block, props.rack_serial, props.isGpuRack]
+    );
+    const periodicRefreshDeviceNames = useMemo(
+        () =>
+            getPeriodicRefreshDeviceNames(deviceStatuses, {
+                periodicValidationRefreshEnabled,
+                isGpuRack: props.isGpuRack,
+            }),
+        [deviceStatuses, periodicValidationRefreshEnabled, props.isGpuRack]
+    );
+    const periodicValidationDeviceNameSet = useMemo(
+        () => new Set(periodicRefreshDeviceNames),
+        [periodicRefreshDeviceNames]
+    );
+    const eligibleDeviceNames = useMemo(
+        () => validationEligibleDeviceNames,
+        [validationEligibleDeviceNames]
     );
     const eligibleDeviceNameSet = useMemo(() => new Set(eligibleDeviceNames), [eligibleDeviceNames]);
 
     // Only run effects when rack context is complete (prevents running on Home page)
     const rackContextReady = Boolean(props.region && props.rack_serial && props.rack && props.building);
+
+    const filterOutPeriodicValidationDevices = useCallback(
+        (failuresByDevice: ValidationFailuresByDevice): ValidationFailuresByDevice => {
+            if (periodicValidationDeviceNameSet.size === 0) {
+                return failuresByDevice;
+            }
+
+            let changed = false;
+            const filtered: ValidationFailuresByDevice = {};
+
+            Object.entries(failuresByDevice).forEach(([deviceName, deviceFailures]) => {
+                if (periodicValidationDeviceNameSet.has(deviceName)) {
+                    changed = true;
+                    return;
+                }
+
+                filtered[deviceName] = deviceFailures;
+            });
+
+            return changed ? filtered : failuresByDevice;
+        },
+        [periodicValidationDeviceNameSet]
+    );
 
     // Keep selected device keys constrained to validation-eligible devices.
     useEffect(() => {
@@ -150,11 +264,13 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
     useEffect(() => {
         if (!rackContextReady) return;
         previousStatusesRef.current = new Map();
-        patchPanelRackRowsCacheRef.current = new Map();
+        validationFailuresByDeviceRef.current = {};
+        patchPanelRowsCacheRef.current = new Map();
         patchPanelPrefetchPromiseRef.current = new Map();
-        setHostReadinessByName({});
-        setHostReadinessLoading(false);
-        setPatchPanelRackRows([]);
+        patchPanelLookupKeysRef.current = new Set();
+        setValidationFailuresByDevice({});
+        setDeviceRefreshTimestampsByName({});
+        setPatchPanelByDevicePort({});
     }, [rackContextReady, props.region, props.rack_serial, props.rack, props.building]);
 
     const refreshRackHostReadiness = useCallback(async (signal?: AbortSignal): Promise<void> => {
@@ -172,7 +288,7 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
                 signal
             );
 
-            const nextReadinessByName = items.reduce((acc, item) => {
+            const nextReadinessByName = items.reduce<Record<string, HostReadinessItem>>((acc, item) => {
                 acc[normalizeLookupKey(item.hostName)] = item;
                 return acc;
             }, {} as HostReadinessByName);
@@ -296,6 +412,19 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
             if (!props.rack_serial || !props.region || !props.rack || !props.building) {
                 return false;
             }
+
+            const localStubStatuses = getLocalRackStubDeviceStatuses({
+                region: props.region,
+                building: props.building,
+                rackNumber: props.rack,
+                rackSerialNumber: props.rack_serial,
+            });
+            if (localStubStatuses) {
+                setDeviceStatuses(localStubStatuses);
+                setIsValidating(false);
+                return false;
+            }
+
             const url = new URL(`${LVV_API}/allDevicesInRack`);
             url.searchParams.set("rackSerialNumber", props.rack_serial);
             url.searchParams.set("regionName", props.region);
@@ -330,20 +459,24 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
         return false;
     }, [props.region, props.rack, props.building, props.rack_serial, props.isGpuRack, props.rackState]);
 
-    const prefetchPatchPanelRowsForCurrentRack = useCallback(async (): Promise<PatchPanelRow[]> => {
+    const prefetchPatchPanelRowsForCurrentRack = useCallback(async (
+        options: { forceRefresh?: boolean } = {}
+    ): Promise<PatchPanelRow[]> => {
         if (!props.building || !props.rack || !props.rack_serial || !props.region) {
             return [];
         }
 
         const rackCacheKey = `${props.region}|${props.rack_serial}|${props.rack}|${props.building}`;
-        const cachedRows = patchPanelRackRowsCacheRef.current.get(rackCacheKey);
-        if (cachedRows) {
-            return cachedRows;
-        }
+        if (!options.forceRefresh) {
+            const cachedRows = patchPanelRowsCacheRef.current.get(rackCacheKey);
+            if (cachedRows) {
+                return cachedRows;
+            }
 
-        const inFlightPromise = patchPanelPrefetchPromiseRef.current.get(rackCacheKey);
-        if (inFlightPromise) {
-            return await inFlightPromise;
+            const inFlightPromise = patchPanelPrefetchPromiseRef.current.get(rackCacheKey);
+            if (inFlightPromise) {
+                return await inFlightPromise;
+            }
         }
 
         const fetchPromise = fetchPatchPanelRowsByRack(
@@ -354,7 +487,7 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
             pageAbortRef.current?.signal as AbortSignal | undefined
         )
             .then((rows) => {
-                patchPanelRackRowsCacheRef.current.set(rackCacheKey, rows);
+                patchPanelRowsCacheRef.current.set(rackCacheKey, rows);
                 return rows;
             })
             .finally(() => {
@@ -365,9 +498,58 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
         return await fetchPromise;
     }, [props.building, props.rack, props.rack_serial, props.region]);
 
+    const applyPatchPanelRowsForValidationFailures = useCallback(async (
+        failuresByDevice: ValidationFailuresByDevice,
+        patchPanelRowsPromise?: Promise<PatchPanelRow[]>
+    ): Promise<void> => {
+        const nextLookupKeys = collectPatchPanelLookupKeysFromFailures(failuresByDevice);
+        if (nextLookupKeys.size === 0) {
+            patchPanelLookupKeysRef.current = new Set();
+            setPatchPanelByDevicePort({});
+            if (patchPanelRowsPromise) {
+                void patchPanelRowsPromise.catch(() => undefined);
+            }
+            return;
+        }
+
+        const previousLookupKeys = patchPanelLookupKeysRef.current;
+        const hasNewLookupKeys = Array.from(nextLookupKeys).some(
+            (lookupKey) => !previousLookupKeys.has(lookupKey)
+        );
+
+        try {
+            const rackRows = patchPanelRowsPromise
+                ? await patchPanelRowsPromise
+                : await prefetchPatchPanelRowsForCurrentRack({ forceRefresh: hasNewLookupKeys });
+            patchPanelLookupKeysRef.current = nextLookupKeys;
+            setPatchPanelByDevicePort(indexPatchPanelRowsByDevicePort(rackRows, nextLookupKeys));
+        } catch (patchPanelError: any) {
+            if (patchPanelError?.name !== "AbortError") {
+                console.warn("[RackValidation] patchPanel backend call failed", {
+                    message: patchPanelError?.message || String(patchPanelError),
+                });
+            }
+        }
+    }, [prefetchPatchPanelRowsForCurrentRack]);
+
     const fetchValidationFailures = useCallback(async (): Promise<boolean> => {
       try {
         if (!props.rack_serial || !props.region) return false;
+
+        const localStubPayload = getLocalRackStubValidationPayload({
+          region: props.region,
+          building: props.building,
+          rackNumber: props.rack,
+          rackSerialNumber: props.rack_serial,
+        });
+        if (localStubPayload) {
+          const normalized = normalizeValidationFailuresPayload(localStubPayload, props.rack_serial);
+          const manualFailures = filterOutPeriodicValidationDevices(normalized);
+          validationFailuresByDeviceRef.current = manualFailures;
+          setValidationFailuresByDevice(manualFailures);
+          setPatchPanelByDevicePort({});
+          return true;
+        }
 
         // Start patch panel request early to overlap with cabling validation parsing.
         const patchPanelRowsPromise = prefetchPatchPanelRowsForCurrentRack();
@@ -384,37 +566,217 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
 
         const data: unknown = await resp.json();
         const normalized = normalizeValidationFailuresPayload(data, props.rack_serial);
-        setValidationFailuresByDevice(normalized);
+        const manualFailures = filterOutPeriodicValidationDevices(normalized);
+        const mergedFailures = mergeValidationFailuresByDevice(
+          validationFailuresByDeviceRef.current,
+          manualFailures
+        );
+        validationFailuresByDeviceRef.current = mergedFailures;
+        setValidationFailuresByDevice(mergedFailures);
+        setDeviceRefreshTimestampsByName((prev) => mergeDeviceRefreshTimestamps(prev, manualFailures));
 
-        const hasErrorRows = Object.values(normalized).some(
+        const hasAnyErrors = Object.values(manualFailures).some(
           (device) => (device?.counts?.overallTotal || 0) > 0
         );
 
-        if (!hasErrorRows) {
-          setPatchPanelRackRows([]);
-          // Ensure early-started promise doesn't produce an unhandled rejection.
-          void patchPanelRowsPromise.catch(() => undefined);
+        if (!hasAnyErrors) {
+          await applyPatchPanelRowsForValidationFailures(manualFailures, patchPanelRowsPromise);
           return true; // validation call succeeded
         }
 
         // Patch panel fetch is auxiliary; keep failures response successful even if it fails.
-        try {
-          const rackRows = await patchPanelRowsPromise;
-          setPatchPanelRackRows(rackRows);
-        } catch (patchPanelError: any) {
-          if (patchPanelError?.name !== "AbortError") {
-            console.warn("[RackValidation] patchPanel backend call failed", {
-              message: patchPanelError?.message || String(patchPanelError),
-            });
-          }
-        }
+        await applyPatchPanelRowsForValidationFailures(manualFailures, patchPanelRowsPromise);
 
         return true;
       } catch (e: any) {
         if (e?.name === "AbortError") return false;
         return false; // this is validation API failure path
       }
-    }, [props.region, props.rack_serial, prefetchPatchPanelRowsForCurrentRack]);
+    }, [
+        props.region,
+        props.rack_serial,
+        props.rack,
+        props.building,
+        filterOutPeriodicValidationDevices,
+        prefetchPatchPanelRowsForCurrentRack,
+        applyPatchPanelRowsForValidationFailures,
+    ]);
+
+    const refreshValidationServiceResults = useCallback(async (
+        deviceNames?: Iterable<string>
+    ): Promise<{ ok: true } | { ok: false; message: string }> => {
+        if (!rackContextReady) {
+            return { ok: false, message: "Rack context is incomplete." };
+        }
+
+        const requestedDeviceNames = Array.from(
+            new Set(
+                Array.from(deviceNames || periodicRefreshDeviceNames)
+                    .map((deviceName) => String(deviceName || "").trim())
+                    .filter((deviceName) => periodicValidationDeviceNameSet.has(deviceName))
+            )
+        );
+
+        if (
+            requestedDeviceNames.length === 0 ||
+            !props.region ||
+            !props.building ||
+            !props.rack_serial ||
+            !props.rack
+        ) {
+            return {
+                ok: false,
+                message: "No devices are configured for periodic validation refresh.",
+            };
+        }
+
+        if (periodicValidationRefreshInFlightRef.current) {
+            return { ok: false, message: "Periodic validation refresh is already in progress." };
+        }
+
+        periodicValidationRefreshInFlightRef.current = true;
+        setIsPeriodicValidationRefreshing(true);
+        try {
+            const localStubPayload = getLocalRackStubValidationPayload({
+                region: props.region,
+                building: props.building,
+                rackNumber: props.rack,
+                rackSerialNumber: props.rack_serial,
+            });
+            if (localStubPayload) {
+                const normalized = normalizeValidationFailuresPayload(localStubPayload, props.rack_serial);
+                const responseTimestamp = new Date().toISOString();
+                const stampedResults = stampValidationFailuresWithResponseTime(normalized, responseTimestamp);
+                setDeviceRefreshTimestampsByName((prev) =>
+                    mergeDeviceRefreshTimestamps(prev, stampedResults)
+                );
+
+                const mergedFailures = mergePeriodicValidationFailuresByDevice(
+                    validationFailuresByDeviceRef.current,
+                    normalized
+                );
+                validationFailuresByDeviceRef.current = mergedFailures;
+                setValidationFailuresByDevice(mergedFailures);
+                await applyPatchPanelRowsForValidationFailures(mergedFailures);
+                return { ok: true };
+            }
+
+            const url = new URL(`${LVV_API}/getResultsFromValidationService`);
+            const headers = createCsrfHeaders();
+            headers.append("Content-Type", "application/json");
+            const payload: ValidationServiceResultsRequestPayload = {
+                regionName: props.region,
+                buildingName: props.building,
+                rackSerialNumber: props.rack_serial,
+                rackNumber: props.rack,
+                devices: requestedDeviceNames.map((deviceName) => ({
+                    deviceName,
+                    isGpuDevice: isGpuComputeDevice(deviceName, props.isGpuRack),
+                })),
+            };
+
+            const resp = await fetchWithRetry(url.href, {
+                method: "POST",
+                headers,
+                body: JSON.stringify(payload),
+                signal: pageAbortRef.current?.signal as AbortSignal | undefined,
+            });
+            if (!resp.ok) {
+                return {
+                    ok: false,
+                    message: `Periodic refresh failed with status ${resp.status} ${resp.statusText}`,
+                };
+            }
+
+            const data: unknown = await resp.json();
+            const normalized = normalizeValidationFailuresPayload(data, props.rack_serial);
+            if (Object.keys(normalized).length === 0) {
+                return {
+                    ok: false,
+                    message: "Validation service returned no results for the requested devices.",
+                };
+            }
+
+            const responseTimestamp = new Date().toISOString();
+            const stampedResults = stampValidationFailuresWithResponseTime(normalized, responseTimestamp);
+            setDeviceRefreshTimestampsByName((prev) =>
+                mergeDeviceRefreshTimestamps(prev, stampedResults)
+            );
+
+            const mergedFailures = mergePeriodicValidationFailuresByDevice(
+                validationFailuresByDeviceRef.current,
+                normalized
+            );
+            validationFailuresByDeviceRef.current = mergedFailures;
+            setValidationFailuresByDevice(mergedFailures);
+            await applyPatchPanelRowsForValidationFailures(mergedFailures);
+            return { ok: true };
+        } catch (e: any) {
+            if (e?.name !== "AbortError") {
+                console.warn("[RackValidation] periodic validation-service refresh failed", {
+                    deviceNames: requestedDeviceNames,
+                    message: e?.message || String(e),
+                });
+            }
+            return {
+                ok: false,
+                message:
+                    e?.name === "AbortError"
+                        ? "Periodic validation refresh was cancelled."
+                        : e?.message
+                            ? String(e.message)
+                            : "Periodic validation refresh failed.",
+            };
+        } finally {
+            periodicValidationRefreshInFlightRef.current = false;
+            setIsPeriodicValidationRefreshing(false);
+        }
+    }, [
+        rackContextReady,
+        periodicRefreshDeviceNames,
+        periodicValidationDeviceNameSet,
+        props.region,
+        props.building,
+        props.rack_serial,
+        props.rack,
+        props.isGpuRack,
+        applyPatchPanelRowsForValidationFailures,
+    ]);
+
+    useEffect(() => {
+        if (!periodicValidationRefreshEnabled) return;
+        if (!rackContextReady) return;
+        if (periodicRefreshDeviceNames.length === 0) return;
+
+        const intervalId = window.setInterval(() => {
+            void refreshValidationServiceResults();
+        }, periodicRefreshIntervalMs);
+
+        return () => {
+            window.clearInterval(intervalId);
+        };
+    }, [
+        periodicValidationRefreshEnabled,
+        rackContextReady,
+        periodicRefreshDeviceNames,
+        periodicRefreshIntervalMs,
+        refreshValidationServiceResults,
+    ]);
+
+    useEffect(() => {
+        if (!validationServiceView) return;
+        if (!periodicValidationRefreshEnabled) return;
+        if (!rackContextReady) return;
+        if (periodicRefreshDeviceNames.length === 0) return;
+
+        void refreshValidationServiceResults();
+    }, [
+        validationServiceView,
+        periodicValidationRefreshEnabled,
+        rackContextReady,
+        periodicRefreshDeviceNames,
+        refreshValidationServiceResults,
+    ]);
 
     // initial/sequential load: devices then failures
     // Avoid "cancelled" flag; snapshot rack key and controller at effect start
@@ -432,6 +794,9 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
             const notAborted = !(startSignal && startSignal.aborted);
             if (sameContext && notAborted) {
                 console.log("isValidating (fresh) ", inProgress);
+                if (validationServiceView) {
+                    return;
+                }
                 if (inProgress){
                     console.log("pollValidationJob being executed");
                     await pollValidationJob(createCsrfHeaders());
@@ -449,7 +814,7 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
             });
             setIsValidating(false);
         });
-    }, [rackContextReady, fetchDeviceValidationStatuses, fetchValidationFailures, props.region, props.rack_serial, props.rack]);
+    }, [rackContextReady, fetchDeviceValidationStatuses, props.region, props.rack_serial, props.rack, validationServiceView]);
 
     // POST to start validation job
     const startValidationJob = useCallback(async () => {
@@ -746,14 +1111,8 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
             setIsValidating(false);
             return;
         }
-        // Prefetch patch panel rows in parallel with validation polling so matrix can render sooner.
-        void prefetchPatchPanelRowsForCurrentRack().catch((patchPanelError: any) => {
-            if (patchPanelError?.name !== "AbortError") {
-                console.warn("[RackValidation] patchPanel prefetch failed", {
-                    message: patchPanelError?.message || String(patchPanelError),
-                });
-            }
-        });
+
+        setPatchPanelByDevicePort({});
         const selectedDeviceCount = selectedLinkKeys.size > 0
             ? Array.from(selectedLinkKeys).filter((key) => eligibleDeviceNameSet.has(selectedKeyToDeviceName(key))).length
             : eligibleDeviceNames.length;
@@ -770,6 +1129,45 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
         if (!pageAbortRef.current) {
             pageAbortRef.current = new AbortController();
         }
+
+        if (isLocalRackStubMatch({
+            region: props.region,
+            building: props.building,
+            rackNumber: props.rack,
+            rackSerialNumber: props.rack_serial,
+        })) {
+            const localStubStatuses = getLocalRackStubDeviceStatuses({
+                region: props.region,
+                building: props.building,
+                rackNumber: props.rack,
+                rackSerialNumber: props.rack_serial,
+            });
+            const localStubPayload = getLocalRackStubValidationPayload({
+                region: props.region,
+                building: props.building,
+                rackNumber: props.rack,
+                rackSerialNumber: props.rack_serial,
+            });
+
+            if (localStubStatuses) {
+                setDeviceStatuses(localStubStatuses);
+            }
+            if (localStubPayload) {
+                const manualFailures = filterOutPeriodicValidationDevices(
+                    normalizeValidationFailuresPayload(localStubPayload, props.rack_serial)
+                );
+                validationFailuresByDeviceRef.current = manualFailures;
+                setValidationFailuresByDevice(
+                    manualFailures
+                );
+            }
+            setIsValidating(false);
+            if (validationMeasurementRef.current?.rackKey === currentRackKeyRef.current) {
+                setCompletedValidationMeasurement(validationMeasurementRef.current);
+            }
+            return;
+        }
+
         const headers = createCsrfHeaders();
 
         try {
@@ -805,12 +1203,12 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
         startValidationJob,
         pollValidationJob,
         fetchValidationFailures,
-        prefetchPatchPanelRowsForCurrentRack,
         selectedLinkKeys,
         eligibleDeviceNameSet,
         eligibleDeviceNames,
         rackValidationAllowed,
-        refreshRackHostReadiness
+        filterOutPeriodicValidationDevices,
+        props.rack_serial,
     ]);
 
     const resolve = useCallback(async (): Promise<{ ok: true } | { ok: false; message: string }> => {
@@ -847,16 +1245,14 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
         }
     }, [resolveAllowed, resolveTooltip, props.ticket, props.region, props.onPageChanged]);
 
-    const downloadExcel = useCallback(async () => {
+    const downloadCsv = useCallback(async () => {
         setIsDownloading(true);
         try {
             const url = new URL(`${LVV_API}/downloadCablingValidationResults`);
             url.searchParams.set("rackSerialNumber", props.rack_serial);
             url.searchParams.set("regionName", props.region);
-            url.searchParams.set("format", "xlsx");
-
             const headers = new Headers();
-            headers.append("Accept", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+            headers.append("Accept", "text/csv");
 
             const resp = await fetchWithRetry(url.href, {
                 method: "GET",
@@ -869,10 +1265,7 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
 
             const blob = await resp.blob();
             const cd = resp.headers.get("content-disposition") || "";
-            const filename = parseContentDispositionFilename(
-                cd,
-                `cabling_validation_${props.rack_serial}.xlsx`
-            );
+            const filename = parseContentDispositionFilename(cd, `cabling_validation_${props.rack_serial}.csv`);
 
             const objectUrl = URL.createObjectURL(blob);
             const a = document.createElement("a");
@@ -884,7 +1277,7 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
             URL.revokeObjectURL(objectUrl);
         } catch (e: any) {
             const message = e?.message ? e.message : "Unknown error";
-            alert(`Download Excel failed: ${message}`);
+            alert(`Download failed: ${message}`);
         } finally {
             setIsDownloading(false);
         }
@@ -902,7 +1295,8 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
         deviceStatuses: mergedDeviceStatuses,
         devicesLoading,
         validationFailuresByDevice,
-        patchPanelRackRows,
+        deviceRefreshTimestampsByName,
+        patchPanelByDevicePort,
         totalFailureRows: summaryStats.totalFailureRows,
         totalLinkFailureRows: summaryStats.totalLinkFailureRows,
         powerFailureDevices: summaryStats.powerFailureDevices,
@@ -910,11 +1304,16 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
         isValidating,
         jobErrorDetails,
         isDownloading,
+        isPeriodicValidationRefreshing,
 
         eligibleDeviceNames: eligibleDeviceNameSet,
         eligibleDeviceCount: eligibleDeviceNames.length,
         rackValidationAllowed,
         rackValidationTooltip,
+        periodicValidationEnabled: periodicValidationRefreshEnabled,
+        periodicValidationDeviceNames: periodicValidationDeviceNameSet,
+        periodicValidationDeviceCount: periodicRefreshDeviceNames.length,
+        periodicRefreshIntervalMs,
         resolveFeatureEnabled,
         resolveAllowed,
         resolveTooltip,
@@ -922,21 +1321,79 @@ export function useRackValidation(props: RackProps): UseRackValidationResult {
         setSelectedLinkKeys,
         validate,
         resolve,
-        downloadExcel,
+        downloadCsv,
+        setPeriodicRefreshIntervalMs,
+        refreshPeriodicValidationResults: refreshValidationServiceResults,
     };
 }
 
-type RowRecord = Record<string, unknown>;
 const MONITORED_DEPLOYED_ONLY_REASON =
     "Device is not in monitored and deployed state.";
 const GPU_RACK_IN_SERVICE_ONLY_REASON =
     "Validation is allowed for GPU racks only when rack state is IN-SERVICE.";
+const POWER_SECTION_TITLE = "Power Errors";
 
-function asRecord(value: unknown): RowRecord | null {
-    if (value && typeof value === "object" && !Array.isArray(value)) {
-        return value as RowRecord;
+function normalizeLookupKey(value: string | null | undefined): string {
+    return String(value || "").trim().toLowerCase();
+}
+
+async function fetchRackHostReadiness(
+    rackSerialNumber: string,
+    region: string,
+    signal?: AbortSignal
+): Promise<HostReadinessItem[]> {
+    if (!rackSerialNumber || !region) {
+        return [];
     }
-    return null;
+
+    const availabilityDomains = [1, 2, 3].map((adNumber) => `${region}-ad-${adNumber}`);
+
+    for (const availabilityDomain of availabilityDomains) {
+        const readinessUrl = new URL(`${LVV_API}/rackHostCableValidationReadiness`);
+        readinessUrl.searchParams.set("rackSerialNumber", rackSerialNumber);
+        readinessUrl.searchParams.set("regionName", region);
+        readinessUrl.searchParams.set("availabilityDomain", availabilityDomain);
+
+        const response = await fetchWithRetry(readinessUrl.href, { method: "GET", signal });
+        if (!response.ok) {
+            continue;
+        }
+
+        const body = await response.text();
+        if (!body.trim()) {
+            continue;
+        }
+
+        let payload: unknown;
+        try {
+            payload = JSON.parse(body);
+        } catch {
+            continue;
+        }
+
+        const record = asRecord(payload);
+        const hostReadiness = asArray(record?.["hostReadiness"]);
+        if (hostReadiness.length === 0) {
+            continue;
+        }
+
+        return hostReadiness
+            .map((rawItem: unknown) => asRecord(rawItem))
+            .filter((item: Record<string, unknown> | null): item is Record<string, unknown> => Boolean(item))
+            .map((item: Record<string, unknown>) => ({
+                hostSerial: String(item["hostSerial"] ?? item["serialNumber"] ?? ""),
+                hostName: String(item["hostName"] ?? item["deviceName"] ?? item["host"] ?? ""),
+                instanceId: item["instanceId"] == null ? null : String(item["instanceId"]),
+                hopsState: item["hopsState"] == null ? undefined : String(item["hopsState"]),
+                computeState: item["computeState"] == null ? undefined : String(item["computeState"]),
+                computePool: item["computePool"] == null ? undefined : String(item["computePool"]),
+                status: String(item["status"] ?? ""),
+                ticketId: item["ticketId"] == null ? null : String(item["ticketId"]),
+                ticketIds: asArray(item["ticketIds"]).map((ticket: unknown) => String(ticket)),
+            }));
+    }
+
+    return [];
 }
 
 function selectedKeyToDeviceName(key: string): string {
@@ -947,484 +1404,503 @@ function isDeviceValidationEligible(device: DeviceStatus): boolean {
     return device.validationEligible !== false;
 }
 
-function normalizeDeviceStatusesPayload(payload: unknown): DeviceStatus[] {
-    const rows = asArray(payload);
-    const devicesByName = new Map<string, DeviceStatus>();
+function areStringArraysEqual(left: string[] | undefined, right: string[] | undefined): boolean {
+    const leftValues = left || [];
+    const rightValues = right || [];
+    if (leftValues.length !== rightValues.length) {
+        return false;
+    }
 
-    rows.forEach((item) => {
-        const record = asRecord(item);
-        if (!record) return;
+    return leftValues.every((value, index) => value === rightValues[index]);
+}
 
-        const deviceName = pick(record, ["deviceName", "name", "device_name"], "");
-        if (!deviceName) return;
+function areUnknownValuesEqual(left: unknown, right: unknown): boolean {
+    if (Object.is(left, right)) {
+        return true;
+    }
 
-        const prior = devicesByName.get(deviceName);
-        const statusValue = pick(record, ["jobStatus", "status", "validationStatus"], "NOT_TRIGGERED");
-        const elevation = toInteger(record["elevation"] ?? record["slot"]);
-        const eligibility = inferValidationEligibility(record);
+    if (Array.isArray(left) || Array.isArray(right)) {
+        if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) {
+            return false;
+        }
 
-        devicesByName.set(deviceName, {
-            deviceName,
-            jobStatus: statusValue || prior?.jobStatus || "NOT_TRIGGERED",
-            elevation:
-                typeof elevation === "number"
-                    ? elevation
-                    : typeof prior?.elevation === "number"
-                        ? prior.elevation
-                        : undefined,
-            validationEligible:
-                typeof eligibility.eligible === "boolean"
-                    ? eligibility.eligible
-                    : prior?.validationEligible,
-            validationEligibilityReason: eligibility.reason || prior?.validationEligibilityReason,
-            _key: deviceName,
-        });
+        return left.every((value, index) => areUnknownValuesEqual(value, right[index]));
+    }
+
+    if (
+        left &&
+        right &&
+        typeof left === "object" &&
+        typeof right === "object"
+    ) {
+        const leftRecord = left as Record<string, unknown>;
+        const rightRecord = right as Record<string, unknown>;
+        const leftKeys = Object.keys(leftRecord).sort();
+        const rightKeys = Object.keys(rightRecord).sort();
+
+        if (!areStringArraysEqual(leftKeys, rightKeys)) {
+            return false;
+        }
+
+        return leftKeys.every((key) => areUnknownValuesEqual(leftRecord[key], rightRecord[key]));
+    }
+
+    return false;
+}
+
+function areValidationTableRowsEqual(
+    leftRows: ValidationTableRow[],
+    rightRows: ValidationTableRow[]
+): boolean {
+    if (leftRows.length !== rightRows.length) {
+        return false;
+    }
+
+    return leftRows.every((row, index) => areUnknownValuesEqual(row, rightRows[index]));
+}
+
+function areValidationSectionsEqual(
+    leftSections: Record<string, ValidationSection>,
+    rightSections: Record<string, ValidationSection>,
+    sectionOrder: string[]
+): boolean {
+    return sectionOrder.every((sectionKey) => {
+        const leftSection = leftSections[sectionKey];
+        const rightSection = rightSections[sectionKey];
+
+        if (!leftSection || !rightSection) {
+            return leftSection === rightSection;
+        }
+
+        return (
+            leftSection.key === rightSection.key &&
+            leftSection.title === rightSection.title &&
+            areValidationTableRowsEqual(leftSection.rows, rightSection.rows)
+        );
     });
-
-    return Array.from(devicesByName.values());
 }
 
-function inferValidationEligibility(record: RowRecord): { eligible: boolean; reason?: string } {
-    const explicitEligibility = firstBoolean([
-        record["validationEligible"],
-        record["isValidationEligible"],
-        record["canValidate"],
-        record["canRunValidation"],
-        record["validatable"],
-        record["isValidatable"],
-        record["eligibleForValidation"],
-        record["validationSupported"],
-    ]);
-    if (explicitEligibility !== null) {
-        return explicitEligibility
-            ? { eligible: true }
-            : { eligible: false, reason: MONITORED_DEPLOYED_ONLY_REASON };
+function areCountsEqual(
+    leftCounts: DeviceValidationFailures["counts"],
+    rightCounts: DeviceValidationFailures["counts"]
+): boolean {
+    if (
+        leftCounts.power !== rightCounts.power ||
+        leftCounts.nonPowerTotal !== rightCounts.nonPowerTotal ||
+        leftCounts.overallTotal !== rightCounts.overallTotal
+    ) {
+        return false;
     }
 
-    const monitored = inferMonitored(record);
-    const deployed = inferDeployed(record);
-
-    if (monitored !== null && deployed !== null) {
-        return monitored && deployed
-            ? { eligible: true }
-            : { eligible: false, reason: MONITORED_DEPLOYED_ONLY_REASON };
-    }
-    if (monitored !== null) {
-        return monitored
-            ? { eligible: true }
-            : { eligible: false, reason: MONITORED_DEPLOYED_ONLY_REASON };
-    }
-    if (deployed !== null) {
-        return deployed
-            ? { eligible: true }
-            : { eligible: false, reason: MONITORED_DEPLOYED_ONLY_REASON };
+    const leftSectionKeys = Object.keys(leftCounts.bySection).sort();
+    const rightSectionKeys = Object.keys(rightCounts.bySection).sort();
+    if (!areStringArraysEqual(leftSectionKeys, rightSectionKeys)) {
+        return false;
     }
 
-    // If API does not expose monitored/deployed hints, keep backward-compatible behavior.
-    return { eligible: true };
+    return leftSectionKeys.every(
+        (sectionKey) => leftCounts.bySection[sectionKey] === rightCounts.bySection[sectionKey]
+    );
 }
 
-function inferMonitored(record: RowRecord): boolean | null {
-    const explicit = firstBoolean([
-        record["isMonitored"],
-        record["monitored"],
-        record["monitoringEnabled"],
-        record["isMonitoringEnabled"],
-    ]);
-    if (explicit !== null) return explicit;
+function areDeviceValidationFailuresEqual(
+    left: DeviceValidationFailures,
+    right: DeviceValidationFailures
+): boolean {
+    return (
+        left.deviceName === right.deviceName &&
+        left.lastValidated === right.lastValidated &&
+        left.reachability === right.reachability &&
+        left.hasPsuFailure === right.hasPsuFailure &&
+        areStringArraysEqual(left.sectionOrder, right.sectionOrder) &&
+        areStringArraysEqual(left.presentSectionKeys, right.presentSectionKeys) &&
+        areStringArraysEqual(left.periodicSectionKeys, right.periodicSectionKeys) &&
+        areValidationTableRowsEqual(left.powerRows, right.powerRows) &&
+        areValidationSectionsEqual(left.sections, right.sections, left.sectionOrder) &&
+        areCountsEqual(left.counts, right.counts)
+    );
+}
 
-    const configAttributes = asRecord(record["configAttributes"]);
-    if (configAttributes) {
-        if (Object.prototype.hasOwnProperty.call(configAttributes, "monitoring.interfaces")) {
-            return toPresenceFlag(configAttributes["monitoring.interfaces"]) ?? false;
-        }
+function areValidationFailuresByDeviceEqual(
+    left: ValidationFailuresByDevice,
+    right: ValidationFailuresByDevice
+): boolean {
+    const leftDeviceNames = Object.keys(left).sort();
+    const rightDeviceNames = Object.keys(right).sort();
+
+    if (!areStringArraysEqual(leftDeviceNames, rightDeviceNames)) {
+        return false;
     }
 
-    const monitoringInterfaces = readRecordPath(record, ["monitoring", "interfaces"]);
-    const monitoringInterfacesDirect = record["monitoringInterfaces"];
-    const monitorByPresence = toPresenceFlag(monitoringInterfaces);
-    if (monitorByPresence !== null) return monitorByPresence;
-    const monitorByPresenceDirect = toPresenceFlag(monitoringInterfacesDirect);
-    if (monitorByPresenceDirect !== null) return monitorByPresenceDirect;
-
-    return null;
-}
-
-function inferDeployed(record: RowRecord): boolean | null {
-    const explicit = firstBoolean([record["isDeployed"], record["deployed"]]);
-    if (explicit !== null) return explicit;
-
-    const stateCandidates = [
-        record["deviceState"],
-        record["state"],
-        record["deploymentState"],
-        record["lifecycleState"],
-        readRecordPath(record, ["state", "conf", "device.state"]),
-        readRecordPath(record, ["state", "device.state"]),
-        readRecordPath(record, ["conf", "device.state"]),
-    ];
-
-    const normalizedState = firstString(stateCandidates);
-    if (!normalizedState) return null;
-
-    return normalizedState.toLowerCase() === "deployed";
-}
-
-function readRecordPath(record: RowRecord, path: string[]): unknown {
-    let current: unknown = record;
-    for (const key of path) {
-        const currentRecord = asRecord(current);
-        if (!currentRecord || !Object.prototype.hasOwnProperty.call(currentRecord, key)) {
-            return undefined;
-        }
-        current = currentRecord[key];
-    }
-    return current;
-}
-
-function firstBoolean(values: unknown[]): boolean | null {
-    for (const value of values) {
-        const parsed = toBoolean(value);
-        if (parsed !== null) return parsed;
-    }
-    return null;
-}
-
-function firstString(values: unknown[]): string | null {
-    for (const value of values) {
-        if (value === null || value === undefined) continue;
-        if (typeof value === "string" && value.trim() !== "") {
-            return value.trim();
-        }
-    }
-    return null;
-}
-
-function toBoolean(value: unknown): boolean | null {
-    if (typeof value === "boolean") return value;
-    if (typeof value === "number") {
-        if (value === 1) return true;
-        if (value === 0) return false;
-    }
-    if (typeof value === "string") {
-        const normalized = value.trim().toLowerCase();
-        if (["true", "yes", "y", "1", "enabled"].includes(normalized)) return true;
-        if (["false", "no", "n", "0", "disabled"].includes(normalized)) return false;
-    }
-    return null;
-}
-
-function toPresenceFlag(value: unknown): boolean | null {
-    const parsedBoolean = toBoolean(value);
-    if (parsedBoolean !== null) return parsedBoolean;
-    if (Array.isArray(value)) return value.length > 0;
-    if (value && typeof value === "object") return true;
-    if (typeof value === "string") return value.trim() !== "";
-    if (value === null || value === undefined) return null;
-    return null;
-}
-
-function toInteger(value: unknown): number | undefined {
-    if (typeof value === "number" && Number.isFinite(value)) return value;
-    if (typeof value === "string") {
-        const parsed = Number.parseInt(value.trim(), 10);
-        if (Number.isFinite(parsed)) return parsed;
-    }
-    return undefined;
-}
-
-function asArray(value: unknown): unknown[] {
-    return Array.isArray(value) ? value : [];
-}
-
-function normalizeLookupKey(value: unknown): string {
-    return String(value || "").trim().toLowerCase();
-}
-
-function text(value: unknown, fallback: string = "Unknown"): string {
-    if (value === null || value === undefined) return fallback;
-    const rendered = String(value).trim();
-    return rendered === "" ? fallback : rendered;
-}
-
-function textOrEmpty(value: unknown): string {
-    if (value === null || value === undefined) return "";
-    return String(value).trim();
-}
-
-function pick(record: RowRecord, keys: string[], fallback: string = "Unknown"): string {
-    for (const key of keys) {
-        if (Object.prototype.hasOwnProperty.call(record, key)) {
-            const value = record[key];
-            if (value !== null && value !== undefined && String(value).trim() !== "") {
-                return String(value).trim();
-            }
-        }
-    }
-    return fallback;
-}
-
-function buildEmptyDeviceValidationFailures(deviceName: string): DeviceValidationFailures {
-    return {
-        deviceName,
-        lastValidated: null,
-        tests: {
-            lldp: [],
-            optics: [],
-            interfaces: [],
-            fecBer: [],
-            fans: [],
-            power: [],
-        },
-        counts: {
-            lldp: 0,
-            optics: 0,
-            interfaces: 0,
-            fecBer: 0,
-            fans: 0,
-            power: 0,
-            nonPowerTotal: 0,
-            overallTotal: 0,
-        },
-        hasPsuFailure: false,
-    };
-}
-
-function finalizeCounts(device: DeviceValidationFailures): DeviceValidationFailures {
-    const counts = {
-        lldp: device.tests.lldp.length,
-        optics: device.tests.optics.length,
-        interfaces: device.tests.interfaces.length,
-        fecBer: device.tests.fecBer.length,
-        fans: device.tests.fans.length,
-        power: device.tests.power.length,
-        nonPowerTotal:
-            device.tests.lldp.length +
-            device.tests.optics.length +
-            device.tests.interfaces.length +
-            device.tests.fecBer.length +
-            device.tests.fans.length,
-        overallTotal:
-            device.tests.lldp.length +
-            device.tests.optics.length +
-            device.tests.interfaces.length +
-            device.tests.fecBer.length +
-            device.tests.fans.length +
-            device.tests.power.length,
-    };
-    return {
-        ...device,
-        counts,
-        hasPsuFailure: counts.power > 0,
-    };
-}
-
-function mapLldpRow(raw: unknown, deviceName: string, idx: number): LldpFailureRow {
-    const row = asRecord(raw) || {};
-    return {
-        _key: `${deviceName}|lldp|${idx}|${pick(row, ["Device A Port", "deviceAPort"], "")}`,
-        deviceARack: pick(row, ["Device A Rack", "deviceARack"]),
-        deviceAName: pick(row, ["Device A Name", "deviceAName"], deviceName),
-        deviceAPort: pick(row, ["Device A Port", "deviceAPort"]),
-        deviceALocation: pick(row, ["Device A Location", "deviceALocation"]),
-        currentDeviceBRack: pick(row, ["Device B Rack", "Current Device B Rack", "deviceBRack"]),
-        currentDeviceBName: pick(row, ["Device B Name", "Current Device B Name", "deviceBName"]),
-        currentDeviceBPort: pick(row, ["Device B Port", "Current Device B Port", "deviceBPort"]),
-        currentBLocation: pick(
-            row,
-            ["Current B Location", "currentBLocation"]
-        ),
-        expectedDeviceBRack: pick(row, ["Expected Device B Rack", "deviceBRackExpected"]),
-        expectedDeviceBName: pick(row, ["Expected Device B Name", "deviceBNameExpected"]),
-        expectedDeviceBPort: pick(row, ["Expected Device B Port", "deviceBPortExpected"]),
-        expectedBLocation: pick(
-            row,
-            ["Expected B Location", "expectedBLocation"]
-        ),
-        linkStatus: pick(row, ["LLDP Status", "Link Status", "lldpStatus", "linkStatus"]),
-        errorMessage: textOrEmpty(row["Error Message"] ?? row["errorMessage"]),
-    };
-}
-
-function mapOpticRow(raw: unknown, deviceName: string, idx: number): OpticFailureRow {
-    const row = asRecord(raw) || {};
-    return {
-        _key: `${deviceName}|optics|${idx}|${pick(row, ["Device Port", "devicePort"], "")}`,
-        deviceName: pick(row, ["Device Name", "deviceName", "Device A Name", "deviceAName"], deviceName),
-        devicePort: pick(row, ["Device Port", "devicePort", "Device A Port", "deviceAPort"]),
-        transceiver: textOrEmpty(row["Transciever"] ?? row["Transceiver"] ?? row["transceiver"]),
-        txPower: pick(row, ["Tx Power", "TX Power", "txPower"], ""),
-        rxPower: pick(row, ["Rx Power", "RX Power", "rxPower"], ""),
-        sourceDeviceName: pick(row, ["Source Device Name", "sourceDeviceName"], deviceName),
-        sourceDevicePort: pick(row, ["Source Device Port", "sourceDevicePort"]),
-        sourceDeviceLocation: pick(row, ["Source Device Location", "sourceDeviceLocation"]),
-        remoteDeviceName: pick(row, ["Remote Device Name", "remoteDeviceName"]),
-        remoteDevicePort: pick(row, ["Remote Device Port", "remoteDevicePort"]),
-        errorMessage: textOrEmpty(row["Error Message"] ?? row["errorMessage"]),
-    };
-}
-
-function mapInterfaceRow(raw: unknown, deviceName: string, idx: number): InterfaceFailureRow {
-    const row = asRecord(raw) || {};
-    return {
-        _key: `${deviceName}|interfaces|${idx}|${pick(row, ["Device Port", "devicePort"], "")}`,
-        deviceName: pick(row, ["Device Name", "deviceName"], deviceName),
-        devicePort: pick(row, ["Device Port", "devicePort"]),
-        issue: pick(row, ["Issue", "issue"]),
-        sourceDeviceName: pick(row, ["Source Device Name", "sourceDeviceName"], deviceName),
-        sourceDevicePort: pick(row, ["Source Device Port", "sourceDevicePort"]),
-        sourceDeviceLocation: pick(row, ["Source Device Location", "sourceDeviceLocation"]),
-        remoteDeviceName: pick(row, ["Remote Device Name", "remoteDeviceName"]),
-        remoteDevicePort: pick(row, ["Remote Device Port", "remoteDevicePort"]),
-    };
-}
-
-function mapFecBerRow(raw: unknown, deviceName: string, idx: number): FecBerFailureRow {
-    const row = asRecord(raw) || {};
-    return {
-        _key: `${deviceName}|fecber|${idx}|${pick(row, ["Device Port", "devicePort"], "")}`,
-        deviceRack: pick(row, ["Device Rack", "deviceRack"]),
-        deviceName: pick(row, ["Device Name", "deviceName"], deviceName),
-        devicePort: pick(row, ["Device Port", "devicePort"]),
-        preFecBer: pick(row, ["PRE_FEC_BER", "preFecBer"]),
-        lockStatus: pick(row, ["Lock Status", "lockStatus"]),
-        remoteDevice: pick(row, ["Remote Device", "remoteDevice"]),
-        remoteInterface: pick(row, ["Remote Interface", "remoteInterface"]),
-        errorMessage: textOrEmpty(row["Error Message"] ?? row["errorMessage"]),
-    };
-}
-
-function mapFanRow(raw: unknown, deviceName: string, idx: number): FanFailureRow {
-    const row = asRecord(raw) || {};
-    return {
-        _key: `${deviceName}|fans|${idx}|${pick(row, ["Fan Slot", "fanSlot"], "")}`,
-        deviceName: pick(row, ["Device Name", "deviceName"], deviceName),
-        fanName: textOrEmpty(row["Fan Name"] ?? row["fanName"]),
-        fanSlot: text(row["Fan Slot"] ?? row["fanSlot"]),
-        status: text(row["Status"] ?? row["status"]),
-        errorMessage: textOrEmpty(row["Error Message"] ?? row["errorMessage"]),
-    };
-}
-
-function mapPowerRow(raw: unknown, deviceName: string, idx: number): PowerFailureRow {
-    const row = asRecord(raw) || {};
-    return {
-        _key: `${deviceName}|power|${idx}`,
-        deviceName: pick(row, ["Device A Name", "Device Name", "deviceAName", "deviceName"], deviceName),
-    };
-}
-
-function normalizeLegacyValidationRows(rows: ValidationFailure[]): ValidationFailuresByDevice {
-    const byDevice: ValidationFailuresByDevice = {};
-
-    rows.forEach((row, idx) => {
-        const deviceName = text(row.deviceAName, "Unknown");
-        if (!byDevice[deviceName]) {
-            byDevice[deviceName] = buildEmptyDeviceValidationFailures(deviceName);
-        }
-        const current = byDevice[deviceName];
-
-        current.tests.lldp.push({
-            _key: `${deviceName}|legacy-lldp|${idx}|${textOrEmpty(row.deviceAPort)}`,
-            deviceARack: text(row.deviceARack),
-            deviceAName: deviceName,
-            deviceAPort: text(row.deviceAPort),
-            currentDeviceBRack: text(row.deviceBRack),
-            currentDeviceBName: text(row.deviceBName),
-            currentDeviceBPort: text(row.deviceBPort),
-            expectedDeviceBRack: text(row.deviceBRackExpected),
-            expectedDeviceBName: text(row.deviceBNameExpected),
-            expectedDeviceBPort: text(row.deviceBPortExpected),
-            linkStatus: text(row.lldpStatus || row.linkStatus),
-            errorMessage: "",
-        });
-
-        const hasOptics = textOrEmpty(row.txPower) !== "" || textOrEmpty(row.rxPower) !== "";
-        if (hasOptics) {
-            current.tests.optics.push({
-                _key: `${deviceName}|legacy-optics|${idx}|${textOrEmpty(row.deviceAPort)}`,
-                deviceName,
-                devicePort: text(row.deviceAPort),
-                txPower: textOrEmpty(row.txPower),
-                rxPower: textOrEmpty(row.rxPower),
-            });
-        }
-
-        const psuFailure = textOrEmpty(row.psuFailure);
-        if (psuFailure !== "" && psuFailure.toLowerCase() !== "null") {
-            current.tests.power.push({
-                _key: `${deviceName}|legacy-power|${idx}`,
-                deviceName,
-            });
-        }
+    return leftDeviceNames.every((deviceName) => {
+        const leftDevice = left[deviceName];
+        const rightDevice = right[deviceName];
+        return Boolean(leftDevice && rightDevice && areDeviceValidationFailuresEqual(leftDevice, rightDevice));
     });
-
-    Object.keys(byDevice).forEach((deviceName) => {
-        byDevice[deviceName] = finalizeCounts(byDevice[deviceName]);
-    });
-
-    return byDevice;
 }
 
-function normalizeValidationFailuresPayload(
-    payload: unknown,
-    rackSerial: string
+function mergeValidationFailuresByDevice(
+    previous: ValidationFailuresByDevice,
+    incoming: ValidationFailuresByDevice
 ): ValidationFailuresByDevice {
-    if (Array.isArray(payload)) {
-        return normalizeLegacyValidationRows(payload as ValidationFailure[]);
+    if (Object.keys(incoming).length === 0) {
+        return previous;
     }
 
-    const payloadRecord = asRecord(payload);
-    if (!payloadRecord) return {};
+    const merged: ValidationFailuresByDevice = {
+        ...previous,
+        ...incoming,
+    };
+    const powerSectionKey = normalizeSectionKey(POWER_SECTION_TITLE);
 
-    let rackNode: unknown = payloadRecord[rackSerial];
-    if (!rackNode) {
-        const keys = Object.keys(payloadRecord);
-        if (keys.length === 1) {
-            rackNode = payloadRecord[keys[0]];
-        }
-    }
-
-    const rackRecord = asRecord(rackNode);
-    if (!rackRecord) return {};
-
-    const byDevice: ValidationFailuresByDevice = {};
-
-    Object.entries(rackRecord).forEach(([deviceName, deviceResults]) => {
-        const resultsRecord = asRecord(deviceResults);
-        if (!resultsRecord) {
+    Object.entries(incoming).forEach(([deviceName, incomingDevice]) => {
+        const previousDevice = previous[deviceName];
+        const periodicSectionKeys = previousDevice?.periodicSectionKeys || [];
+        if (!previousDevice || periodicSectionKeys.length === 0) {
             return;
         }
 
-        const current = buildEmptyDeviceValidationFailures(deviceName);
-        const lastValidatedValue = resultsRecord["Last Validated"];
-        current.lastValidated =
-            lastValidatedValue === null || lastValidatedValue === undefined
-                ? null
-                : String(lastValidatedValue).trim() || null;
-        current.tests.lldp = asArray(resultsRecord["LLDP Errors"]).map((row, idx) =>
-            mapLldpRow(row, deviceName, idx)
-        );
-        current.tests.optics = asArray(resultsRecord["Optic Errors"]).map((row, idx) =>
-            mapOpticRow(row, deviceName, idx)
-        );
-        current.tests.interfaces = asArray(resultsRecord["Interface Errors"]).map((row, idx) =>
-            mapInterfaceRow(row, deviceName, idx)
-        );
-        current.tests.fecBer = asArray(resultsRecord["FEC_BER Errors"]).map((row, idx) =>
-            mapFecBerRow(row, deviceName, idx)
-        );
-        current.tests.fans = asArray(resultsRecord["Fan Errors"]).map((row, idx) =>
-            mapFanRow(row, deviceName, idx)
-        );
-        current.tests.power = asArray(resultsRecord["Power Errors"]).map((row, idx) =>
-            mapPowerRow(row, deviceName, idx)
-        );
+        const nextDevice: DeviceValidationFailures = {
+            ...incomingDevice,
+            reachability: incomingDevice.reachability ?? previousDevice.reachability ?? null,
+            sections: { ...incomingDevice.sections },
+            sectionOrder: [...incomingDevice.sectionOrder],
+            presentSectionKeys: [...(incomingDevice.presentSectionKeys || [])],
+            periodicSectionKeys: [...periodicSectionKeys],
+            powerRows: incomingDevice.powerRows,
+        };
 
-        byDevice[deviceName] = finalizeCounts(current);
+        periodicSectionKeys.forEach((sectionKey) => {
+            if (sectionKey === powerSectionKey) {
+                nextDevice.powerRows = previousDevice.powerRows;
+                return;
+            }
+
+            const periodicSection = previousDevice.sections[sectionKey];
+            if (periodicSection) {
+                nextDevice.sections[sectionKey] = periodicSection;
+                if (!nextDevice.sectionOrder.includes(sectionKey)) {
+                    nextDevice.sectionOrder.push(sectionKey);
+                }
+                return;
+            }
+
+            delete nextDevice.sections[sectionKey];
+            nextDevice.sectionOrder = nextDevice.sectionOrder.filter(
+                (existingSectionKey) => existingSectionKey !== sectionKey
+            );
+        });
+
+        merged[deviceName] = finalizeCounts(nextDevice);
     });
 
-    return byDevice;
+    return areValidationFailuresByDeviceEqual(previous, merged) ? previous : merged;
+}
+
+function mergePeriodicValidationFailuresByDevice(
+    previous: ValidationFailuresByDevice,
+    incoming: ValidationFailuresByDevice
+): ValidationFailuresByDevice {
+    if (Object.keys(incoming).length === 0) {
+        return previous;
+    }
+
+    const merged: ValidationFailuresByDevice = { ...previous };
+    const powerSectionKey = normalizeSectionKey(POWER_SECTION_TITLE);
+
+    Object.entries(incoming).forEach(([deviceName, incomingDevice]) => {
+        const previousDevice = previous[deviceName];
+
+        if (!previousDevice) {
+            merged[deviceName] = finalizeCounts(incomingDevice);
+            return;
+        }
+
+        const incomingPeriodicSectionKeys = [...(incomingDevice.presentSectionKeys || [])];
+        const previousPeriodicSectionKeys = [...(previousDevice.periodicSectionKeys || [])];
+        const previousReachability = previousDevice.reachability ?? null;
+        const incomingReachability = incomingDevice.reachability ?? previousReachability;
+        const periodicSectionsChanged =
+            !areStringArraysEqual(previousPeriodicSectionKeys, incomingPeriodicSectionKeys) ||
+            incomingPeriodicSectionKeys.some((sectionKey) => {
+                if (sectionKey === powerSectionKey) {
+                    return !areValidationTableRowsEqual(previousDevice.powerRows, incomingDevice.powerRows);
+                }
+
+                const previousSection = previousDevice.sections[sectionKey];
+                const incomingSection = incomingDevice.sections[sectionKey];
+                if (!previousSection || !incomingSection) {
+                    return previousSection !== incomingSection;
+                }
+
+                return (
+                    previousSection.title !== incomingSection.title ||
+                    !areValidationTableRowsEqual(previousSection.rows, incomingSection.rows)
+                );
+            });
+
+        const nextDevice: DeviceValidationFailures = {
+            ...previousDevice,
+            lastValidated: previousDevice.lastValidated,
+            reachability: incomingReachability,
+            sections: { ...previousDevice.sections },
+            sectionOrder: [...previousDevice.sectionOrder],
+            powerRows: previousDevice.powerRows,
+            presentSectionKeys: incomingPeriodicSectionKeys,
+            periodicSectionKeys: incomingPeriodicSectionKeys,
+        };
+
+        previousPeriodicSectionKeys.forEach((sectionKey) => {
+            if (incomingPeriodicSectionKeys.includes(sectionKey)) {
+                return;
+            }
+
+            if (sectionKey === powerSectionKey) {
+                return;
+            }
+
+            delete nextDevice.sections[sectionKey];
+            nextDevice.sectionOrder = nextDevice.sectionOrder.filter(
+                (existingSectionKey) => existingSectionKey !== sectionKey
+            );
+        });
+
+        incomingPeriodicSectionKeys.forEach((sectionKey) => {
+            if (sectionKey === powerSectionKey) {
+                nextDevice.powerRows = incomingDevice.powerRows;
+                return;
+            }
+
+            const incomingSection = incomingDevice.sections[sectionKey];
+            if (incomingSection) {
+                nextDevice.sections[sectionKey] = incomingSection;
+                if (!nextDevice.sectionOrder.includes(sectionKey)) {
+                    nextDevice.sectionOrder.push(sectionKey);
+                }
+                return;
+            }
+
+            delete nextDevice.sections[sectionKey];
+            nextDevice.sectionOrder = nextDevice.sectionOrder.filter(
+                (existingSectionKey) => existingSectionKey !== sectionKey
+            );
+        });
+
+        const finalizedNextDevice = finalizeCounts(nextDevice);
+        if (
+            !periodicSectionsChanged &&
+            previousReachability === incomingReachability
+        ) {
+            merged[deviceName] = previousDevice;
+            return;
+        }
+
+        merged[deviceName] = finalizedNextDevice;
+    });
+
+    return areValidationFailuresByDeviceEqual(previous, merged) ? previous : merged;
+}
+
+function mergeDeviceRefreshTimestamps(
+    previous: Record<string, string | null>,
+    incoming: ValidationFailuresByDevice
+): Record<string, string | null> {
+    let changed = false;
+    const next = { ...previous };
+
+    Object.entries(incoming).forEach(([deviceName, deviceFailures]) => {
+        const nextTimestamp = deviceFailures.lastValidated ?? null;
+        if (next[deviceName] !== nextTimestamp) {
+            next[deviceName] = nextTimestamp;
+            changed = true;
+        }
+    });
+
+    return changed ? next : previous;
+}
+
+function stampValidationFailuresWithResponseTime(
+    failuresByDevice: ValidationFailuresByDevice,
+    responseTimestamp: string
+): ValidationFailuresByDevice {
+    const stampedEntries = Object.entries(failuresByDevice).map(([deviceName, deviceFailures]) => [
+        deviceName,
+        {
+            ...deviceFailures,
+            lastValidated: responseTimestamp,
+        },
+    ]);
+
+    return Object.fromEntries(stampedEntries);
+}
+
+function isSectionTitle(sectionTitle: string, expectedTitle: string): boolean {
+    return normalizeSectionKey(sectionTitle) === normalizeSectionKey(expectedTitle);
+}
+
+function getLookupValue(
+    primary: unknown,
+    fallback?: unknown
+): string {
+    if (isLookupPortValue(primary == null ? "" : String(primary))) {
+        return String(primary ?? "").trim();
+    }
+
+    if (isLookupPortValue(fallback == null ? "" : String(fallback))) {
+        return String(fallback ?? "").trim();
+    }
+
+    return "";
+}
+
+function normalizePortMembership(devicePort: string | undefined | null): { basePort: string; members: number[] } | null {
+    const normalizedPort = String(devicePort || "").trim();
+    if (!normalizedPort) return null;
+
+    const groupedPortMatch = normalizedPort.match(/^(.*\[)([^\]]+)(\].*)$/);
+    if (groupedPortMatch) {
+        const [, prefix, groupedSegment, suffix] = groupedPortMatch;
+        const prefixWithoutBracket = prefix.slice(0, -1);
+        const suffixWithoutBracket = suffix.startsWith("]") ? suffix.slice(1) : suffix;
+        const separatorMatch = prefixWithoutBracket.match(/([\/-])$/);
+        const separator = separatorMatch ? separatorMatch[1] : "";
+        const basePrefix = separator ? prefixWithoutBracket.slice(0, -1) : prefixWithoutBracket;
+        const trailingNumberMatch = basePrefix.match(/^(.*?)(\d+)$/);
+
+        const members = groupedSegment
+            .split("+")
+            .map((part) => Number(part.trim()))
+            .filter((part) => Number.isFinite(part))
+            .sort((a, b) => a - b);
+
+        if (members.length === 0) return null;
+
+        const basePort = trailingNumberMatch
+            ? `${trailingNumberMatch[1]}${separator}${suffixWithoutBracket}`
+            : `${basePrefix}${suffixWithoutBracket}`;
+
+        return {
+            basePort: basePort.toLowerCase(),
+            members,
+        };
+    }
+
+    const singlePortMatch = normalizedPort.match(/^(.*?)(\d+)$/);
+    if (!singlePortMatch) return null;
+
+    const [, prefix, trailingNumberText] = singlePortMatch;
+    const trailingNumber = Number(trailingNumberText);
+    if (!Number.isFinite(trailingNumber)) return null;
+
+    return {
+        basePort: prefix.toLowerCase(),
+        members: [trailingNumber],
+    };
+}
+
+function expandFamilyPortVariants(devicePort: string | undefined | null): string[] {
+    const normalizedPort = String(devicePort || "").trim();
+    if (!normalizedPort) return [];
+
+    const membership = normalizePortMembership(normalizedPort);
+    if (!membership || membership.members.length === 1) {
+        return [normalizedPort];
+    }
+
+    const variants = new Set<string>([normalizedPort]);
+    membership.members.forEach((member) => {
+        variants.add(`${membership.basePort}${member}`);
+    });
+
+    return Array.from(variants);
+}
+
+function buildPatchPanelLookupKeys(
+    deviceName: string | undefined | null,
+    devicePort: string | undefined | null
+): string[] {
+    const normalizedDeviceName = String(deviceName || "").trim();
+    if (!normalizedDeviceName) return [];
+
+    const lookupKeys = new Set<string>();
+    expandFamilyPortVariants(devicePort).forEach((portVariant) => {
+        lookupKeys.add(normalizeDevicePortKey(normalizedDeviceName, portVariant));
+    });
+
+    const membership = normalizePortMembership(devicePort);
+    if (membership && membership.members.length === 1) {
+        const member = membership.members[0];
+        const pairStart = member % 2 === 0 ? member - 1 : member;
+        if (pairStart > 0) {
+            lookupKeys.add(normalizeDevicePortKey(normalizedDeviceName, `${membership.basePort}${pairStart}`));
+            lookupKeys.add(normalizeDevicePortKey(normalizedDeviceName, `${membership.basePort}${pairStart + 1}`));
+            lookupKeys.add(normalizeDevicePortKey(normalizedDeviceName, `${membership.basePort}[${pairStart}+${pairStart + 1}]`));
+        }
+    }
+
+    return Array.from(lookupKeys);
+}
+
+function collectPatchPanelLookupKeysFromFailures(
+    failuresByDevice: ValidationFailuresByDevice
+): Set<string> {
+    const lookupKeys = new Set<string>();
+
+    Object.values(failuresByDevice).forEach((deviceFailures) => {
+        deviceFailures.sectionOrder.forEach((sectionKey) => {
+            const section = deviceFailures.sections[sectionKey];
+            if (!section || isSectionTitle(section.title, "Fan Errors")) {
+                return;
+            }
+
+            section.rows.forEach((row) => {
+                let rowLookupKeys: string[] = [];
+                if (isSectionTitle(section.title, "LLDP Errors")) {
+                    const primaryName = getLookupValue(row.deviceAName);
+                    const primaryPort = getLookupValue(row.deviceAPort);
+                    if (primaryName && primaryPort) {
+                        rowLookupKeys.push(...buildPatchPanelLookupKeys(primaryName, primaryPort));
+                    }
+
+                    const expectedName = getLookupValue(row.expectedDeviceBName);
+                    const expectedPort = getLookupValue(row.expectedDeviceBPort);
+                    if (expectedName && expectedPort) {
+                        rowLookupKeys.push(...buildPatchPanelLookupKeys(expectedName, expectedPort));
+                    }
+                } else if (isSectionTitle(section.title, "Optic Errors") || isSectionTitle(section.title, "Interface Errors")) {
+                    rowLookupKeys = buildPatchPanelLookupKeys(
+                        getLookupValue(row.deviceName, row.remoteDeviceName ?? row.sourceDeviceName),
+                        getLookupValue(row.devicePort, row.remoteDevicePort ?? row.sourceDevicePort)
+                    );
+                } else if (isSectionTitle(section.title, "FEC_BER Errors")) {
+                    rowLookupKeys = buildPatchPanelLookupKeys(
+                        getLookupValue(row.deviceName, row.remoteDevice),
+                        getLookupValue(row.devicePort, row.remoteInterface)
+                    );
+                } else {
+                    rowLookupKeys = buildPatchPanelLookupKeys(
+                        getLookupValue(row.deviceName, row.remoteDeviceName ?? row.remoteDevice),
+                        getLookupValue(row.devicePort, row.remoteDevicePort ?? row.remoteInterface)
+                    );
+                }
+
+                rowLookupKeys.forEach((lookupKey) => lookupKeys.add(lookupKey));
+            });
+        });
+    });
+
+    return lookupKeys;
+}
+
+function normalizeDeviceKey(value: string | null | undefined): string {
+    return String(value || "").trim().toLowerCase();
+}
+
+function normalizeDevicePortKey(
+    deviceName: string | null | undefined,
+    devicePort: string | null | undefined
+): string {
+    return `${normalizeDeviceKey(deviceName)}|${normalizeDeviceKey(devicePort)}`;
 }
 
 function normalizeIdeCutsheetRows(payload: unknown): PatchPanelRow[] {
@@ -1443,6 +1919,25 @@ function normalizeIdeCutsheetRows(payload: unknown): PatchPanelRow[] {
     }
 
     return [];
+}
+
+function toRawJsonString(value: unknown): string {
+    try {
+        return JSON.stringify(value, null, 2);
+    } catch {
+        return String(value);
+    }
+}
+
+function isLookupPortValue(value: string | null | undefined): boolean {
+    const normalized = normalizeDeviceKey(value);
+    return (
+        normalized !== "" &&
+        normalized !== "unknown" &&
+        normalized !== "n/a" &&
+        normalized !== "na" &&
+        normalized !== "-"
+    );
 }
 
 async function fetchPatchPanelRowsByRack(
@@ -1480,75 +1975,42 @@ async function fetchPatchPanelRowsByRack(
     } catch {
         payload = [];
     }
+
     return normalizeIdeCutsheetRows(payload);
 }
 
-function normalizeHostReadinessPayload(payload: unknown): HostReadinessItem[] {
-    const record = asRecord(payload);
-    if (!record) return [];
+function indexPatchPanelRowsByDevicePort(
+    rows: PatchPanelRow[],
+    allowedLookupKeys?: Set<string>
+): PatchPanelByDevicePort {
+    const byDevicePort: PatchPanelByDevicePort = {};
 
-    return asArray(record["hostReadiness"])
-        .map((item) => asRecord(item))
-        .filter((item): item is RowRecord => item !== null)
-        .map((item) => ({
-            hostSerial: textOrEmpty(item["hostSerial"]),
-            hostName: textOrEmpty(item["hostName"]),
-            instanceId: item["instanceId"] == null ? null : String(item["instanceId"]),
-            hopsState: textOrEmpty(item["hopsState"]),
-            computeState: textOrEmpty(item["computeState"]),
-            computePool: textOrEmpty(item["computePool"]),
-            status: textOrEmpty(item["status"]),
-            ticketId: item["ticketId"] == null ? null : String(item["ticketId"]),
-            ticketIds: asArray(item["ticketIds"]).map((ticketId) => String(ticketId)).filter((ticketId) => ticketId.trim() !== ""),
-        }))
-        .filter((item) => item.hostName !== "");
-}
-
-async function fetchRackHostReadiness(
-    rackSerialNumber: string,
-    regionName: string,
-    signal?: AbortSignal
-): Promise<HostReadinessItem[]> {
-    const availabilityDomains = [1, 2, 3].map((adNumber) => `${regionName}-ad-${adNumber}`);
-    let lastError: Error | null = null;
-
-    for (const availabilityDomain of availabilityDomains) {
-        try {
-            const readinessUrl = new URL(`${LVV_API}/rackHostCableValidationReadiness`);
-            readinessUrl.searchParams.set("rackSerialNumber", rackSerialNumber);
-            readinessUrl.searchParams.set("regionName", regionName);
-            readinessUrl.searchParams.set("availabilityDomain", availabilityDomain);
-
-            const response = await fetchWithRetry(readinessUrl.href, {
-                method: "GET",
-                signal,
-            });
-            if (!response.ok) {
-                throw new Error(`rackHostCableValidationReadiness query failed (${response.status} ${response.statusText})`);
-            }
-
-            let payload: unknown;
-            try {
-                payload = await response.json();
-            } catch {
-                payload = {};
-            }
-
-            const normalized = normalizeHostReadinessPayload(payload);
-            if (normalized.length > 0) {
-                return normalized;
-            }
-        } catch (error: any) {
-            if (error?.name === "AbortError") {
-                throw error;
-            }
-            lastError = error instanceof Error ? error : new Error(String(error));
+    rows.forEach((row) => {
+        const deviceKey = normalizeDeviceKey(row.deviceName);
+        if (!deviceKey) {
+            return;
         }
-    }
 
-    if (lastError) {
-        throw lastError;
-    }
+        const addRowForKey = (key: string) => {
+            if (!byDevicePort[key]) {
+                byDevicePort[key] = [];
+            }
+            byDevicePort[key].push({
+                ...row,
+                rawJson: toRawJsonString(row),
+            });
+        };
 
-    return [];
+        if (isLookupPortValue(row.devicePort)) {
+            const devicePortKeys = buildPatchPanelLookupKeys(row.deviceName, row.devicePort);
+            devicePortKeys.forEach((devicePortKey) => {
+                if (allowedLookupKeys && !allowedLookupKeys.has(devicePortKey)) {
+                    return;
+                }
+                addRowForKey(devicePortKey);
+            });
+        }
+    });
+
+    return byDevicePort;
 }

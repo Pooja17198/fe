@@ -10,7 +10,20 @@ import "ojs/ojpagingcontrol";
 import { ProjectLoadMeasurement } from "./types";
 import { emitMetric, TELEMETRY_METRICS } from "../telemetry/api";
 import { getLvvApiBase } from "../../config/api";
-import "oj-c/button";
+import { fetchWithRetry } from "../rack/api";
+import type { RackValidationSummary } from "../rack/validationShared";
+import {
+    asArray,
+    asRecord,
+    normalizeValidationFailuresPayload,
+    NOT_VALIDATED_SUMMARY,
+    summarizeValidationFailuresByDevice,
+} from "../rack/validationShared";
+import {
+    getLocalRackStubRows,
+    getLocalRackStubValidationPayload,
+    mergeLocalRackStubRows,
+} from "../../localRackStub";
 
 const BASE_RACK_COLUMNS = [
     { headerText: "Rack Location", field: "rackLocation", id: "rackLocation", resizable: "enabled" as const, sortable: 'enabled' as const },
@@ -66,13 +79,6 @@ interface ProjectRackRow {
     _validationReady?: number;
 }
 
-type RackValidationSummary = {
-    isValidated: boolean;
-    cableFailures: number;
-    opticsFailures: number;
-    deviceFailures: number;
-};
-
 type RackStatusToken = {
     className: string;
     label: string;
@@ -90,15 +96,6 @@ type RackHostCountSummary = {
     customerCount: number;
 };
 
-type JsonRecord = Record<string, unknown>;
-
-const NOT_VALIDATED_SUMMARY: RackValidationSummary = {
-    isValidated: false,
-    cableFailures: 0,
-    opticsFailures: 0,
-    deviceFailures: 0,
-};
-
 const EMPTY_VALIDATION_READY_SUMMARY: RackValidationReadySummary = {
     readyCount: 0,
 };
@@ -110,43 +107,8 @@ const EMPTY_HOST_COUNT_SUMMARY: RackHostCountSummary = {
     customerCount: 0,
 };
 
-async function fetchWithRetry(url: string, options: any = {}, maxAttempts: number = 3, delayMs: number = 1000): Promise<Response> {
-    const signal: AbortSignal | undefined = options?.signal;
-    let lastError;
-    for (let attempt = 0; attempt < maxAttempts; attempt++) {
-        if (signal?.aborted) {
-            throw new DOMException('Aborted', 'AbortError');
-        }
-        try {
-            const response = await fetch(url, options);
-            // Retry for network errors or 5xx; accept 404, 400, etc. as non-retryable (customize as needed)
-            if (!response.ok && response.status >= 500) {
-                throw new Error(`Server error: ${response.status}`);
-            }
-            return response; // Success!
-        } catch (err) {
-            // If aborted, stop retrying immediately
-            if (signal?.aborted) {
-                throw err;
-            }
-            lastError = err;
-            if (attempt < maxAttempts - 1) {
-                await new Promise(res => setTimeout(res, delayMs));
-            }
-        }
-    }
-    throw lastError;
-}
-
-function asRecord(value: unknown): JsonRecord | null {
-    if (value && typeof value === "object" && !Array.isArray(value)) {
-        return value as JsonRecord;
-    }
-    return null;
-}
-
-function asArray(value: unknown): unknown[] {
-    return Array.isArray(value) ? value : [];
+function isEmptyObject(value: Record<string, unknown>): boolean {
+    return Object.keys(value).length === 0;
 }
 
 function getRackSearchTerms(q: string): string[] {
@@ -156,109 +118,40 @@ function getRackSearchTerms(q: string): string[] {
         .filter((term) => term.length > 0);
 }
 
-function summarizeLegacyValidationRows(rows: unknown[]): RackValidationSummary {
-    if (rows.length === 0) {
-        return NOT_VALIDATED_SUMMARY;
-    }
-
-    let cableFailures = 0;
-    let opticsFailures = 0;
-    let deviceFailures = 0;
-
-    rows.forEach((rawRow) => {
-        const row = asRecord(rawRow);
-        if (!row) {
-            return;
-        }
-
-        const linkStatus = String(row["lldpStatus"] ?? row["linkStatus"] ?? "")
-            .trim()
-            .toUpperCase();
-        if (linkStatus !== "" && linkStatus !== "PASS" && linkStatus !== "UNSUPPORTED") {
-            cableFailures += 1;
-        }
-
-        const hasOptics =
-            String(row["txPower"] ?? "").trim() !== "" || String(row["rxPower"] ?? "").trim() !== "";
-        if (hasOptics) {
-            opticsFailures += 1;
-        }
-
-        const psuFailure = String(row["psuFailure"] ?? "").trim().toLowerCase();
-        if (psuFailure !== "" && psuFailure !== "null" && psuFailure !== "pass") {
-            deviceFailures += 1;
-        }
+async function fetchRackValidationPayload(
+    row: ProjectRackRow,
+    region: string,
+    signal: AbortSignal
+): Promise<unknown | null> {
+    const localStubPayload = getLocalRackStubValidationPayload({
+        region,
+        building: row.building,
+        rackNumber: row.rackLocation,
+        rackSerialNumber: row.rackSerialNumber,
     });
-
-    return {
-        isValidated: true,
-        cableFailures,
-        opticsFailures,
-        deviceFailures,
-    };
-}
-
-function summarizeValidationPayload(payload: unknown, rackSerial: string): RackValidationSummary {
-    if (Array.isArray(payload)) {
-        return summarizeLegacyValidationRows(payload);
+    if (localStubPayload) {
+        return localStubPayload;
     }
 
-    const payloadRecord = asRecord(payload);
-    if (!payloadRecord) {
-        return NOT_VALIDATED_SUMMARY;
+    const validationUrl = new URL(`${API_URL}/cablingValidation`);
+    validationUrl.searchParams.set("regionName", region);
+    validationUrl.searchParams.set("rackSerialNumber", row.rackSerialNumber);
+
+    const response = await fetchWithRetry(validationUrl.href, { method: "GET", signal });
+    if (!response.ok) {
+        return null;
     }
 
-    let rackNode: unknown = payloadRecord[rackSerial];
-    if (!rackNode) {
-        const keys = Object.keys(payloadRecord);
-        if (keys.length === 1) {
-            rackNode = payloadRecord[keys[0]];
-        }
+    const body = await response.text();
+    if (!body.trim()) {
+        return null;
     }
 
-    const rackRecord = asRecord(rackNode);
-    if (!rackRecord) {
-        return NOT_VALIDATED_SUMMARY;
+    try {
+        return JSON.parse(body) as unknown;
+    } catch {
+        return null;
     }
-
-    const deviceResults = Object.values(rackRecord)
-        .map((value) => asRecord(value))
-        .filter((value): value is JsonRecord => value !== null);
-
-    if (deviceResults.length === 0) {
-        return NOT_VALIDATED_SUMMARY;
-    }
-
-    const cableFailures = deviceResults.reduce((sum, result) => {
-        return (
-            sum +
-            asArray(result["LLDP Errors"]).length +
-            asArray(result["Interface Errors"]).length
-        );
-    }, 0);
-
-    const opticsFailures = deviceResults.reduce((sum, result) => {
-        return (
-            sum +
-            asArray(result["Optic Errors"]).length +
-            asArray(result["FEC_BER Errors"]).length
-        );
-    }, 0);
-
-    const deviceFailures = deviceResults.reduce((sum, result) => {
-        return (
-            sum +
-            asArray(result["Power Errors"]).length +
-            asArray(result["Fan Errors"]).length
-        );
-    }, 0);
-
-    return {
-        isValidated: true,
-        cableFailures,
-        opticsFailures,
-        deviceFailures,
-    };
 }
 
 function buildRackStatusTokens(summary: RackValidationSummary): RackStatusToken[] {
@@ -340,26 +233,13 @@ async function fetchRackStatusSummary(
         return NOT_VALIDATED_SUMMARY;
     }
 
-    const validationUrl = new URL(`${API_URL}/cablingValidation`);
-    validationUrl.searchParams.set("regionName", region);
-    validationUrl.searchParams.set("rackSerialNumber", row.rackSerialNumber);
+    const cablingPayload = await fetchRackValidationPayload(row, region, signal);
 
-    const response = await fetchWithRetry(validationUrl.href, { method: "GET", signal });
-    if (!response.ok) {
-        return NOT_VALIDATED_SUMMARY;
-    }
+    const cablingFailuresByDevice = cablingPayload
+        ? normalizeValidationFailuresPayload(cablingPayload, row.rackSerialNumber)
+        : {};
 
-    const body = await response.text();
-    if (!body.trim()) {
-        return NOT_VALIDATED_SUMMARY;
-    }
-
-    try {
-        const payload: unknown = JSON.parse(body);
-        return summarizeValidationPayload(payload, row.rackSerialNumber);
-    } catch {
-        return NOT_VALIDATED_SUMMARY;
-    }
+    return summarizeValidationFailuresByDevice(cablingFailuresByDevice);
 }
 
 function summarizeHostReadinessPayload(payload: unknown): RackValidationReadySummary {
@@ -465,6 +345,49 @@ async function fetchRackValidationReadySummary(
     return EMPTY_VALIDATION_READY_SUMMARY;
 }
 
+async function fetchRackHostCountSummary(
+    row: ProjectRackRow,
+    region: string,
+    signal: AbortSignal
+): Promise<RackHostCountSummary> {
+    if (!row.isGpuRack || !row.rackSerialNumber || !region) {
+        return EMPTY_HOST_COUNT_SUMMARY;
+    }
+
+    const availabilityDomains = [1, 2, 3].map((adNumber) => `${region}-ad-${adNumber}`);
+
+    for (const availabilityDomain of availabilityDomains) {
+        try {
+            const readinessUrl = new URL(`${API_URL}/rackHostCableValidationReadiness`);
+            readinessUrl.searchParams.set("rackSerialNumber", row.rackSerialNumber);
+            readinessUrl.searchParams.set("regionName", region);
+            readinessUrl.searchParams.set("availabilityDomain", availabilityDomain);
+
+            const response = await fetchWithRetry(readinessUrl.href, { method: "GET", signal });
+            if (!response.ok) {
+                continue;
+            }
+
+            const body = await response.text();
+            if (!body.trim()) {
+                continue;
+            }
+
+            const payload: unknown = JSON.parse(body);
+            const hasHostReadiness = asArray(asRecord(payload)?.["hostReadiness"]).length > 0;
+            if (hasHostReadiness) {
+                return summarizeHostCountPayload(payload);
+            }
+        } catch (e) {
+            if ((e as any)?.name === "AbortError") {
+                throw e;
+            }
+        }
+    }
+
+    return EMPTY_HOST_COUNT_SUMMARY;
+}
+
 const ProjectDetailsContainer = (props: Props) => {
 
     const [allProjectData, setAllProjectData] = useState<ProjectRackRow[]>([]);
@@ -479,6 +402,7 @@ const ProjectDetailsContainer = (props: Props) => {
     const [searchText, setSearchText] = useState("");
     const [hideMissingSerial, setHideMissingSerial] = useState(false);
     const [pageSize, setPageSize] = useState<number>(25);
+    const [currentPage, setCurrentPage] = useState<number>(0);
     const requestSeqRef = useRef(0);
     const statusRequestSeqRef = useRef(0);
     const [includeInServiceRacks, setIncludeInServiceRacks] = useState(false);
@@ -550,6 +474,17 @@ const ProjectDetailsContainer = (props: Props) => {
 
                 const rackResp = await fetchWithRetry(projectRacksUrl.href, { method: "GET", headers, signal: ac.signal });
                 if (!rackResp.ok) {
+                    const stubRows = getLocalRackStubRows(props.project.projectId, props.region);
+                    if (stubRows.length > 0 && fetchId === requestSeqRef.current) {
+                        setAllProjectData(
+                            stubRows.map((r) => ({
+                                ...r,
+                                gpuRackLabel: r.isGpuRack ? "Yes" : "No",
+                                _key: `${r.block ?? ''}|${r.rackLocation ?? ''}`,
+                            }))
+                        );
+                        return;
+                    }
                     if (fetchId === requestSeqRef.current) {
                         setAllProjectData([]);
                         setLoadError(
@@ -561,7 +496,7 @@ const ProjectDetailsContainer = (props: Props) => {
                 }
 
                 const rows: ProjectRackRow[] = await rackResp.json();
-                const normalized: ProjectRackRow[] = (rows || []).map((r) => ({
+                const normalized: ProjectRackRow[] = mergeLocalRackStubRows(rows || [], props.project.projectId, props.region).map((r) => ({
                     ...r,
                     gpuRackLabel: r.isGpuRack ? "Yes" : "No",
                     _key: `${r.block ?? ''}|${r.rackLocation ?? ''}`
@@ -587,6 +522,18 @@ const ProjectDetailsContainer = (props: Props) => {
                 }
                 console.error('Failed to fetch project racks:', e);
                 if (fetchId === requestSeqRef.current) {
+                    const stubRows = getLocalRackStubRows(props.project.projectId, props.region);
+                    if (stubRows.length > 0) {
+                        setAllProjectData(
+                            stubRows.map((r) => ({
+                                ...r,
+                                gpuRackLabel: r.isGpuRack ? "Yes" : "No",
+                                _key: `${r.block ?? ''}|${r.rackLocation ?? ''}`,
+                            }))
+                        );
+                        setLoadError(null);
+                        return;
+                    }
                     setAllProjectData([]);
                     const msg = (e as any)?.message ? String((e as any).message) : 'Unknown error';
                     setLoadError(`Failed to load racks list: ${msg}`);
@@ -638,194 +585,7 @@ const ProjectDetailsContainer = (props: Props) => {
         return () => cancelAnimationFrame(raf);
     }, [loading, loadError, loadedMeasurement, props.project, props.region]);
 
-    useEffect(() => {
-        const ac = new AbortController();
-        const requestId = ++statusRequestSeqRef.current;
-
-        if (!props.project?.projectId || allProjectData.length === 0) {
-            setRackStatusByKey({});
-            return () => ac.abort();
-        }
-
-        const nextStatuses: Record<string, RackValidationSummary | undefined> = {};
-        allProjectData.forEach((row) => {
-            nextStatuses[row._key] = row.rackSerialNumber ? undefined : NOT_VALIDATED_SUMMARY;
-        });
-        setRackStatusByKey(nextStatuses);
-
-        const rowsToFetch = allProjectData.filter(
-            (row) => row.rackSerialNumber && row.rackSerialNumber.trim() !== ""
-        );
-
-        void Promise.all(
-            rowsToFetch.map(async (row) => {
-                try {
-                    const summary = await fetchRackStatusSummary(row, props.region, ac.signal);
-                    return [row._key, summary] as const;
-                } catch (e) {
-                    if ((e as any)?.name === 'AbortError') {
-                        return null;
-                    }
-                    return [row._key, NOT_VALIDATED_SUMMARY] as const;
-                }
-            })
-        ).then((entries) => {
-            if (ac.signal.aborted || requestId !== statusRequestSeqRef.current) {
-                return;
-            }
-
-            const resolvedStatuses = { ...nextStatuses };
-            entries.forEach((entry) => {
-                if (!entry) {
-                    return;
-                }
-                const [key, summary] = entry;
-                resolvedStatuses[key] = summary;
-            });
-            setRackStatusByKey(resolvedStatuses);
-        });
-
-        return () => ac.abort();
-    }, [allProjectData, props.project, props.region]);
-
-    const refreshHostReadiness = async (signal: AbortSignal) => {
-        if (!showOnlyGpuRacks || !props.project?.projectId || allProjectData.length === 0) {
-            setRackValidationReadyByKey({});
-            setRackHostCountByKey({});
-            return;
-        }
-
-        const gpuRows = allProjectData.filter(
-            (row) => row.isGpuRack && row.rackSerialNumber && row.rackSerialNumber.trim() !== ""
-        );
-
-        const nextReadyCounts: Record<string, RackValidationReadySummary | undefined> = {};
-        const nextHostCounts: Record<string, RackHostCountSummary | undefined> = {};
-        gpuRows.forEach((row) => {
-            nextReadyCounts[row._key] = undefined;
-            nextHostCounts[row._key] = undefined;
-        });
-        setRackValidationReadyByKey(nextReadyCounts);
-        setRackHostCountByKey(nextHostCounts);
-
-        gpuRows.forEach((row) => {
-            void (async () => {
-                try {
-                    const availabilityDomains = [1, 2, 3].map((adNumber) => `${props.region}-ad-${adNumber}`);
-                    let lastError: unknown = null;
-
-                    for (const availabilityDomain of availabilityDomains) {
-                        try {
-                            const readinessUrl = new URL(`${API_URL}/rackHostCableValidationReadiness`);
-                            readinessUrl.searchParams.set("rackSerialNumber", row.rackSerialNumber);
-                            readinessUrl.searchParams.set("regionName", props.region);
-                            readinessUrl.searchParams.set("availabilityDomain", availabilityDomain);
-
-                            const response = await fetchWithRetry(readinessUrl.href, { method: "GET", signal });
-                            if (!response.ok) {
-                                throw new Error(`rackHostCableValidationReadiness query failed (${response.status} ${response.statusText})`);
-                            }
-
-                            const body = await response.text();
-                            if (!body.trim()) {
-                                continue;
-                            }
-
-                            const payload: unknown = JSON.parse(body);
-                            const hasHostReadiness = asArray(asRecord(payload)?.["hostReadiness"]).length > 0;
-                            if (hasHostReadiness) {
-                                if (signal.aborted) {
-                                    return;
-                                }
-
-                                const readySummary = summarizeHostReadinessPayload(payload);
-                                const hostCountSummary = summarizeHostCountPayload(payload);
-
-                                setRackValidationReadyByKey((prev) => ({
-                                    ...prev,
-                                    [row._key]: readySummary,
-                                }));
-                                setRackHostCountByKey((prev) => ({
-                                    ...prev,
-                                    [row._key]: hostCountSummary,
-                                }));
-                                return;
-                            }
-                        } catch (e) {
-                            if ((e as any)?.name === "AbortError") {
-                                return;
-                            }
-                            lastError = e;
-                        }
-                    }
-
-                    if (signal.aborted) {
-                        return;
-                    }
-
-                    const emptyReadySummary = EMPTY_VALIDATION_READY_SUMMARY;
-                    const emptyHostCountSummary = EMPTY_HOST_COUNT_SUMMARY;
-                    if (lastError) {
-                        setRackValidationReadyByKey((prev) => ({
-                            ...prev,
-                            [row._key]: emptyReadySummary,
-                        }));
-                        setRackHostCountByKey((prev) => ({
-                            ...prev,
-                            [row._key]: emptyHostCountSummary,
-                        }));
-                        return;
-                    }
-
-                    setRackValidationReadyByKey((prev) => ({
-                        ...prev,
-                        [row._key]: emptyReadySummary,
-                    }));
-                    setRackHostCountByKey((prev) => ({
-                        ...prev,
-                        [row._key]: emptyHostCountSummary,
-                    }));
-                } catch (e) {
-                    if ((e as any)?.name === "AbortError") {
-                        return;
-                    }
-                    if (signal.aborted) {
-                        return;
-                    }
-
-                    setRackValidationReadyByKey((prev) => ({
-                        ...prev,
-                        [row._key]: EMPTY_VALIDATION_READY_SUMMARY,
-                    }));
-                    setRackHostCountByKey((prev) => ({
-                        ...prev,
-                        [row._key]: EMPTY_HOST_COUNT_SUMMARY,
-                    }));
-                }
-            })();
-        });
-    };
-
-    useEffect(() => {
-        const ac = new AbortController();
-
-        void refreshHostReadiness(ac.signal);
-
-        return () => ac.abort();
-    }, [allProjectData, props.project, props.region, showOnlyGpuRacks]);
-
-    const handleRefreshHostReadiness = async () => {
-        const ac = new AbortController();
-        setIsRefreshingHostReadiness(true);
-        try {
-            await refreshHostReadiness(ac.signal);
-        } finally {
-            setIsRefreshingHostReadiness(false);
-            ac.abort();
-        }
-    };
-
-    const filteredRows = useMemo((): ProjectRackRow[] => {
+    const filteredBaseRows = useMemo((): ProjectRackRow[] => {
         if (activeBlocks.length === 0) {
             return [];
         }
@@ -871,10 +631,8 @@ const ProjectDetailsContainer = (props: Props) => {
             }
         }
 
-        return rows.map((row) => ({
-            ...row,
-            _validationReady: rackValidationReadyByKey[row._key]?.readyCount ?? 0,
-        }));
+        return rows;
+
     }, [
         activeBlocks,
         allProjectData,
@@ -882,6 +640,15 @@ const ProjectDetailsContainer = (props: Props) => {
         searchText,
         includeInServiceRacks,
         showOnlyGpuRacks,
+    ]);
+
+    const filteredRows = useMemo((): ProjectRackRow[] => {
+        return filteredBaseRows.map((row) => ({
+            ...row,
+            _validationReady: rackValidationReadyByKey[row._key]?.readyCount ?? 0,
+        }));
+    }, [
+        filteredBaseRows,
         rackValidationReadyByKey,
     ]);
 
@@ -893,12 +660,137 @@ const ProjectDetailsContainer = (props: Props) => {
         () => new PagingDataProviderView(baseDataProvider),
         [baseDataProvider]
     );
+    const visibleRows = useMemo((): ProjectRackRow[] => {
+        const startIndex = currentPage * pageSize;
+        return filteredBaseRows.slice(startIndex, startIndex + pageSize);
+    }, [currentPage, filteredBaseRows, pageSize]);
 
 
     // Reset paging when filters change or page size changes
     useEffect(() => {
+        setCurrentPage(0);
         (pagingDataProvider as any).setPage(0, { pageSize });
-    }, [pagingDataProvider, pageSize, searchText, hideMissingSerial, activeBlocks, includeInServiceRacks, showOnlyGpuRacks]);
+    }, [pageSize, searchText, hideMissingSerial, activeBlocks, includeInServiceRacks, showOnlyGpuRacks, props.project?.projectId]);
+
+    useEffect(() => {
+        const provider = pagingDataProvider as any;
+        const syncCurrentPage = (event?: Event) => {
+            const nextPage =
+                typeof (event as any)?.detail?.page === "number"
+                    ? (event as any).detail.page
+                    : typeof provider.getPage === "function"
+                        ? provider.getPage()
+                        : 0;
+            setCurrentPage(nextPage);
+        };
+
+        syncCurrentPage();
+        provider.addEventListener?.("page", syncCurrentPage);
+
+        return () => {
+            provider.removeEventListener?.("page", syncCurrentPage);
+        };
+    }, [pagingDataProvider]);
+
+    useEffect(() => {
+        const ac = new AbortController();
+        const requestId = ++statusRequestSeqRef.current;
+
+        if (!props.project?.projectId || visibleRows.length === 0) {
+            setRackStatusByKey((prev) => (isEmptyObject(prev) ? prev : {}));
+            return () => ac.abort();
+        }
+
+        const nextStatuses: Record<string, RackValidationSummary | undefined> = {};
+        visibleRows.forEach((row) => {
+            nextStatuses[row._key] = row.rackSerialNumber ? undefined : NOT_VALIDATED_SUMMARY;
+        });
+        setRackStatusByKey(nextStatuses);
+
+        const rowsToFetch = visibleRows.filter(
+            (row) => row.rackSerialNumber && row.rackSerialNumber.trim() !== ""
+        );
+
+        void Promise.all(
+            rowsToFetch.map(async (row) => {
+                try {
+                    const summary = await fetchRackStatusSummary(row, props.region, ac.signal);
+                    return [row._key, summary] as const;
+                } catch (e) {
+                    if ((e as any)?.name === 'AbortError') {
+                        return null;
+                    }
+                    return [row._key, NOT_VALIDATED_SUMMARY] as const;
+                }
+            })
+        ).then((entries) => {
+            if (ac.signal.aborted || requestId !== statusRequestSeqRef.current) {
+                return;
+            }
+
+            const resolvedStatuses = { ...nextStatuses };
+            entries.forEach((entry) => {
+                if (!entry) {
+                    return;
+                }
+                const [key, summary] = entry;
+                resolvedStatuses[key] = summary;
+            });
+            setRackStatusByKey(resolvedStatuses);
+        });
+
+        return () => ac.abort();
+    }, [props.project, props.region, visibleRows]);
+
+    const handleRefreshHostReadiness = async () => {
+        const rowsToFetch = visibleRows.filter(
+            (row) => row.isGpuRack && row.rackSerialNumber && row.rackSerialNumber.trim() !== ""
+        );
+
+        if (rowsToFetch.length === 0) {
+            setRackValidationReadyByKey((prev) => (isEmptyObject(prev) ? prev : {}));
+            setRackHostCountByKey((prev) => (isEmptyObject(prev) ? prev : {}));
+            return;
+        }
+
+        setIsRefreshingHostReadiness(true);
+        const ac = new AbortController();
+
+        try {
+            const results = await Promise.all(
+                rowsToFetch.map(async (row) => {
+                    const [readySummary, hostCountSummary] = await Promise.all([
+                        fetchRackValidationReadySummary(row, props.region, ac.signal),
+                        fetchRackHostCountSummary(row, props.region, ac.signal),
+                    ]);
+
+                    return [row._key, readySummary, hostCountSummary] as const;
+                })
+            );
+
+            const nextReadyByKey: Record<string, RackValidationReadySummary | undefined> = {};
+            const nextHostCountByKey: Record<string, RackHostCountSummary | undefined> = {};
+
+            results.forEach(([key, readySummary, hostCountSummary]) => {
+                nextReadyByKey[key] = readySummary;
+                nextHostCountByKey[key] = hostCountSummary;
+            });
+
+            setRackValidationReadyByKey(nextReadyByKey);
+            setRackHostCountByKey(nextHostCountByKey);
+        } catch (e) {
+            if ((e as any)?.name !== "AbortError") {
+                console.warn("Failed to refresh host readiness summaries", e);
+            }
+        } finally {
+            setIsRefreshingHostReadiness(false);
+            ac.abort();
+        }
+    };
+
+    useEffect(() => {
+        void handleRefreshHostReadiness();
+    }, [props.project, props.region, visibleRows]);
 
     // This resets the selectedRowKeySet to empty, so that same row selection triggers onSelectionChangedHandler
     const [selectedRowKeySet, setSelectedRowKeySet] = useState<KeySetImpl<any>>(new KeySetImpl<any>());

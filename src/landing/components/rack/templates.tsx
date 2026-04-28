@@ -1,4 +1,5 @@
 import { h } from "preact";
+import { formatValidationTimestamp } from "./utils";
 
 /**
  * Oracle JET template renderers must be functions that accept a context and return a VNode.
@@ -23,7 +24,15 @@ export const lldpStatusTemplate = (context: any) => {
 
 export const booleanStatusTemplate = (context: any) => {
   const row = (context?.item && context.item.data) || {};
-  const value = `${row.status ?? row.lockStatus ?? ""}`.trim().toLowerCase();
+  const cellValue =
+    context?.data ??
+    context?.cell?.data ??
+    context?.item?.data?.status ??
+    context?.item?.data?.lockStatus ??
+    context?.item?.data?.["Status"] ??
+    context?.item?.data?.["Lock Status"];
+  const displayValue = `${cellValue ?? row.status ?? row.lockStatus ?? row["Status"] ?? row["Lock Status"] ?? ""}`.trim();
+  const value = displayValue.toLowerCase();
   if (value === "true" || value === "up" || value === "pass") {
     return (
         <span class="oj-text-color-success" aria-label="Status true">
@@ -38,7 +47,7 @@ export const booleanStatusTemplate = (context: any) => {
       </span>
     );
   }
-  return <span>{row.status ?? row.lockStatus ?? "-"}</span>;
+  return <span>{displayValue || "-"}</span>;
 };
 
 export const psuStatusTemplate = (hasFailure: boolean) => {
@@ -60,6 +69,95 @@ export const patchPanelMatrixTemplate = (context: any) => {
     ? rawValue.split("•").map((part) => part.trim()).filter(Boolean).join("\n")
     : "Not Available";
   return <div class="patch-panel-matrix-cell">{value}</div>;
+};
+
+type RawBerToken = {
+  key: string;
+  value: string;
+};
+
+function parseRawBerEntry(rawEntry: string): RawBerToken[] {
+  const normalized = rawEntry.replace(/\s+/g, " ").trim();
+  if (!normalized) {
+    return [];
+  }
+
+  const tokens: RawBerToken[] = [];
+  const pattern = /([a-zA-Z_][a-zA-Z0-9_]*)\s*:\s*(.*?)(?=\s+[a-zA-Z_][a-zA-Z0-9_]*\s*:|$)/g;
+
+  for (const match of normalized.matchAll(pattern)) {
+    const key = (match[1] || "").trim();
+    const value = (match[2] || "").trim();
+    if (key) {
+      tokens.push({ key, value: value || "Not Available" });
+    }
+  }
+
+  if (tokens.length > 0) {
+    return tokens;
+  }
+
+  return [{ key: "value", value: normalized }];
+}
+
+function getRawBerStatusClass(status: string): string {
+  const normalized = status.trim().toLowerCase();
+  if (["pass", "passed", "success", "ok", "healthy"].includes(normalized)) {
+    return "raw-ber-token-value-status-pass";
+  }
+  if (["fail", "failed", "error", "down", "critical"].includes(normalized)) {
+    return "raw-ber-token-value-status-fail";
+  }
+  return "raw-ber-token-value-status-neutral";
+}
+
+function formatRawBerEntries(rawValue: unknown): RawBerToken[][] {
+  const normalized = `${rawValue ?? ""}`.trim().replace(/\\n/g, "\n");
+  if (!normalized) {
+    return [];
+  }
+
+  return normalized
+    .split(/\s*,\s*/)
+    .map((entry) => parseRawBerEntry(entry))
+    .filter((entry) => entry.length > 0);
+}
+
+export const opticalRawBerTemplate = (context: any) => {
+  const row = (context?.item && context.item.data) || {};
+  const entries = formatRawBerEntries(
+    row.opticalRawBer ?? row["Optical RawBer"] ?? row.raw_ber ?? row.rawBer
+  );
+
+  if (entries.length === 0) {
+    return <div class="raw-ber-cell-empty">Not Available</div>;
+  }
+
+  return (
+    <div class="raw-ber-cell">
+      {entries.map((entry, entryIndex) => (
+        <div class="raw-ber-entry" key={`raw-ber-entry-${entryIndex}`}>
+          {entry.map((token, tokenIndex) => {
+            const isStatusToken = token.key.trim().toLowerCase() === "status";
+            const valueClass = isStatusToken
+              ? getRawBerStatusClass(token.value)
+              : "raw-ber-token-value";
+            return [
+              <span class="raw-ber-token-key" key={`raw-ber-key-${entryIndex}-${tokenIndex}`}>
+                {token.key}:
+              </span>,
+              <span
+                class={valueClass}
+                key={`raw-ber-value-${entryIndex}-${tokenIndex}`}
+              >
+                {token.value}
+              </span>,
+            ];
+          })}
+        </div>
+      ))}
+    </div>
+  );
 };
 
 function formatRxPowerValue(rawValue: unknown): string {
@@ -93,6 +191,13 @@ const createPowerValueTemplate = (field: "txPower" | "rxPower") => (context: any
 
 export const txPowerTemplate = createPowerValueTemplate("txPower");
 export const rxPowerTemplate = createPowerValueTemplate("rxPower");
+
+export const relativeTimestampTemplate = (context: any) => {
+  const row = (context?.item && context.item.data) || {};
+  const rawValue = `${row["Last Executed"] ?? row.lastExecuted ?? ""}`.trim();
+  const formattedValue = formatValidationTimestamp(rawValue || null);
+  return <span title={rawValue || formattedValue}>{formattedValue}</span>;
+};
 
 const renderGpuMultilineValue = (value: unknown) => {
   const text = formatLocationValue(value).replace(/\\n/g, "\n") || "Not Available";

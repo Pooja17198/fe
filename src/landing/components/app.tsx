@@ -54,6 +54,15 @@ function isLocalhost(): boolean {
   return window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
 }
 
+function getStoredVendorName(): string {
+  const storedVendor = sessionStorage.getItem("X-Oracle-Vendor") || "";
+  if (storedVendor.trim() !== "") {
+    return storedVendor;
+  }
+
+  return "";
+}
+
 function isSyncOverriddenError(error: unknown): boolean {
   return error === "sync overridden"
     || (error instanceof Error && error.message === "sync overridden");
@@ -95,7 +104,7 @@ const pageChangeHandler = async (route: Route) => {
 };
 
 export const App = registerCustomElement("app-root", (props: Props) => {
-    const [selectedVendor, setSelectedVendor] = useState("XYZ");
+    const [selectedVendor, setSelectedVendor] = useState<string>(getStoredVendorName);
     const [selectedRegion, setSelectedRegion] = useState<string>("us-phoenix-1");
 
     props.appName = "LVV Portal";
@@ -169,7 +178,7 @@ export const App = registerCustomElement("app-root", (props: Props) => {
 
     useEffect(() => {
       Context.getPageContext().getBusyContext().applicationBootstrapComplete();
-      setSelectedVendor(sessionStorage.getItem("X-Oracle-Vendor") || "");
+      setSelectedVendor(getStoredVendorName());
 
       // If user lands directly on a shared /rack/{id}?region=... URL, hydrate the app region from URL.
       // This ensures rack refresh/share uses the correct region for allDevicesInRack.

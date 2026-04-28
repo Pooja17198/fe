@@ -1,16 +1,14 @@
 /**
  * Network Monitoring API utilities
  * - Centralizes all fetch calls related to network monitoring.
- * - Self-contained (inlines API_URL).
  * - Used by:
  *    - useBuildingBadLinks (Rack page-only polling bound to current building)
  *    - BadLinksBanner (Rack page banner UI)
  */
-const API_URL =
-  window.location.host.includes("localhost")
-    ? "http://localhost:21000/lvv"
-    : `https://${window.location.host}/lvv`;
+import { getLvvApiBase } from "../../config/api";
 import type { BadLinkDetail } from "./badLinksTypes";
+
+const API_URL = getLvvApiBase();
 
 /**
  * Fetch bad links for a specific building.
