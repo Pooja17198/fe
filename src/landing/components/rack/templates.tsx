@@ -192,6 +192,25 @@ const createPowerValueTemplate = (field: "txPower" | "rxPower") => (context: any
 export const txPowerTemplate = createPowerValueTemplate("txPower");
 export const rxPowerTemplate = createPowerValueTemplate("rxPower");
 
+function formatLaneValues(rawValue: unknown): string {
+  const value = `${rawValue ?? ""}`.trim().replace(/\\n/g, "\n");
+  if (!value) {
+    return "";
+  }
+
+  return value
+    .split(/\s*,\s*/)
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .join("\n");
+}
+
+export const laneValuesTemplate = (context: any) => {
+  const row = (context?.item && context.item.data) || {};
+  const value = formatLaneValues(row["Lane Values"] ?? row.laneValues);
+  return <div class="gpu-multiline-value-cell">{value || "Not Available"}</div>;
+};
+
 export const relativeTimestampTemplate = (context: any) => {
   const row = (context?.item && context.item.data) || {};
   const rawValue = `${row["Last Executed"] ?? row.lastExecuted ?? ""}`.trim();

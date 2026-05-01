@@ -518,6 +518,7 @@ function buildValidationRowKey(
         [
           "devicePort",
           "Device Port",
+          "Interface",
           "deviceAPort",
           "Device A Port",
           "fanSlot",
@@ -589,14 +590,18 @@ function mapDynamicValidationRow(
     remoteDevicePort: textOrEmpty(
       record["remoteDevicePort"] ?? record["Remote Device Port"]
     ),
+    deviceRack: textOrEmpty(record["deviceRack"] ?? record["Device Rack"]),
     deviceName: textOrEmpty(record["deviceName"] ?? record["Device Name"]),
-    devicePort: textOrEmpty(record["devicePort"] ?? record["Device Port"]),
+    devicePort: textOrEmpty(
+      record["devicePort"] ?? record["Device Port"] ?? record["Interface"]
+    ),
     txPower: textOrEmpty(record["txPower"] ?? record["Tx Power"]),
     rxPower: textOrEmpty(record["rxPower"] ?? record["Rx Power"]),
     opticalRawBer: textOrEmpty(
       record["opticalRawBer"] ?? record["Optical RawBer"] ?? record["raw_ber"] ?? record["rawBer"]
     ),
     preFecBer: textOrEmpty(record["preFecBer"] ?? record["PRE_FEC_BER"]),
+    laneValues: textOrEmpty(record["laneValues"] ?? record["Lane Values"]),
     lockStatus: textOrEmpty(record["lockStatus"] ?? record["Lock Status"]),
     remoteDevice: textOrEmpty(record["remoteDevice"] ?? record["Remote Device"]),
     remoteInterface: textOrEmpty(record["remoteInterface"] ?? record["Remote Interface"]),

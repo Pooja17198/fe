@@ -18,6 +18,7 @@ import {
   ValidationTableRow,
 } from "./types";
 import {
+  FEC_BER_FAILURE_COLUMNS,
   GPU_COMPUTE_LLDP_FAILURE_COLUMNS,
   GPU_COMPUTE_OPTIC_FAILURE_COLUMNS,
   PATCH_PANEL_COLUMN_SETTINGS,
@@ -40,6 +41,7 @@ import {
   relativeTimestampTemplate,
   txPowerTemplate,
   rxPowerTemplate,
+  laneValuesTemplate,
   sourceDeviceLocationTemplate,
 } from "./templates";
 import {
@@ -281,6 +283,7 @@ function ValidationSectionRowsTable(
       <template slot="gpuLldpErrorDetailsTemplate" render={gpuLldpErrorDetailsTemplate} />
       <template slot="gpuMultilineErrorMessageTemplate" render={gpuMultilineErrorMessageTemplate} />
       <template slot="opticalRawBerTemplate" render={opticalRawBerTemplate} />
+      <template slot="laneValuesTemplate" render={laneValuesTemplate} />
       <template slot="errorMessageClampTemplate" render={errorMessageClampTemplate} />
     </oj-table>
   );
@@ -488,6 +491,13 @@ const INTERNAL_RENDER_ALIAS_FIELDS = new Set<string>([
   "errorMessage",
 ]);
 
+const EXCLUDED_DYNAMIC_FIELDS = new Set<string>([
+  "deviceRack",
+  "Device Rack",
+  "laneValues",
+  "Lane Values",
+]);
+
 function isLldpSection(sectionTitle: string): boolean {
   return normalizeSectionTitle(sectionTitle) === "lldp errors";
 }
@@ -532,6 +542,43 @@ function isGpuOpticSection(sectionTitle: string, sectionRows: ValidationTableRow
       row.remoteDevicePort,
     ].some((value) => typeof value === "string" && value.trim() !== "")
   );
+}
+
+function isGpuFecBerSection(sectionTitle: string, sectionRows: ValidationTableRow[]): boolean {
+  if (!isFecBerSection(sectionTitle)) {
+    return false;
+  }
+
+  return sectionRows.some((row) =>
+    [row.issue, row.laneValues, row["Lane Values"], row["Interface"]].some(
+      (value) => typeof value === "string" && value.trim() !== ""
+    )
+  );
+}
+
+function buildGpuFecBerColumns(sectionRows: ValidationTableRow[]): any[] {
+  const shouldShowDeviceName = sectionRows.some((row) => hasRenderableValue(row.deviceName ?? row["Device Name"]));
+
+  const columns: any[] = [];
+
+  if (shouldShowDeviceName) {
+    columns.push({ headerText: "Device Name", field: "Device Name", id: "Device Name", resizable: "enabled", sortable: "enabled" });
+  }
+
+  columns.push(
+    { headerText: "Device Port", field: "Interface", id: "Interface", resizable: "enabled", sortable: "enabled" },
+    {
+      headerText: "Lane Values",
+      field: "Lane Values",
+      id: "Lane Values",
+      template: "laneValuesTemplate",
+      resizable: "enabled",
+      sortable: "enabled",
+    },
+    { headerText: "Issue", field: "Issue", id: "Issue", resizable: "enabled", sortable: "enabled" }
+  );
+
+  return columns;
 }
 
 function hasRenderableValue(value: unknown): boolean {
@@ -809,6 +856,7 @@ function getColumnTemplate(sectionTitle: string, field: string): string | undefi
   if (field === "txPower" || field === "Tx Power") return "txPowerTemplate";
   if (field === "rxPower" || field === "Rx Power") return "rxPowerTemplate";
   if (field === "opticalRawBer" || field === "Optical RawBer") return "opticalRawBerTemplate";
+  if (field === "Lane Values" || field === "laneValues") return "laneValuesTemplate";
   if (field === "lastExecuted" || field === "Last Executed") return "relativeTimestampTemplate";
 
   if (field === "sourceDeviceLocation" || field === "Source Device Location") {
@@ -838,12 +886,32 @@ function getSectionColumns(
     return buildGpuLldpColumns(sectionRows);
   }
 
+  if (Boolean(isGpuRack) && isGpuFecBerSection(sectionTitle, sectionRows)) {
+    return buildGpuFecBerColumns(sectionRows);
+  }
+
+  if (isFecBerSection(sectionTitle) && !isGpuRack) {
+    const shouldShowErrorMessage = sectionRows.some((row) => {
+      const errorMessage = row?.errorMessage;
+      return typeof errorMessage === "string" && errorMessage.trim() !== "";
+    });
+
+    return shouldShowErrorMessage
+      ? FEC_BER_FAILURE_COLUMNS
+      : FEC_BER_FAILURE_COLUMNS.filter((column) => column.field !== "errorMessage");
+  }
+
   const fieldOrder: string[] = [];
   const seen = new Set<string>();
 
   sectionRows.forEach((row) => {
     Object.keys(row).forEach((key) => {
-      if (key === "_key" || INTERNAL_RENDER_ALIAS_FIELDS.has(key) || seen.has(key)) return;
+      if (
+        key === "_key" ||
+        INTERNAL_RENDER_ALIAS_FIELDS.has(key) ||
+        EXCLUDED_DYNAMIC_FIELDS.has(key) ||
+        seen.has(key)
+      ) return;
       seen.add(key);
       fieldOrder.push(key);
     });
