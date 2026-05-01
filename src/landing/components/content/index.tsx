@@ -217,15 +217,22 @@ const Content = (props: Props) => {
 
   const isRack = Boolean(props.page?.includes("rack"));
   const isCabling = Boolean(props.page?.includes("cabling"));
+  const isHome = !isRack && !isCabling;
   return (
     <div class="oj-web-applayout-max-width oj-web-applayout-content">
       {isCabling ? (
         <Cabling />
       ) : (
         <>
+      {/* Keep Home mounted to preserve project/filter state; isActive pauses Home-only requests while hidden. */}
       <div style={{ display: isRack ? 'none' : 'block' }}>
         <div>
-          <HomeContainer onRackChanged={rackChangedHandler} vendor={selectedVendor} region={props.region} />
+          <HomeContainer
+            isActive={isHome}
+            onRackChanged={rackChangedHandler}
+            vendor={selectedVendor}
+            region={props.region}
+          />
         </div>
       </div>
       {isRack && (

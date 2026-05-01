@@ -12,6 +12,7 @@ let INIT_SELECTEDPROJECT: any | null = null;
 
 // Props coming from the parent component
 type Props = {
+  isActive?: boolean;
   onRackChanged: (value: RackMetadata) => void;
   vendor?: string;
   region: string;
@@ -58,6 +59,14 @@ const HomeContainer = (props: Props) => {
     const masterUrl = `${API_URL}/allProjects${params ? `?${params}` : ''}`;
 
     useEffect(() => {
+        // Route changes run the previous cleanup first; skip starting Home list work while hidden.
+        if (props.isActive === false) {
+            return;
+        }
+
+        // Abort project-list requests when Home is hidden, unmounts, or vendor/region changes.
+        const ac = new AbortController();
+
         const fetchData = async () => {
             setIsLoading(true);
 
@@ -67,7 +76,7 @@ const HomeContainer = (props: Props) => {
 
             try {
                 if (!props.vendor && isLocalDesktop) {
-                    const masterFetch = await fetch(masterUrl);
+                    const masterFetch = await fetch(masterUrl, { signal: ac.signal });
                     if (masterFetch.ok) {
                         projects = await masterFetch.json();
                         resolvedUserType = "master";
@@ -76,14 +85,14 @@ const HomeContainer = (props: Props) => {
                     }
                 } else {
                     // Fetch from vendorUrl
-                    const vendorFetch = await fetch(vendorUrl);
+                    const vendorFetch = await fetch(vendorUrl, { signal: ac.signal });
                     vendorResponse = await vendorFetch.json();
 
                     // Assuming the API returns an array of projects
                     if (Array.isArray(vendorResponse) && vendorResponse.length === 0) {
                         // vendorUrl returned empty: try masterUrl
                         try {
-                            const masterFetch = await fetch(masterUrl);
+                            const masterFetch = await fetch(masterUrl, { signal: ac.signal });
                             if (masterFetch.status === 404) {
                                 // masterUrl returns 404: fallback to vendorResponse
                                 projects = vendorResponse;
@@ -103,8 +112,15 @@ const HomeContainer = (props: Props) => {
                     }
                 }
             } catch (error) {
+                if ((error as any)?.name === "AbortError") {
+                    return;
+                }
                 // Error fetching vendorUrl
                 projects = []; // or handle error as needed
+            }
+
+            if (ac.signal.aborted) {
+                return;
             }
 
             sessionStorage.setItem("LVV_USER_TYPE", resolvedUserType);
@@ -116,7 +132,11 @@ const HomeContainer = (props: Props) => {
         if (props.vendor || isLocalDesktop) {
             fetchData();
         }
-    }, [props.vendor, props.region, isLocalDesktop]);
+
+        return () => {
+            ac.abort();
+        };
+    }, [props.isActive, props.vendor, props.region, isLocalDesktop]);
 
     const [selectedProject, setSelectedProject] = useState(
         INIT_SELECTEDPROJECT
@@ -176,6 +196,7 @@ const HomeContainer = (props: Props) => {
             }
             {showProjectDetails() && (
                 <ProjectDetailsContainer
+                    isActive={props.isActive !== false}
                     project={selectedProject}
                     onRackChanged={rackSelectedHandler}
                     region={props.region}

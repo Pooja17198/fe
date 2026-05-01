@@ -45,6 +45,7 @@ type Project = {
 };
 
 type Props = {
+    isActive?: boolean;
     project: Project;
     onRackChanged: (value: any) => void;
     region: string;
@@ -446,6 +447,11 @@ const ProjectDetailsContainer = (props: Props) => {
     }, [someSelected]);
 
     useEffect(() => {
+        // Route changes run the previous cleanup first; skip starting Home table work while hidden.
+        if (props.isActive === false) {
+            return;
+        }
+
         const ac = new AbortController();
         const fetchId = ++requestSeqRef.current;
         setLoadedMeasurement(null);
@@ -548,7 +554,7 @@ const ProjectDetailsContainer = (props: Props) => {
         fetchAllData();
 
         return () => ac.abort(); // cancel any in-flight request when selection changes/unmounts
-    }, [props.project, props.region, props.projectLoadMeasurement]);
+    }, [props.isActive, props.project, props.region, props.projectLoadMeasurement]);
 
     useEffect(() => {
         if (loading || loadError || !loadedMeasurement) {
@@ -693,6 +699,10 @@ const ProjectDetailsContainer = (props: Props) => {
     }, [pagingDataProvider]);
 
     useEffect(() => {
+        if (props.isActive === false) {
+            return;
+        }
+
         const ac = new AbortController();
         const requestId = ++statusRequestSeqRef.current;
 
@@ -740,57 +750,93 @@ const ProjectDetailsContainer = (props: Props) => {
         });
 
         return () => ac.abort();
-    }, [props.project, props.region, visibleRows]);
+    }, [props.isActive, props.project, props.region, visibleRows]);
 
-    const handleRefreshHostReadiness = async () => {
+    const handleRefreshHostReadiness = async (signal?: AbortSignal) => {
+        if (!showOnlyGpuRacks) {
+            if (!signal?.aborted) {
+                setRackValidationReadyByKey((prev) => (isEmptyObject(prev) ? prev : {}));
+                setRackHostCountByKey((prev) => (isEmptyObject(prev) ? prev : {}));
+                setIsRefreshingHostReadiness(false);
+            }
+            return;
+        }
+
         const rowsToFetch = visibleRows.filter(
             (row) => row.isGpuRack && row.rackSerialNumber && row.rackSerialNumber.trim() !== ""
         );
 
         if (rowsToFetch.length === 0) {
-            setRackValidationReadyByKey((prev) => (isEmptyObject(prev) ? prev : {}));
-            setRackHostCountByKey((prev) => (isEmptyObject(prev) ? prev : {}));
+            if (!signal?.aborted) {
+                setRackValidationReadyByKey((prev) => (isEmptyObject(prev) ? prev : {}));
+                setRackHostCountByKey((prev) => (isEmptyObject(prev) ? prev : {}));
+                setIsRefreshingHostReadiness(false);
+            }
             return;
         }
 
+        if (signal?.aborted) {
+            return;
+        }
+
+        const nextLoadingReadyByKey: Record<string, RackValidationReadySummary | undefined> = {};
+        const nextLoadingHostCountByKey: Record<string, RackHostCountSummary | undefined> = {};
+        rowsToFetch.forEach((row) => {
+            nextLoadingReadyByKey[row._key] = undefined;
+            nextLoadingHostCountByKey[row._key] = undefined;
+        });
+
+        setRackValidationReadyByKey(nextLoadingReadyByKey);
+        setRackHostCountByKey(nextLoadingHostCountByKey);
+
         setIsRefreshingHostReadiness(true);
-        const ac = new AbortController();
+        const localController = signal ? null : new AbortController();
+        const requestSignal = signal || localController!.signal;
 
         try {
-            const results = await Promise.all(
+            await Promise.all(
                 rowsToFetch.map(async (row) => {
                     const [readySummary, hostCountSummary] = await Promise.all([
-                        fetchRackValidationReadySummary(row, props.region, ac.signal),
-                        fetchRackHostCountSummary(row, props.region, ac.signal),
+                        fetchRackValidationReadySummary(row, props.region, requestSignal),
+                        fetchRackHostCountSummary(row, props.region, requestSignal),
                     ]);
 
-                    return [row._key, readySummary, hostCountSummary] as const;
+                    if (requestSignal.aborted) {
+                        return;
+                    }
+
+                    setRackValidationReadyByKey((prev) => ({
+                        ...prev,
+                        [row._key]: readySummary,
+                    }));
+                    setRackHostCountByKey((prev) => ({
+                        ...prev,
+                        [row._key]: hostCountSummary,
+                    }));
                 })
             );
-
-            const nextReadyByKey: Record<string, RackValidationReadySummary | undefined> = {};
-            const nextHostCountByKey: Record<string, RackHostCountSummary | undefined> = {};
-
-            results.forEach(([key, readySummary, hostCountSummary]) => {
-                nextReadyByKey[key] = readySummary;
-                nextHostCountByKey[key] = hostCountSummary;
-            });
-
-            setRackValidationReadyByKey(nextReadyByKey);
-            setRackHostCountByKey(nextHostCountByKey);
         } catch (e) {
             if ((e as any)?.name !== "AbortError") {
                 console.warn("Failed to refresh host readiness summaries", e);
             }
         } finally {
-            setIsRefreshingHostReadiness(false);
-            ac.abort();
+            if (!requestSignal.aborted) {
+                setIsRefreshingHostReadiness(false);
+            }
+            localController?.abort();
         }
     };
 
     useEffect(() => {
-        void handleRefreshHostReadiness();
-    }, [props.project, props.region, visibleRows]);
+        if (props.isActive === false) {
+            return;
+        }
+
+        // Cancel host-readiness fan-out when visible rows change or Home becomes inactive.
+        const ac = new AbortController();
+        void handleRefreshHostReadiness(ac.signal);
+        return () => ac.abort();
+    }, [props.isActive, props.project, props.region, visibleRows, showOnlyGpuRacks]);
 
     // This resets the selectedRowKeySet to empty, so that same row selection triggers onSelectionChangedHandler
     const [selectedRowKeySet, setSelectedRowKeySet] = useState<KeySetImpl<any>>(new KeySetImpl<any>());
@@ -873,7 +919,7 @@ const ProjectDetailsContainer = (props: Props) => {
             type="button"
             class="validation-ready-refresh-button"
             onClick={() => void handleRefreshHostReadiness()}
-            disabled={isRefreshingHostReadiness || allProjectData.length === 0}
+            disabled={!showOnlyGpuRacks || isRefreshingHostReadiness || allProjectData.length === 0}
             title="Refresh Validation Ready and Host Count"
             aria-label="Refresh Validation Ready and Host Count"
         >
