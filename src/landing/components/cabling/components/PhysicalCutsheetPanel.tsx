@@ -18,6 +18,46 @@ interface PhysicalCutsheetProps {
   disableBackButton?: boolean;
 }
 
+const escapeCsvCell = (value: unknown) =>
+  `"${String(value ?? "").replace(/"/g, '""')}"`;
+
+const buildRackViewEasyMarkRows = (
+  devices: RackDeviceSummary[],
+): string[] =>
+  devices.flatMap((device) =>
+    (device.patchPanel ?? [])
+      .flat()
+      .map((port) =>
+        (port.easyMark ?? [])
+          .filter((easyMark) => easyMark.trim().length > 0)
+          .join("\n"),
+      )
+      .filter((easyMarkBlock) => easyMarkBlock.length > 0),
+  );
+
+const downloadEasyMarkCsv = (
+  easyMarkRows: string[],
+  roomName: string | undefined,
+  rackNumber: string,
+) => {
+  const csvRows = easyMarkRows.map((easyMark) => escapeCsvCell(easyMark));
+
+  const blob = new Blob([`\ufeff${csvRows.join("\r\n")}`], {
+    type: "text/csv;charset=utf-8",
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  const safeName = `${roomName ?? "room"}-rack-${rackNumber}-easymark.csv`
+    .replace(/[^\w.-]+/g, "_")
+    .replace(/_+/g, "_");
+  link.href = url;
+  link.download = safeName;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+};
+
 export const PhysicalCutsheetPanel = ({
   gpuRacks,
   roomName,
@@ -38,6 +78,7 @@ export const PhysicalCutsheetPanel = ({
     port: PatchPanelPortSummary;
     deviceName: string;
   } | null>(null);
+  const [exportLoading, setExportLoading] = useState(false);
 
   const handlePortClick = (port: PatchPanelPortSummary, deviceName: string) => {
     setDialogPort({ port, deviceName });
@@ -163,6 +204,21 @@ export const PhysicalCutsheetPanel = ({
     return null;
   };
 
+  const handleExportEasyMark = async () => {
+    if (!selectedRack || !roomName) return;
+    setExportLoading(true);
+
+    try {
+      downloadEasyMarkCsv(
+        buildRackViewEasyMarkRows(devices),
+        roomName,
+        selectedRack,
+      );
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
   // View 2: directly render rackDevices and their patchPanel ports
   return (
     <div className="material-panel">
@@ -184,6 +240,14 @@ export const PhysicalCutsheetPanel = ({
           Rack {selectedRack} ({rackViewLoading ? "..." : devices.length}{" "}
           devices)
         </strong>
+        <oj-c-button
+          chroming="borderless"
+          disabled={rackViewLoading || exportLoading || !roomName}
+          onojAction={handleExportEasyMark}
+          label={exportLoading ? "Exporting easyMark" : "Export easyMark"}
+        >
+          <span slot="startIcon" class="oj-ux-ico-download"></span>
+        </oj-c-button>
       </div>
 
       {physicalCutsheetsError && (
@@ -323,13 +387,9 @@ export const PhysicalCutsheetPanel = ({
       )}
       <oj-c-dialog
         id="easymarkCompareDialog"
-        opened={rackViewLoading || dialogOpen}
+        opened={dialogOpen}
         aria-describedby="easymarkCompareBody"
-        dialog-title={
-          rackViewLoading
-            ? ""
-            : `Device:${dialogPort?.deviceName}, Port:${dialogPort?.port?.portName ?? ""}`
-        }
+        dialog-title={`Device:${dialogPort?.deviceName ?? ""}, Port:${dialogPort?.port?.portName ?? ""}`}
         // width={rackViewLoading ? "600px" : "900px"}
         // maxWidth={rackViewLoading ? "600px" : "900px"}
       >

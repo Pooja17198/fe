@@ -111,6 +111,14 @@ div:has(> .port-accordion-header) {
   text-align: center;
 }
 
+.rack-detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 8px 0;
+}
+
 .info-key {
   font-weight: bold;
 }
