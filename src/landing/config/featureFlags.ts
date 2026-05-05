@@ -26,7 +26,11 @@ export const PERIODIC_VALIDATION_REFRESH_CONFIG: PeriodicValidationRefreshConfig
   // If blocks is omitted or [] for a building object, periodic refresh applies to all
   // blocks in that building.
   regions: [
-    { name: "us-saltlake-2", buildings: ["aga5"] }
+    { name: "us-saltlake-2", buildings: ["aga5"] },
+    { name: "ap-kulai-2", buildings: ["jbp15", "jbp19"] },
+    { name: "us-phoenix-1", buildings: ["phx20", "phx23"] },
+    { name: "us-ashburn-1", buildings: ["iad65"] },
+    { name: "ap-batam-1", buildings: ["hsg17"] }
   ],
   // Leave rackSerials empty to enable periodic refresh for all racks matched by the
   // other config filters. If rackSerials are provided, only those rack serials are enabled.
