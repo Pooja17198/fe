@@ -285,6 +285,8 @@ export function useRackValidation(props: RackProps, options?: UseRackValidationO
             const items = await fetchRackHostReadiness(
                 props.rack_serial,
                 props.region,
+                props.building,
+                props.block,
                 signal
             );
 
@@ -1344,6 +1346,8 @@ function normalizeLookupKey(value: string | null | undefined): string {
 async function fetchRackHostReadiness(
     rackSerialNumber: string,
     region: string,
+    building: string,
+    block: string,
     signal?: AbortSignal
 ): Promise<HostReadinessItem[]> {
     if (!rackSerialNumber || !region) {
@@ -1357,6 +1361,8 @@ async function fetchRackHostReadiness(
         readinessUrl.searchParams.set("rackSerialNumber", rackSerialNumber);
         readinessUrl.searchParams.set("regionName", region);
         readinessUrl.searchParams.set("availabilityDomain", availabilityDomain);
+        readinessUrl.searchParams.set("building", building);
+        readinessUrl.searchParams.set("block", block);
 
         const response = await fetchWithRetry(readinessUrl.href, { method: "GET", signal });
         if (!response.ok) {

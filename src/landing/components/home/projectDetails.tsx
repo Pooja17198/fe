@@ -314,6 +314,8 @@ async function fetchRackValidationReadySummary(
             readinessUrl.searchParams.set("rackSerialNumber", row.rackSerialNumber);
             readinessUrl.searchParams.set("regionName", region);
             readinessUrl.searchParams.set("availabilityDomain", availabilityDomain);
+            readinessUrl.searchParams.set("building", row.building);
+            readinessUrl.searchParams.set("block", row.block);
 
             const response = await fetchWithRetry(readinessUrl.href, { method: "GET", signal });
             if (!response.ok) {
@@ -363,6 +365,8 @@ async function fetchRackHostCountSummary(
             readinessUrl.searchParams.set("rackSerialNumber", row.rackSerialNumber);
             readinessUrl.searchParams.set("regionName", region);
             readinessUrl.searchParams.set("availabilityDomain", availabilityDomain);
+            readinessUrl.searchParams.set("building", row.building);
+            readinessUrl.searchParams.set("block", row.block);
 
             const response = await fetchWithRetry(readinessUrl.href, { method: "GET", signal });
             if (!response.ok) {

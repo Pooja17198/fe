@@ -748,7 +748,8 @@ function renderDeviceInformationSection(
     return null;
   }
 
-  const showTicketIds = readinessStatus === "LVV";
+  const showLvvTicketIds = readinessStatus === "LVV";
+  const showRepairTicketIds = readinessStatus === "CPV-REPAIR";
   const rows = [
     {
       label: "Device Name",
@@ -784,7 +785,7 @@ function renderDeviceInformationSection(
     },
     { label: "Compute State", value: computeState },
     { label: "Compute Pool", value: computePool },
-    ...(showTicketIds && lvvTicketIds.length > 0
+    ...(showLvvTicketIds && lvvTicketIds.length > 0
       ? [{
           label: "LVV Tickets",
           value: (
@@ -801,7 +802,7 @@ function renderDeviceInformationSection(
           ),
         }]
       : []),
-    ...(showTicketIds && repairTicketIds.length > 0
+    ...(showRepairTicketIds && repairTicketIds.length > 0
       ? [{
           label: "Repair Tickets",
           value: (
