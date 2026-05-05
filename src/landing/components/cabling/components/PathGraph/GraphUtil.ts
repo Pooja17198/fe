@@ -123,7 +123,7 @@ export const calculateScaledY = (
   // drawing:           +Y = up
   if (graphProp) {
     y = y * (convertToMM ? 25.4 : 1); // convert to mm
-    let actualY = graphProp.maxY - y; // 0..Y actual (flipped)
+    let actualY = y - graphProp.minY; // 0..Y actual (flipped)
     actualY -= graphProp.sizeRangeY * 0.5;
     const imageY = actualY * graphProp.scale; // 0..Y image
     const cenY = graphProp.imageHeight / 2.0;

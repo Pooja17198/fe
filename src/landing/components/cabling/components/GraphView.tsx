@@ -9,7 +9,7 @@ import "oj-c/select-single";
 import PathGraph from "./PathGraph/PathGraph";
 import RegionADSiteSelectors from "./RegionADSiteSelectors";
 import { DataCenterRoom } from "../types";
-import { useEffect, useRef, useState } from "preact/hooks";
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import {
   useConnections,
   useListGPURacks,
@@ -53,8 +53,9 @@ export const GraphView = () => {
 
   const [selectedRackToRack, setSelectedRackToRack] = useState<{
     sourceRack: string;
-    destinationRack: string;
+    destinationRack: string | null;
     showRackToRackImageView?: boolean;
+    sourceOnly?: boolean;
   } | null>(null);
 
   const [filteredGpuRacks, setFilteredGpuRacks] = useState<string[] | null>(
@@ -144,16 +145,51 @@ export const GraphView = () => {
   ];
   const [activeTab, setActiveTab] = useState<string>(tabs[0].path);
   const lastFetchedRoomforLayoutRef = useRef<string | null>(null);
+  const isSourceOnlySelection = !!selectedRackToRack?.sourceOnly;
+  const [clearRackSelection, setClearRackSelection] = useState<boolean>(false);
+
+  const sourceRackMaterials = useMemo(() => {
+    const sourceRack = selectedRackToRack?.sourceRack;
+    if (!isSourceOnlySelection || !sourceRack) {
+      return [];
+    }
+
+    const sourceRackBomIds = new Set<number>(
+      (connections?.items || [])
+        .filter(
+          (connection) =>
+            connection.sourceRackNumber === sourceRack &&
+            connection.bomId !== undefined,
+        )
+        .map((connection) => connection.bomId as number),
+    );
+
+    if (sourceRackBomIds.size === 0) {
+      return [];
+    }
+
+    return (materials?.items || []).filter(
+      (material) =>
+        material.bomId !== undefined && sourceRackBomIds.has(material.bomId),
+    );
+  }, [
+    isSourceOnlySelection,
+    selectedRackToRack?.sourceRack,
+    connections?.items,
+    materials?.items,
+  ]);
 
   const materialShown = !selectedRoom?.roomName
     ? []
-    : selectedRackToRack
-      ? rackToRackConnectionsError
-        ? []
-        : rackToRackConnections?.materials
-      : materialsError
-        ? []
-        : materials?.items;
+    : isSourceOnlySelection
+      ? sourceRackMaterials
+      : selectedRackToRack
+        ? rackToRackConnectionsError
+          ? []
+          : rackToRackConnections?.materials
+        : materialsError
+          ? []
+          : materials?.items;
 
   useEffect(() => {
     const roomName = selectedRoom?.roomName || null;
@@ -173,6 +209,7 @@ export const GraphView = () => {
       // Always clear rack selection when the room changes
       setClearRackSelection((prev) => !prev);
       setFilteredGpuRacks(null);
+      setMaterialPanelOpen(false);
       setPhysicalCutsheetsPanelOpen(false);
     }
   }, [selectedRoom?.roomName, activeTab]);
@@ -184,7 +221,12 @@ export const GraphView = () => {
   // }, [physicalCutsheets]);
 
   useEffect(() => {
-    if (selectedRoom?.roomName && selectedRackToRack) {
+    if (
+      selectedRoom?.roomName &&
+      selectedRackToRack &&
+      !selectedRackToRack.sourceOnly &&
+      selectedRackToRack.destinationRack
+    ) {
       refetchRackToRackConnections(
         selectedRoom?.roomName,
         selectedRackToRack.sourceRack,
@@ -192,6 +234,16 @@ export const GraphView = () => {
       );
     }
   }, [selectedRackToRack]);
+
+  useEffect(() => {
+    if (selectedRoom?.roomName && selectedRackToRack?.sourceOnly) {
+      refetchMaterials(selectedRoom.roomName);
+    }
+  }, [
+    selectedRoom?.roomName,
+    selectedRackToRack?.sourceOnly,
+    selectedRackToRack?.sourceRack,
+  ]);
 
   const tabItemTemplate = (item: ojTabBar.ItemContext<Tab["path"], Tab>) => (
     <li>
@@ -231,12 +283,22 @@ export const GraphView = () => {
     { keyAttributes: "path" },
   );
 
-  const [clearRackSelection, setClearRackSelection] = useState<boolean>(false);
+  const resetPathSelectorsAndHideSidePanels = () => {
+    setClearRackSelection((prev) => !prev);
+    setSelectedRackToRack(null);
+    setSelectedCutsheetRack(null);
+    setHoverRackId(null);
+    setFilteredGpuRacks(null);
+    setMaterialPanelOpen(false);
+    setPhysicalCutsheetsPanelOpen(false);
+  };
+
   return (
     <div class="oj-web-applayout-max-width oj-web-applayout-content">
       <RegionADSiteSelectors
         selectedRoom={selectedRoom?.roomName}
         setSelectedRoom={setSelectedRoom}
+        onLocationSelectorsChange={resetPathSelectorsAndHideSidePanels}
       />
       <PathSelectors
         roomName={selectedRoom?.roomName}
@@ -253,15 +315,24 @@ export const GraphView = () => {
         onRackListChange={(rackList) => {
           // rackList: gpu racks that are in the selected group (or all if cleared)
           // keep this in state so PathGraph can use the same filtered list
-          if (rackList.length > 0) {
+
+          const onlyGPURacks = rackList.filter((rack: string) =>
+            gpuRacks.includes(rack),
+          );
+          if (onlyGPURacks.length > 0) {
+            if (onlyGPURacks.length === 1) {
+              setSelectedCutsheetRack(onlyGPURacks[0]);
+              setHoverRackId(onlyGPURacks[0]);
+            } else {
+              setSelectedCutsheetRack(null);
+              setHoverRackId(null);
+            }
             setMaterialPanelOpen(false);
             setPhysicalCutsheetsPanelOpen(true);
-            if (rackList.length === 1) {
-              setSelectedCutsheetRack(rackList[0]);
-              setHoverRackId(rackList[0]);
-            }
+          } else {
+            setPhysicalCutsheetsPanelOpen(false);
           }
-          setFilteredGpuRacks(rackList);
+          setFilteredGpuRacks(onlyGPURacks);
         }}
       />
       <div className="layout-material-tab-bar">
@@ -323,7 +394,7 @@ export const GraphView = () => {
             {/* <PathGraph room={roomLayout} highlights={highlights} /> */}
             {!roomLayoutIsPending && !!roomLayout && (
               <div class="control-buttons">
-                {selectedRackToRack && (
+                {selectedRackToRack && !selectedRackToRack.sourceOnly && (
                   <oj-button
                     class="oj-md-padding-2x-horizontal"
                     onojAction={() => {
@@ -342,12 +413,7 @@ export const GraphView = () => {
                   class="oj-md-padding-2x-horizontal"
                   onojAction={(value) => {
                     value.preventDefault();
-                    setClearRackSelection(!clearRackSelection);
-                    setMaterialPanelOpen(false);
-                    setPhysicalCutsheetsPanelOpen(false);
-                    setSelectedCutsheetRack(null);
-                    setHoverRackId(null);
-                    setFilteredGpuRacks(null);
+                    resetPathSelectorsAndHideSidePanels();
                   }}
                 >
                   Clear Rack Selection
@@ -365,6 +431,10 @@ export const GraphView = () => {
                   onojAction={() => {
                     setMaterialPanelOpen(false);
                     setPhysicalCutsheetsPanelOpen(!physicalCutsheetsPanelOpen);
+                    if (selectedRackToRack) {
+                      resetPathSelectorsAndHideSidePanels();
+                      setPhysicalCutsheetsPanelOpen(true);
+                    }
                   }}
                 >
                   {`${physicalCutsheetsPanelOpen ? "Hide" : "View"} GPU Connections (${
@@ -381,6 +451,13 @@ export const GraphView = () => {
             <MaterialPanel
               materials={materialShown}
               loading={materialsLoading || !selectedRoom?.roomName}
+              headerText={
+                rackToRackConnections?.materials  && selectedRackToRack && selectedRackToRack.destinationRack ?
+                  `Rack ${selectedRackToRack?.sourceRack} to Rack ${selectedRackToRack?.destinationRack}`
+                  : selectedCutsheetRack ? 
+                  `Rack ${selectedCutsheetRack}` :
+                  `Room ${selectedRoom?.roomName}`
+              }
             />
           </div>
         ) : (
@@ -397,6 +474,13 @@ export const GraphView = () => {
             <MaterialPanel
               materials={materialShown}
               loading={materialsLoading || !selectedRoom?.roomName}
+              headerText={
+                rackToRackConnections?.materials  && selectedRackToRack && selectedRackToRack.destinationRack ?
+                  `Rack ${selectedRackToRack?.sourceRack} to Rack ${selectedRackToRack?.destinationRack}`
+                  : selectedCutsheetRack ? 
+                  `Rack ${selectedCutsheetRack}` :
+                  `Room ${selectedRoom?.roomName}`
+              }
             />
           ) : (
             <PhysicalCutsheetPanel

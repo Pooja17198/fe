@@ -12,6 +12,7 @@ interface RegionADSiteSelectorsProps {
   loading?: boolean;
   selectedRoom: string | undefined;
   setSelectedRoom: Dispatch<StateUpdater<DataCenterRoom | null>>;
+  onLocationSelectorsChange?: () => void;
 }
 
 const emptyDP = new ArrayDataProvider([], { keyAttributes: "value" });
@@ -21,6 +22,7 @@ const RegionADSiteSelectors = ({
   loading,
   selectedRoom,
   setSelectedRoom,
+  onLocationSelectorsChange,
 }: RegionADSiteSelectorsProps) => {
   const { data: adrBuildingData, isFetching: adsLoading } =
     useRoomMetadata(UseMockData);
@@ -86,6 +88,10 @@ const RegionADSiteSelectors = ({
   };
 
   const handleRegionTypeaheadChange = (regionsOnSelect: string) => {
+    if (regionsOnSelect === selectedRegion) {
+      return;
+    }
+    onLocationSelectorsChange?.();
     setSelectedRegion(regionsOnSelect);
     setSelectedAd(null);
     setSelectedRoom(null);
@@ -109,6 +115,10 @@ const RegionADSiteSelectors = ({
   };
 
   const handleADTypeaheadChange = (adsOnSelect: string) => {
+    if (adsOnSelect === selectedAd) {
+      return;
+    }
+    onLocationSelectorsChange?.();
     setSelectedAd(adsOnSelect);
     setSelectedRoom(null);
 
@@ -130,7 +140,8 @@ const RegionADSiteSelectors = ({
   };
 
   const handleBuildingTypeaheadChange = (roomOnSelect: string) => {
-    if (!roomOnSelect) return;
+    if (!roomOnSelect || roomOnSelect === selectedRoom) return;
+    onLocationSelectorsChange?.();
     const validRooms = (
       adrBuildingData?.filter(
         (r: any) => r.roomCanonicalName === roomOnSelect
@@ -182,7 +193,8 @@ const RegionADSiteSelectors = ({
       .filter(
         (ad, index, self) =>
           index === self.findIndex((a) => a.value === ad.value)
-      );
+      )
+      .sort((a, b) => a.label.localeCompare(b.label));
     const validAds = ads.filter((option) => typeof option.value === "string");
     return validAds;
   };
@@ -212,7 +224,8 @@ const RegionADSiteSelectors = ({
       .filter(
         (region, index, self) =>
           index === self.findIndex((r) => r.value === region.value)
-      );
+      )
+      .sort((a, b) => a.label.localeCompare(b.label));
     const validRegions = regions.filter(
       (option) => typeof option.value === "string"
     );
@@ -232,7 +245,8 @@ const RegionADSiteSelectors = ({
       .filter(
         (room, index, self) =>
           index === self.findIndex((b) => b.value === room.value)
-      );
+      )
+      .sort((a, b) => a.label.localeCompare(b.label));
     const validRoom = room.filter((option) => typeof option.value === "string");
     const validRoomDP = new ArrayDataProvider(validRoom, {
       keyAttributes: "value",

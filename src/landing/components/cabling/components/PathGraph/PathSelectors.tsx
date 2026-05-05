@@ -18,7 +18,6 @@ import { flattenConnections } from "./GraphUtil";
 import ArrayDataProvider from "ojs/ojarraydataprovider";
 import { PhysicalConnectionSummary } from "../../../../../../gen/clients/ide-lvv-client";
 import mapping from "../../api/mockAPI/deployment-groups.json";
-import { on } from "events";
 interface Option {
   label: string;
   value: string;
@@ -33,8 +32,9 @@ interface PathSelectorsProps {
   setRackToRack: Dispatch<
     StateUpdater<{
       sourceRack: string;
-      destinationRack: string;
+      destinationRack: string | null;
       showRackToRackImageView?: boolean;
+      sourceOnly?: boolean;
     } | null>
   >;
 
@@ -64,7 +64,6 @@ export const PathSelectors = ({
   const [srcRackMapping, setSrcRackMapping] = useState<
     Map<string, Set<string>>
   >(new Map());
-  const [srcOptions, setSrcOptions] = useState<Option[]>([]);
   const [destOptions, setDestOptions] = useState<Option[]>([]);
 
   useEffect(() => {
@@ -76,6 +75,7 @@ export const PathSelectors = ({
     });
     // setHighlights({ items: {} });
     setRackToRack(null);
+    setDestOptions([]);
   }, [clearRackSelection]);
 
   useEffect(() => {
@@ -93,23 +93,6 @@ export const PathSelectors = ({
 
       setSrcRackMapping(srcRackMappingLocal);
 
-      setSrcOptions(
-        Array.from(srcRackMappingLocal.keys())
-          .sort()
-          .map((src) => {
-            const destinations = Array.from(
-              srcRackMappingLocal.get(src) || [],
-            ).sort();
-            const label =
-              destinations.length > 0
-                ? `${src} - (${destinations.join(", ")})`
-                : src;
-            return {
-              label,
-              value: src,
-            };
-          }),
-      );
       setDestOptions(
         Array.from(destRackMappingLocal.keys())
           .sort()
@@ -147,26 +130,6 @@ export const PathSelectors = ({
     });
 
     setSrcRackMapping(srcRackMappingLocal);
-
-    // srcOptions now includes both connection-derived racks and GPU racks
-    setSrcOptions(
-      Array.from(srcRackMappingLocal.keys())
-        .sort()
-        .map((src) => {
-          const destinations = Array.from(
-            srcRackMappingLocal.get(src) || [],
-          ).sort();
-          const label =
-            destinations.length > 0
-              ? `${src} - (${destinations.join(", ")})`
-              : src;
-          return {
-            label,
-            value: src,
-          };
-        }),
-    );
-
     setDestOptions(
       Array.from(destRackMappingLocal.keys())
         .sort()
@@ -178,25 +141,7 @@ export const PathSelectors = ({
   }, [connections, gpuRacks]);
 
   useEffect(() => {
-    if (selected.destRack && !selected.srcRack) {
-      setSrcOptions(
-        Array.from(srcRackMapping.get(selected.destRack) || [])
-          ?.sort()
-          .map((src) => {
-            const destinations = Array.from(
-              srcRackMapping.get(src) || [],
-            ).sort();
-            const label =
-              destinations.length > 0
-                ? `${src} - (${destinations.join(", ")})`
-                : src;
-            return {
-              label,
-              value: src,
-            };
-          }),
-      );
-    } else if (selected.srcRack && selected.destRack) {
+    if (selected.srcRack && selected.destRack) {
       setDestOptions(
         Array.from(srcRackMapping.get(selected.srcRack) || [])
           ?.sort()
@@ -220,11 +165,20 @@ export const PathSelectors = ({
         sourceRack: selected.srcRack,
         destinationRack: selected.destRack,
         showRackToRackImageView: true,
+        sourceOnly: false,
       });
       onRackListChange?.([selected.srcRack]);
     } else if (selected.srcRack && !selected.destRack) {
       setDestOptions([]);
+      setRackToRack({
+        sourceRack: selected.srcRack,
+        destinationRack: null,
+        showRackToRackImageView: false,
+        sourceOnly: true,
+      });
       onRackListChange?.([selected.srcRack]);
+    } else {
+      setRackToRack(null);
     }
   }, [selected, srcRackMapping]);
 
@@ -252,6 +206,7 @@ export const PathSelectors = ({
       gpuRackSet.has(rack),
     );
 
+    if(!roomName) return [];
     // If in aga5.1 and a specific group is chosen, further filter by group
     if (roomName?.startsWith("aga5") && selected.deploymentGroup) {
       const group = mapping.groups.find(

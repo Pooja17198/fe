@@ -20,6 +20,8 @@ const IMAGE_WIDTH = 1000;
 const IMAGE_HEIGHT = 800;
 const IMAGE_BORDER_SPACE = 100;
 const PAN_DISTANCE = 50;
+const RACK_HOVER_SCALE = 2;
+const RACK_HOVER_TEXT_OFFSET_X = 15;
 
 interface PathGraphProps {
   room: RoomLayout;
@@ -47,18 +49,86 @@ export const PathGraph = ({
     .y((p: any) => p.pointY);
 
   const svgRef = useRef<SVGSVGElement>(null);
-  const svgElement = d3.select(svgRef.current as Element);
-
   const viewportRef = useRef<HTMLDivElement>(null);
-  function zoomed({ transform }: any) {
-    svgElement.attr("transform", transform);
+  const zoomBehaviorRef = useRef<
+    d3Zoom.ZoomBehavior<SVGSVGElement, unknown> | null
+  >(null);
+  const getSvgElement = () => d3.select(svgRef.current as SVGSVGElement);
+  const getGraphLayer = () =>
+    getSvgElement().select<SVGGElement>("g.graph-content");
+  const getRackPolygonPoints = (
+    coordinates: [number, number][],
+    scaleFactor = 1,
+  ) => {
+    if (!graphProp || !coordinates?.length) return "";
+
+    const screenPoints = coordinates.map(([x, y]) => ({
+      x: calculateScaledX(x, graphProp, true),
+      y: calculateScaledY(y, graphProp, true),
+    }));
+
+    if (scaleFactor === 1) {
+      return screenPoints.map((pt) => `${pt.x},${pt.y}`).join(" ");
   }
 
-  const zoom = d3Zoom.zoom().scaleExtent([0.8, 10]).on("zoom", zoomed);
+    const centerX =
+      screenPoints.reduce((sum, pt) => sum + pt.x, 0) / screenPoints.length;
+    const centerY =
+      screenPoints.reduce((sum, pt) => sum + pt.y, 0) / screenPoints.length;
+
+    return screenPoints
+      .map((pt) => {
+        const scaledX = centerX + (pt.x - centerX) * scaleFactor;
+        const scaledY = centerY + (pt.y - centerY) * scaleFactor;
+        return `${scaledX},${scaledY}`;
+      })
+      .join(" ");
+  };
+  const getRackBounds = (coordinates: [number, number][]) => {
+    if (!graphProp || !coordinates?.length) return null;
+
+    const screenPoints = coordinates.map(([x, y]) => ({
+      x: calculateScaledX(x, graphProp, true),
+      y: calculateScaledY(y, graphProp, true),
+    }));
+
+    return {
+      minX: Math.min(...screenPoints.map((pt) => pt.x)),
+      maxX: Math.max(...screenPoints.map((pt) => pt.x)),
+      minY: Math.min(...screenPoints.map((pt) => pt.y)),
+      maxY: Math.max(...screenPoints.map((pt) => pt.y)),
+    };
+  };
 
   // calculate max, min, scale, range on x/y, and set in GraphProp state
   useEffect(() => {
+    const svgElement = getSvgElement();
+    if (svgElement.empty()) return;
+
+    const width = svgElement.node()?.getBoundingClientRect().width;
+    const height = svgElement.node()?.getBoundingClientRect().height;
+
+    if (!width || !height) {
+      return;
+    }
+
+    svgElement.attr("viewBox", `0 0 ${width} ${height}`);
     svgElement.selectAll("*").remove();
+
+    const graphLayer = svgElement.append("g").attr("class", "graph-content");
+
+    const zoom = d3Zoom
+      .zoom<SVGSVGElement, unknown>()
+      .scaleExtent([0.5, 10])
+      .on("zoom", (e) => {
+        graphLayer.attr("transform", e.transform.toString());
+      });
+
+    zoomBehaviorRef.current = zoom;
+
+    svgElement.call(zoom as any).on("dblclick.zoom", null);
+    svgElement.call(zoom.transform as any, d3.zoomIdentity.translate(50, 0));
+
     const racks: RoomObject[] = [];
     const basketTrays: RoomObject[] = [];
     room?.layout?.room?.objects.forEach((item: any, index: number) => {
@@ -112,78 +182,51 @@ export const PathGraph = ({
       racks,
       basketTrays,
     });
-
-    // setup zoom in/zoom out and pan over
-    const zoom = d3Zoom
-      .zoom()
-      .scaleExtent([1, 10])
-      .on("zoom", (e) => {
-        svgElement.attr("transform", e.transform);
-        // let size = NOMINAL_SCALE;
-        // let tx = 1;
-        // d3.selectAll('.rack-node-text').remove();
-
-        // if (NOMINAL_SCALE * e.transform.k > MAX_SCALE) {
-        //   size = MAX_SCALE / e.transform.k;
-        //   tx = e.transform.k / MAX_SCALE;
-        //   svgElement
-        //     .selectAll('g.node-group')
-        //     .append('text')
-        //     .attr('class', 'rack-node-text')
-        //     .attr('key', (d: Node) => d.key)
-        //     .attr('x', (d: Node) => calculateScaledX(d.x))
-        //     .attr('y', (d: Node) => calculateScaledY(d.y))
-        //     .attr('dx', '-3')
-        //     .attr('dy', '-1')
-        //     .attr('font-size', '0.2em')
-        //     .text((d: Node) => d.attributes?.rackAttributes?.rackId || d.id);
-        // }
-        // d3.selectAll('.rack-node-text').raise();
-      });
-
-    svgElement
-      .call(zoom)
-      // .on("mousedown.zoom", null)
-      // .on("touchstart.zoom", null)
-      // .on("touchmove.zoom", null)
-      // .on("touchend.zoom", null)
-      .on("dblclick.zoom", null);
   }, [room]);
 
-  const renderRackInfo = (d: any, node: any) => {
-    const rackInfo = node["__data__"].label;
-    const { offsetX, offsetY } = d;
+  const renderRackInfo = (node: any) => {
+    const graphLayer = getGraphLayer();
+    if (graphLayer.empty()) return;
+    const rackData = node?.["__data__"];
+    const rackInfo = rackData?.label || rackData?.id || "";
+    const bounds = getRackBounds(rackData?.coordinates || []);
+    if (!bounds) return;
+
+    const hoverX = bounds.maxX + RACK_HOVER_TEXT_OFFSET_X;
+    const hoverY = bounds.minY + (bounds.maxY - bounds.minY - 20) / 2;
     if (!rackInfo) return;
-    svgElement
+    graphLayer
       .append("g")
       .attr("class", "rack-hover-text")
-      .attr("key", d.key)
+      .attr("key", rackData?.key || rackData?.label || rackData?.id || "")
       .append("rect")
       .attr("width", rackInfo.length * 10 + 15)
       .attr("height", 20)
       .attr("stroke", "grey")
       .attr("stroke-width", "1")
       .attr("fill", "lightgrey")
-      .attr("x", offsetX + 20)
-      .attr("y", offsetY);
+      .attr("x", hoverX)
+      .attr("y", hoverY);
 
-    svgElement
+    graphLayer
       .selectAll("g.rack-hover-text")
       .append("text")
-      .attr("x", offsetX + 25)
-      .attr("y", offsetY)
+      .attr("x", hoverX + 5)
+      .attr("y", hoverY)
       .attr("font-size", "1em")
       .html(
-        `<tspan x=${offsetX + 25} dy='1em'>${rackInfo || ""}</tspan>
+        `<tspan x=${hoverX + 5} dy='1em'>${rackInfo || ""}</tspan>
       `,
       );
 
-    d3.selectAll(`.rack-hover-text`).raise();
+    graphLayer.selectAll(`.rack-hover-text`).raise();
   };
   // helper: enlarge a rack polygon and show label, same as mouseover
   const enlargeRackById = (rackId: string) => {
+    const graphLayer = getGraphLayer();
+    if (graphLayer.empty()) return;
     if (!graphProp) return;
-    const sel = svgElement.select(`g#node-group-rack-${rackId} polygon`);
+    const sel = graphLayer.select(`g#node-group-rack-${rackId} polygon`);
     if (sel.empty()) return;
 
     const data: any = (sel.node() as any)?.__data__;
@@ -192,43 +235,19 @@ export const PathGraph = ({
     sel
       .transition()
       .duration(100)
-      .attr("points", (d: any) => {
-        const coords = data.coordinates || [];
-        const xs = coords.map((c: [number, number]) => c[0]);
-        const ys = coords.map((c: [number, number]) => c[1]);
+      .attr("points", () =>
+        getRackPolygonPoints(data.coordinates || [], RACK_HOVER_SCALE),
+      );
 
-        const minX = Math.min(...xs);
-        const maxX = Math.max(...xs);
-        const minY = Math.min(...ys);
-        const maxY = Math.max(...ys);
-
-        return (coords || [])
-          .map((pt: any) => {
-            const x = pt[0];
-            const y = pt[1];
-            const left = x <= (minX + maxX) / 2;
-            const top = y <= (minY + maxY) / 2;
-            return [
-              calculateScaledX(x, graphProp, true) + (left ? -5 : 5),
-              calculateScaledY(y, graphProp, true) + (top ? 5 : -5),
-            ].join(",");
-          })
-          .join(" ");
-      });
-
-    // approximate mouse position to reuse renderRackInfo; we can take first coordinate
-    const first = data.coordinates[0];
-    const dLike = {
-      offsetX: calculateScaledX(first[0], graphProp, true),
-      offsetY: calculateScaledY(first[1], graphProp, true),
-    };
-    renderRackInfo(dLike, sel.node() as Element);
+    renderRackInfo(sel.node() as Element);
   };
 
   // helper: reset rack polygon and remove label, same as mouseout
   const resetRackById = (rackId: string) => {
+    const graphLayer = getGraphLayer();
+    if (graphLayer.empty()) return;
     if (!graphProp) return;
-    const sel = svgElement.select(`g#node-group-rack-${rackId} polygon`);
+    const sel = graphLayer.select(`g#node-group-rack-${rackId} polygon`);
     if (sel.empty()) return;
 
     const data: any = (sel.node() as any)?.__data__;
@@ -237,29 +256,29 @@ export const PathGraph = ({
     sel
       .transition()
       .duration(200)
-      .attr("points", (d: any) => {
-        return (data.coordinates || [])
-          .map((pt: any) => {
-            return [
-              calculateScaledX(pt[0], graphProp, true),
-              calculateScaledY(pt[1], graphProp, true),
-            ].join(",");
-          })
-          .join(" ");
-      });
+      .attr("points", () => getRackPolygonPoints(data.coordinates || []));
 
-    d3.selectAll(".rack-hover-text").remove();
+    graphLayer.selectAll(".rack-hover-text").remove();
+  };
+  const raiseCutsheetRacks = () => {
+    const graphLayer = getGraphLayer();
+    if (graphLayer.empty()) return;
+
+    racksWithPhysicalCutsheet.forEach((rackId) => {
+      graphLayer.select(`g#node-group-rack-${rackId}`).raise();
+    });
   };
 
   // inital node rendering
   useEffect(() => {
-    const svgElement = d3.select(svgRef.current as Element);
-    d3.selectAll(".node-group").remove();
+    const graphLayer = getGraphLayer();
+    if (graphLayer.empty()) return;
+    graphLayer.selectAll("*").remove();
     if (!graphProp) return;
 
     // rack node group handles the mouse over/out event
-    svgElement
-      .selectAll(".visualizer")
+    graphLayer
+      .selectAll("g.node-group-rack")
       .data(graphProp?.racks || [])
       .enter()
       .append("g")
@@ -267,8 +286,8 @@ export const PathGraph = ({
       .attr("class", "node-group node-group-rack")
       .attr("id", (d) => "node-group-rack-" + d.label || d.id || "");
 
-    svgElement
-      .selectAll(".visualizer")
+    graphLayer
+      .selectAll("g.basket-tray-group")
       .data(graphProp?.basketTrays || [])
       .enter()
       .append("g")
@@ -276,21 +295,12 @@ export const PathGraph = ({
       .attr("class", "basket-tray-group")
       .attr("id", (d) => "basket-tray-" + d.id || d.label || "");
 
-    svgElement
+    graphLayer
       .selectAll("g.node-group")
       .append("polygon")
       .attr("class", "rack-node-rect")
       .attr("id", (d: any) => d.id)
-      .attr("points", (d: any) => {
-        return (d.coordinates || [])
-          .map((d: any) => {
-            return [
-              calculateScaledX(d[0], graphProp, true),
-              calculateScaledY(d[1], graphProp, true),
-            ].join(",");
-          })
-          .join(" ");
-      })
+      .attr("points", (d: any) => getRackPolygonPoints(d.coordinates || []))
       .attr("stroke", (d: any) => {
         const rackId = d.label || d.id || "";
         if (racksWithPhysicalCutsheet.includes(rackId)) {
@@ -317,51 +327,21 @@ export const PathGraph = ({
         d3.select(this)
           .transition()
           .duration(100)
-          .attr("points", (d: any) => {
-            const coords = d.coordinates || [];
-            // Determine min/max for x and y across all four points
-            const xs = coords.map((c: [number, number]) => c[0]);
-            const ys = coords.map((c: [number, number]) => c[1]);
-
-            const minX = Math.min(...xs);
-            const maxX = Math.max(...xs);
-            const minY = Math.min(...ys);
-            const maxY = Math.max(...ys);
-
-            return (d.coordinates || [])
-              .map((d: any) => {
-                const x = d[0];
-                const y = d[1];
-                const left = x <= (minX + maxX) / 2;
-                const top = y <= (minY + maxY) / 2;
-                return [
-                  calculateScaledX(x, graphProp, true) + (left ? -5 : 5),
-                  calculateScaledY(y, graphProp, true) + (top ? 5 : -5),
-                ].join(",");
-              })
-              .join(" ");
-          });
-        renderRackInfo(d, d3.select(this).node() as Element);
+          .attr("points", (d: any) =>
+            getRackPolygonPoints(d.coordinates || [], RACK_HOVER_SCALE),
+          );
+        renderRackInfo(d3.select(this).node() as Element);
       })
       .on("mouseout", function (d: any, node: any) {
         if (hoverRackId === (node.label || node.id)) return;
         d3.select(this)
           .transition()
           .duration(200)
-          .attr("points", (d: any) => {
-            return (d.coordinates || [])
-              .map((d: any) => {
-                return [
-                  calculateScaledX(d[0], graphProp, true),
-                  calculateScaledY(d[1], graphProp, true),
-                ].join(",");
-              })
-              .join(" ");
-          });
-        d3.selectAll(".rack-hover-text").remove();
+          .attr("points", (d: any) => getRackPolygonPoints(d.coordinates || []));
+        graphLayer.selectAll(".rack-hover-text").remove();
       });
     // basket trays connections
-    svgElement
+    graphLayer
       .selectAll("g.basket-tray-group")
       .append("polygon")
       .attr("class", "edge")
@@ -381,16 +361,11 @@ export const PathGraph = ({
       .attr("stroke-width", "0.6")
       .attr("opacity", "0.3");
 
-    d3.selectAll(".node-group").raise();
-    d3.selectAll(".edge").lower();
-    const currentTransform = d3.zoomTransform(svgElement.node() as Element);
-    svgElement
-      .transition()
-      .duration(100)
-      .call(zoom.transform, currentTransform.translate(50, 0));
+    graphLayer.selectAll(".node-group").raise();
+    graphLayer.selectAll(".edge").lower();
     if (racksWithPhysicalCutsheet.length) {
       racksWithPhysicalCutsheet.forEach((rackId) => {
-        svgElement
+        graphLayer
           .selectAll("g#node-group-rack-" + rackId + " polygon")
           .attr("stroke", "darkgreen")
           .attr("fill", "green")
@@ -401,11 +376,15 @@ export const PathGraph = ({
             onRackClick(rackId, hasCutsheet);
           });
       });
+      raiseCutsheetRacks();
     }
   }, [graphProp]);
 
   useEffect(() => {
-    svgElement
+    const graphLayer = getGraphLayer();
+    if (graphLayer.empty()) return;
+
+    graphLayer
       .selectAll("g.node-group polygon")
       .attr("stroke", (d: any) => {
         const rackId = d.label || d.id || "";
@@ -427,6 +406,8 @@ export const PathGraph = ({
         const hasCutsheet = racksWithPhysicalCutsheet.includes(rackId);
         onRackClick(rackId, hasCutsheet);
       });
+
+    raiseCutsheetRacks();
   }, [racksWithPhysicalCutsheet]);
 
   // respond to hoverRackId from PhysicalCutsheetPanel
@@ -638,15 +619,22 @@ export const PathGraph = ({
   //   }
   // }, [highlights]);
 
+  const withZoom = (callback: (svgElement: any, zoom: any) => void) => {
+    const zoom = zoomBehaviorRef.current;
+    if (!zoom || !svgRef.current) return;
+
+    const svgElement = d3.select(svgRef.current as SVGSVGElement);
+    callback(svgElement, zoom);
+  };
+
   const handleMove = (x: number, y: number) => {
-    if (svgElement) {
+    withZoom((svgElement, zoom) => {
       const currentTransform = d3.zoomTransform(svgElement.node() as Element);
-      // Apply a new transform with a translation to the left
       svgElement
         .transition()
         .duration(100)
         .call(zoom.transform, currentTransform.translate(x, y));
-    }
+    });
   };
 
   return (
@@ -658,7 +646,9 @@ export const PathGraph = ({
               id="zoom-in-button"
               display="icons"
               onojAction={() => {
-                svgElement.transition().call(zoom.scaleBy, 1.2);
+                withZoom((svgElement, zoom) => {
+                  svgElement.transition().call(zoom.scaleBy as any, 1.2);
+                });
               }}
             >
               +
@@ -676,7 +666,9 @@ export const PathGraph = ({
               id="zoom-out-button"
               display="icons"
               onojAction={() => {
-                svgElement.transition().call(zoom.scaleBy, 0.8);
+                withZoom((svgElement, zoom) => {
+                  svgElement.transition().call(zoom.scaleBy as any, 0.8);
+                });
               }}
             >
               -
@@ -695,9 +687,11 @@ export const PathGraph = ({
             <oj-button
               id="reset-button"
               onojAction={() => {
+                withZoom((svgElement, zoom) => {
                 svgElement
                   .transition()
-                  .call(zoom.transform, d3.zoomIdentity.translate(50, 0));
+                    .call(zoom.transform as any, d3.zoomIdentity.translate(50, 0));
+                });
               }}
             >
               o
