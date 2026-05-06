@@ -1358,7 +1358,15 @@ async function fetchRackHostReadiness(
         return [];
     }
 
-    const availabilityDomains = [1, 2, 3].map((adNumber) => `${region}-ad-${adNumber}`);
+    const availabilityDomainRegionPrefix =
+        region === "us-phoenix-1"
+            ? "phx"
+            : region === "us-ashburn-1"
+                ? "iad"
+                : region;
+    const availabilityDomains = [1, 2, 3].map(
+        (adNumber) => `${availabilityDomainRegionPrefix}-ad-${adNumber}`
+    );
 
     for (const availabilityDomain of availabilityDomains) {
         const readinessUrl = new URL(`${LVV_API}/rackHostCableValidationReadiness`);
