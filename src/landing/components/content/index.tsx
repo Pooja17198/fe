@@ -249,6 +249,7 @@ const Content = (props: Props) => {
                 ticket={selectedTicket}
                 rack_serial={selectedRackSerialNumber}
                 isGpuRack={selectedIsGpuRack}
+                vendorName={selectedVendor}
                 availabilityDomain={selectedAvailabilityDomain}
                 userType={selectedUserType}
                 resolveEnabled={selectedResolveEnabled}

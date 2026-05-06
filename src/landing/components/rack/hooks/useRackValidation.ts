@@ -1223,6 +1223,10 @@ export function useRackValidation(props: RackProps, options?: UseRackValidationO
         const headers = createCsrfHeaders();
         const url = new URL(`${LVV_API}/cablingTasks/${props.ticket}/actions/resolveValidationFailureTask`);
         url.searchParams.set("regionName", props.region);
+        const vendorName = String(props.vendorName || "").trim();
+        if (vendorName) {
+            url.searchParams.set("vendorName", vendorName);
+        }
         const request = new Request(url.href, {method: "POST", headers});
 
         const response = await fetch(request, {signal: pageAbortRef.current?.signal as AbortSignal | undefined});
@@ -1245,7 +1249,7 @@ export function useRackValidation(props: RackProps, options?: UseRackValidationO
             }
             return { ok: false, message: errMsg };
         }
-    }, [resolveAllowed, resolveTooltip, props.ticket, props.region, props.onPageChanged]);
+    }, [resolveAllowed, resolveTooltip, props.ticket, props.region, props.vendorName, props.onPageChanged]);
 
     const downloadExcel = useCallback(async () => {
         setIsDownloading(true);

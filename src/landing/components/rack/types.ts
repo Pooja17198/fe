@@ -113,6 +113,7 @@ export type RackProps = {
   rack_serial: string;
   isGpuRack?: boolean;
   region: string;
+  vendorName?: string;
   availabilityDomain?: string;
   userType?: "master" | "vendor";
   resolveEnabled?: boolean;
