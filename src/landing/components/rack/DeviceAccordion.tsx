@@ -346,18 +346,47 @@ function isUsableLookupValue(value: string | undefined | null): boolean {
 }
 
 function getLookupValue(
-  primary: string | undefined | null,
-  fallback?: string | undefined | null
+  primary: unknown,
+  fallback?: unknown
 ): string {
-  if (isUsableLookupValue(primary)) {
+  if (isUsableLookupValue(primary == null ? "" : String(primary))) {
     return String(primary ?? "").trim();
   }
 
-  if (isUsableLookupValue(fallback)) {
+  if (isUsableLookupValue(fallback == null ? "" : String(fallback))) {
     return String(fallback ?? "").trim();
   }
 
   return "";
+}
+
+function buildNonLldpPatchPanelLookupKeys(row: ValidationTableRow): string[] {
+  const lookupKeys: string[] = [];
+  const seen = new Set<string>();
+  const candidates: Array<[string, string]> = [
+    [getLookupValue(row.deviceName), getLookupValue(row.devicePort)],
+    [getLookupValue(row.sourceDeviceName), getLookupValue(row.sourceDevicePort)],
+    [
+      getLookupValue(row.remoteDeviceName, row.remoteDevice),
+      getLookupValue(row.remoteDevicePort, row.remoteInterface),
+    ],
+  ];
+
+  candidates.forEach(([deviceName, devicePort]) => {
+    if (!deviceName || !devicePort) {
+      return;
+    }
+
+    buildPatchPanelLookupKeys(deviceName, devicePort).forEach((lookupKey) => {
+      if (seen.has(lookupKey)) {
+        return;
+      }
+      seen.add(lookupKey);
+      lookupKeys.push(lookupKey);
+    });
+  });
+
+  return lookupKeys;
 }
 
 function toDevicePortKey(deviceName: string | undefined | null, devicePort: string | undefined | null): string {
@@ -1002,37 +1031,7 @@ function addPatchPanelToSectionRows(
         return keys;
       }
 
-      const normalizedSectionTitle = normalizeSectionTitle(sectionTitle);
-      if (normalizedSectionTitle === "optic errors" || normalizedSectionTitle === "interface errors") {
-        return buildPatchPanelLookupKeys(
-          getLookupValue(
-            String(row.deviceName ?? ""),
-            String(row.remoteDeviceName ?? row.sourceDeviceName ?? "")
-          ),
-          getLookupValue(
-            String(row.devicePort ?? ""),
-            String(row.remoteDevicePort ?? row.sourceDevicePort ?? "")
-          )
-        );
-      }
-
-      if (isFecBerSection(sectionTitle)) {
-        return buildPatchPanelLookupKeys(
-          getLookupValue(String(row.deviceName ?? ""), String(row.remoteDevice ?? "")),
-          getLookupValue(String(row.devicePort ?? ""), String(row.remoteInterface ?? ""))
-        );
-      }
-
-      return buildPatchPanelLookupKeys(
-        getLookupValue(
-          String(row.deviceName ?? ""),
-          String(row.remoteDeviceName ?? row.remoteDevice ?? "")
-        ),
-        getLookupValue(
-          String(row.devicePort ?? ""),
-          String(row.remoteDevicePort ?? row.remoteInterface ?? "")
-        )
-      );
+      return buildNonLldpPatchPanelLookupKeys(row);
     })();
 
     for (const key of lookupKeys) {

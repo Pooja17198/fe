@@ -1767,6 +1767,35 @@ function getLookupValue(
     return "";
 }
 
+function buildNonLldpPatchPanelLookupKeys(row: ValidationTableRow): string[] {
+    const lookupKeys: string[] = [];
+    const seen = new Set<string>();
+    const candidates: Array<[string, string]> = [
+        [getLookupValue(row.deviceName), getLookupValue(row.devicePort)],
+        [getLookupValue(row.sourceDeviceName), getLookupValue(row.sourceDevicePort)],
+        [
+            getLookupValue(row.remoteDeviceName, row.remoteDevice),
+            getLookupValue(row.remoteDevicePort, row.remoteInterface),
+        ],
+    ];
+
+    candidates.forEach(([deviceName, devicePort]) => {
+        if (!deviceName || !devicePort) {
+            return;
+        }
+
+        buildPatchPanelLookupKeys(deviceName, devicePort).forEach((lookupKey) => {
+            if (seen.has(lookupKey)) {
+                return;
+            }
+            seen.add(lookupKey);
+            lookupKeys.push(lookupKey);
+        });
+    });
+
+    return lookupKeys;
+}
+
 function normalizePortMembership(devicePort: string | undefined | null): { basePort: string; members: number[] } | null {
     const normalizedPort = String(devicePort || "").trim();
     if (!normalizedPort) return null;
@@ -1881,21 +1910,8 @@ function collectPatchPanelLookupKeysFromFailures(
                     if (expectedName && expectedPort) {
                         rowLookupKeys.push(...buildPatchPanelLookupKeys(expectedName, expectedPort));
                     }
-                } else if (isSectionTitle(section.title, "Optic Errors") || isSectionTitle(section.title, "Interface Errors")) {
-                    rowLookupKeys = buildPatchPanelLookupKeys(
-                        getLookupValue(row.deviceName, row.remoteDeviceName ?? row.sourceDeviceName),
-                        getLookupValue(row.devicePort, row.remoteDevicePort ?? row.sourceDevicePort)
-                    );
-                } else if (isSectionTitle(section.title, "FEC_BER Errors")) {
-                    rowLookupKeys = buildPatchPanelLookupKeys(
-                        getLookupValue(row.deviceName, row.remoteDevice),
-                        getLookupValue(row.devicePort, row.remoteInterface)
-                    );
                 } else {
-                    rowLookupKeys = buildPatchPanelLookupKeys(
-                        getLookupValue(row.deviceName, row.remoteDeviceName ?? row.remoteDevice),
-                        getLookupValue(row.devicePort, row.remoteDevicePort ?? row.remoteInterface)
-                    );
+                    rowLookupKeys = buildNonLldpPatchPanelLookupKeys(row);
                 }
 
                 rowLookupKeys.forEach((lookupKey) => lookupKeys.add(lookupKey));
