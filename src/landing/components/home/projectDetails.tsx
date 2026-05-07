@@ -652,19 +652,9 @@ const ProjectDetailsContainer = (props: Props) => {
         showOnlyGpuRacks,
     ]);
 
-    const filteredRows = useMemo((): ProjectRackRow[] => {
-        return filteredBaseRows.map((row) => ({
-            ...row,
-            _validationReady: rackValidationReadyByKey[row._key]?.readyCount ?? 0,
-        }));
-    }, [
-        filteredBaseRows,
-        rackValidationReadyByKey,
-    ]);
-
     const baseDataProvider = useMemo(
-        () => new ArrayDataProvider(filteredRows, { keyAttributes: "_key" }),
-        [filteredRows]
+        () => new ArrayDataProvider(filteredBaseRows, { keyAttributes: "_key" }),
+        [filteredBaseRows]
     );
     const pagingDataProvider = useMemo(
         () => new PagingDataProviderView(baseDataProvider),
@@ -674,6 +664,63 @@ const ProjectDetailsContainer = (props: Props) => {
         const startIndex = currentPage * pageSize;
         return filteredBaseRows.slice(startIndex, startIndex + pageSize);
     }, [currentPage, filteredBaseRows, pageSize]);
+    const readinessVisibleRows = useMemo((): ProjectRackRow[] => {
+        const startIndex = currentPage * pageSize;
+        let rows = allProjectData.filter((row) => row.block && activeBlocks.includes(row.block));
+
+        if (showOnlyGpuRacks) {
+            rows = rows.filter((row) => row.isGpuRack);
+        }
+
+        if (hideMissingSerial) {
+            rows = rows.filter((row) => row.rackSerialNumber && row.rackSerialNumber.trim() !== "");
+        }
+
+        const q = searchText.trim().toLowerCase();
+        if (q) {
+            const rackSearchItems = getRackSearchTerms(q);
+            const isMultiRackSearch = q.includes(",");
+
+            if (isMultiRackSearch && rackSearchItems.length > 0) {
+                rows = rows.filter((row) => {
+                    const rackLocation = String(row.rackLocation || "").trim();
+                    return rackSearchItems.some((term) => rackLocation.includes(term));
+                });
+            } else {
+                rows = rows.filter((row) => {
+                    const haystack = [
+                        row.rackLocation,
+                        row.block,
+                        row.rackSerialNumber,
+                        row.gpuRackLabel || "",
+                        row.ticketType || "",
+                        row.ticketId || "",
+                        row.rackState || "",
+                        row.platformName
+                    ].join(" ").toLowerCase();
+                    return haystack.includes(q);
+                });
+            }
+        }
+
+        return rows.slice(startIndex, startIndex + pageSize);
+    }, [
+        currentPage,
+        pageSize,
+        allProjectData,
+        activeBlocks,
+        hideMissingSerial,
+        searchText,
+        showOnlyGpuRacks,
+    ]);
+    const visibleRowsSignature = useMemo(
+        () => visibleRows.map((row) => `${row._key}|${row.rackSerialNumber ?? ""}|${row.isGpuRack ? 1 : 0}`).join("::"),
+        [visibleRows]
+    );
+    const readinessVisibleRowsSignature = useMemo(
+        () => readinessVisibleRows.map((row) => `${row._key}|${row.rackSerialNumber ?? ""}|${row.isGpuRack ? 1 : 0}`).join("::"),
+        [readinessVisibleRows]
+    );
 
 
     // Reset paging when filters change or page size changes
@@ -691,7 +738,7 @@ const ProjectDetailsContainer = (props: Props) => {
                     : typeof provider.getPage === "function"
                         ? provider.getPage()
                         : 0;
-            setCurrentPage(nextPage);
+            setCurrentPage((prev) => (prev === nextPage ? prev : nextPage));
         };
 
         syncCurrentPage();
@@ -754,9 +801,9 @@ const ProjectDetailsContainer = (props: Props) => {
         });
 
         return () => ac.abort();
-    }, [props.isActive, props.project, props.region, visibleRows]);
+    }, [props.isActive, props.project, props.region, visibleRowsSignature]);
 
-    const handleRefreshHostReadiness = async (signal?: AbortSignal) => {
+    const handleRefreshHostReadiness = async (rows: ProjectRackRow[], signal?: AbortSignal) => {
         if (!showOnlyGpuRacks) {
             if (!signal?.aborted) {
                 setRackValidationReadyByKey((prev) => (isEmptyObject(prev) ? prev : {}));
@@ -766,7 +813,7 @@ const ProjectDetailsContainer = (props: Props) => {
             return;
         }
 
-        const rowsToFetch = visibleRows.filter(
+        const rowsToFetch = rows.filter(
             (row) => row.isGpuRack && row.rackSerialNumber && row.rackSerialNumber.trim() !== ""
         );
 
@@ -838,9 +885,9 @@ const ProjectDetailsContainer = (props: Props) => {
 
         // Cancel host-readiness fan-out when visible rows change or Home becomes inactive.
         const ac = new AbortController();
-        void handleRefreshHostReadiness(ac.signal);
+        void handleRefreshHostReadiness(readinessVisibleRows, ac.signal);
         return () => ac.abort();
-    }, [props.isActive, props.project, props.region, visibleRows, showOnlyGpuRacks]);
+    }, [props.isActive, props.project, props.region, readinessVisibleRowsSignature, showOnlyGpuRacks]);
 
     // This resets the selectedRowKeySet to empty, so that same row selection triggers onSelectionChangedHandler
     const [selectedRowKeySet, setSelectedRowKeySet] = useState<KeySetImpl<any>>(new KeySetImpl<any>());
@@ -922,7 +969,7 @@ const ProjectDetailsContainer = (props: Props) => {
         <button
             type="button"
             class="validation-ready-refresh-button"
-            onClick={() => void handleRefreshHostReadiness()}
+            onClick={() => void handleRefreshHostReadiness(visibleRows)}
             disabled={!showOnlyGpuRacks || isRefreshingHostReadiness || allProjectData.length === 0}
             title="Refresh Validation Ready and Host Count"
             aria-label="Refresh Validation Ready and Host Count"
