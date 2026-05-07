@@ -123,10 +123,14 @@ function formatRawBerEntries(rawValue: unknown): RawBerToken[][] {
     .filter((entry) => entry.length > 0);
 }
 
+function firstNonEmptyValue(...values: unknown[]): unknown {
+  return values.find((value) => `${value ?? ""}`.trim() !== "");
+}
+
 export const opticalRawBerTemplate = (context: any) => {
   const row = (context?.item && context.item.data) || {};
   const entries = formatRawBerEntries(
-    row.opticalRawBer ?? row["Optical RawBer"] ?? row.raw_ber ?? row.rawBer
+    firstNonEmptyValue(row.opticalRawBer, row["Optical RawBer"], row.raw_ber, row.rawBer, row["Raw BER"])
   );
 
   if (entries.length === 0) {
@@ -139,9 +143,20 @@ export const opticalRawBerTemplate = (context: any) => {
         <div class="raw-ber-entry" key={`raw-ber-entry-${entryIndex}`}>
           {entry.map((token, tokenIndex) => {
             const isStatusToken = token.key.trim().toLowerCase() === "status";
+            const isPlainValueToken = token.key.trim().toLowerCase() === "value";
             const valueClass = isStatusToken
               ? getRawBerStatusClass(token.value)
               : "raw-ber-token-value";
+            if (isPlainValueToken) {
+              return (
+                <span
+                  class={valueClass}
+                  key={`raw-ber-value-${entryIndex}-${tokenIndex}`}
+                >
+                  {token.value}
+                </span>
+              );
+            }
             return [
               <span class="raw-ber-token-key" key={`raw-ber-key-${entryIndex}-${tokenIndex}`}>
                 {token.key}:
@@ -160,6 +175,12 @@ export const opticalRawBerTemplate = (context: any) => {
   );
 };
 
+export const plainRawBerTemplate = (context: any) => {
+  const row = (context?.item && context.item.data) || {};
+  const value = `${firstNonEmptyValue(row["Raw BER"], row.opticalRawBer, row["Optical RawBer"], row.raw_ber, row.rawBer) ?? ""}`.trim();
+  return <span>{value || "Not Available"}</span>;
+};
+
 function formatRxPowerValue(rawValue: unknown): string {
   const value = `${rawValue ?? ""}`.trim().replace(/\\n/g, "\n");
   if (!value) {
@@ -176,7 +197,16 @@ function formatRxPowerValue(rawValue: unknown): string {
 
 const createPowerValueTemplate = (field: "txPower" | "rxPower") => (context: any) => {
   const row = (context?.item && context.item.data) || {};
-  const value = formatRxPowerValue(row[field]);
+  const isHostTransceiverRxPower =
+    field === "rxPower" && Object.prototype.hasOwnProperty.call(row, "RX Power (dBm)");
+  const value = formatRxPowerValue(
+    field === "rxPower"
+      ? firstNonEmptyValue(row[field], row["RX Power (dBm)"])
+      : firstNonEmptyValue(row[field], row["Tx Power"])
+  );
+  if (!value && isHostTransceiverRxPower) {
+    return <div class="gpu-multiline-value-cell">Not Available</div>;
+  }
   if (!value) {
     return (
       <div class="gpu-multiline-value-cell">
@@ -213,7 +243,13 @@ export const laneValuesTemplate = (context: any) => {
 
 export const relativeTimestampTemplate = (context: any) => {
   const row = (context?.item && context.item.data) || {};
-  const rawValue = `${row["Last Executed"] ?? row.lastExecuted ?? ""}`.trim();
+  const displayValue = `${row.__relativeTimestampDisplay ?? ""}`.trim();
+  const displayRawValue = `${row.__relativeTimestampRaw ?? ""}`.trim();
+  if (displayValue) {
+    return <span title={displayRawValue || displayValue}>{displayValue}</span>;
+  }
+
+  const rawValue = `${row["Last Executed"] ?? row.lastExecuted ?? row["Last Updated"] ?? ""}`.trim();
   const formattedValue = formatValidationTimestamp(rawValue || null);
   return <span title={rawValue || formattedValue}>{formattedValue}</span>;
 };

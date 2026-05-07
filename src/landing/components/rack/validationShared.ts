@@ -17,16 +17,30 @@ export type RackValidationSummary = {
   isValidated: boolean;
   cableFailures: number;
   opticsFailures: number;
+  hostOpticsFailures: number;
   deviceFailures: number;
+};
+
+export type HostTransceiverReadiness = {
+  status?: string;
+  instanceId?: string | null;
 };
 
 export const NOT_VALIDATED_SUMMARY: RackValidationSummary = {
   isValidated: false,
   cableFailures: 0,
   opticsFailures: 0,
+  hostOpticsFailures: 0,
   deviceFailures: 0,
 };
 
+const HOST_TRANSCEIVER_ALLOWED_STATES = new Set([
+  "CPV-EMPTY",
+  "CPV-INIT",
+  "LVV",
+  "CPV-TESTING",
+  "CPV-REPAIR",
+]);
 const LAST_VALIDATED_SECTION_TITLE = "Last Validated";
 const POWER_SECTION_TITLE = "Power Errors";
 const DEVICE_REACHABILITY_SECTION_TITLE = "Device Reachability";
@@ -44,6 +58,20 @@ export function asArray(value: unknown): unknown[] {
 
 export function normalizeSectionKey(title: string): string {
   return String(title || "").trim().toLowerCase();
+}
+
+export function normalizeDeviceName(deviceName: string | null | undefined): string {
+  return String(deviceName || "").trim().toLowerCase();
+}
+
+export function hasAttachedInstance(instanceId?: string | null): boolean {
+  const normalized = String(instanceId || "").trim();
+  return normalized !== "" && normalized !== "-";
+}
+
+export function shouldShowHostTransceiverSection(readiness?: HostTransceiverReadiness): boolean {
+  return HOST_TRANSCEIVER_ALLOWED_STATES.has(String(readiness?.status || "").trim().toUpperCase()) &&
+    hasAttachedInstance(readiness?.instanceId);
 }
 
 export function pick(
@@ -223,6 +251,8 @@ export function summarizeValidationFailuresByDevice(
   options: {
     includeDeviceNames?: Iterable<string>;
     excludeDeviceNames?: Iterable<string>;
+    hostReadinessByDevice?: Map<string, HostTransceiverReadiness>;
+    requireHostTransceiverReadiness?: boolean;
   } = {}
 ): RackValidationSummary {
   const includeNames = toNormalizedNameSet(options.includeDeviceNames);
@@ -231,6 +261,7 @@ export function summarizeValidationFailuresByDevice(
   let includedDeviceCount = 0;
   let cableFailures = 0;
   let opticsFailures = 0;
+  let hostOpticsFailures = 0;
   let deviceFailures = 0;
 
   Object.entries(failuresByDevice).forEach(([deviceName, failures]) => {
@@ -247,6 +278,10 @@ export function summarizeValidationFailuresByDevice(
     cableFailures += getSectionCount(failures, "Interface Errors");
     opticsFailures += getSectionCount(failures, "Optic Errors");
     opticsFailures += getSectionCount(failures, "FEC_BER Errors");
+    const hostReadiness = options.hostReadinessByDevice?.get(normalizedName);
+    if (!options.requireHostTransceiverReadiness || shouldShowHostTransceiverSection(hostReadiness)) {
+      hostOpticsFailures += getHostTransceiverActionableCount(failures);
+    }
     deviceFailures += failures.counts.power;
     deviceFailures += getSectionCount(failures, "Fan Errors");
   });
@@ -259,6 +294,7 @@ export function summarizeValidationFailuresByDevice(
     isValidated: true,
     cableFailures,
     opticsFailures,
+    hostOpticsFailures,
     deviceFailures,
   };
 }
@@ -271,6 +307,7 @@ export function mergeRackValidationSummaries(
       isValidated: acc.isValidated || summary.isValidated,
       cableFailures: acc.cableFailures + summary.cableFailures,
       opticsFailures: acc.opticsFailures + summary.opticsFailures,
+      hostOpticsFailures: acc.hostOpticsFailures + summary.hostOpticsFailures,
       deviceFailures: acc.deviceFailures + summary.deviceFailures,
     }),
     { ...NOT_VALIDATED_SUMMARY }
@@ -591,6 +628,7 @@ function mapDynamicValidationRow(
       record["remoteDevicePort"] ?? record["Remote Device Port"]
     ),
     deviceRack: textOrEmpty(record["deviceRack"] ?? record["Device Rack"]),
+    validationDeviceName: deviceName,
     deviceName: textOrEmpty(record["deviceName"] ?? record["Device Name"]),
     devicePort: textOrEmpty(
       record["devicePort"] ?? record["Device Port"] ?? record["Interface"]
@@ -697,6 +735,67 @@ function getSectionCount(
   return failures.counts.bySection[normalizeSectionKey(sectionTitle)] || 0;
 }
 
+function normalizeHostTransceiverStatus(value: unknown): "pass" | "fail" | "stale" | "" {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (["pass", "passed", "success", "ok", "healthy"].includes(normalized)) {
+    return "pass";
+  }
+  if (["fail", "failed", "failure", "error", "critical", "down"].includes(normalized)) {
+    return "fail";
+  }
+  if (["stale", "missing", "not available", "n/a", "na", "unknown", "no data", "pending"].includes(normalized)) {
+    return "stale";
+  }
+  return normalized === "" ? "" : "stale";
+}
+
+function rowHasAnyValue(row: ValidationTableRow, keys: string[]): boolean {
+  return keys.some((key) => String(row[key] ?? "").trim() !== "");
+}
+
+function isHostTransceiverActionableMetric(
+  row: ValidationTableRow,
+  metricKeys: string[],
+  statusKeys: string[]
+): boolean {
+  const metricStatuses = statusKeys
+    .map((key) => normalizeHostTransceiverStatus(row[key]))
+    .filter((status): status is "pass" | "fail" | "stale" => status !== "");
+
+  if (metricStatuses.some((status) => status === "fail" || status === "stale")) {
+    return true;
+  }
+
+  if (metricStatuses.some((status) => status === "pass")) {
+    return false;
+  }
+
+  if (!rowHasAnyValue(row, metricKeys)) {
+    return true;
+  }
+
+  const validationStatus = normalizeHostTransceiverStatus(row["Validation Status"]);
+  return validationStatus === "fail" || validationStatus === "stale";
+}
+
+function getHostTransceiverActionableCount(failures: DeviceValidationFailures): number {
+  return failures.sectionOrder.reduce((count, sectionKey) => {
+    const section = failures.sections[sectionKey];
+    if (!section || normalizeSectionKey(section.title) !== normalizeSectionKey("GPU Host Transceiver")) {
+      return count;
+    }
+
+    const opticsCount = section.rows.filter((row) =>
+      isHostTransceiverActionableMetric(row, ["RX Power (dBm)"], ["RX Status"])
+    ).length;
+    const fecBerCount = section.rows.filter((row) =>
+      isHostTransceiverActionableMetric(row, ["Raw BER"], ["Raw BER Status"])
+    ).length;
+
+    return count + opticsCount + fecBerCount;
+  }, 0);
+}
+
 function toNormalizedNameSet(
   deviceNames?: Iterable<string>
 ): Set<string> | null {
@@ -709,8 +808,4 @@ function toNormalizedNameSet(
     .filter((deviceName) => deviceName !== "");
 
   return new Set(names);
-}
-
-function normalizeDeviceName(deviceName: string): string {
-  return String(deviceName || "").trim().toLowerCase();
 }

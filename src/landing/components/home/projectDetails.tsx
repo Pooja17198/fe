@@ -11,10 +11,11 @@ import { ProjectLoadMeasurement } from "./types";
 import { emitMetric, TELEMETRY_METRICS } from "../telemetry/api";
 import { getLvvApiBase } from "../../config/api";
 import { fetchWithRetry } from "../rack/api";
-import type { RackValidationSummary } from "../rack/validationShared";
+import type { HostTransceiverReadiness, RackValidationSummary } from "../rack/validationShared";
 import {
     asArray,
     asRecord,
+    normalizeDeviceName,
     normalizeValidationFailuresPayload,
     NOT_VALIDATED_SUMMARY,
     summarizeValidationFailuresByDevice,
@@ -155,6 +156,58 @@ async function fetchRackValidationPayload(
     }
 }
 
+async function fetchRackHostReadinessPayload(
+    row: ProjectRackRow,
+    region: string,
+    signal: AbortSignal
+): Promise<unknown | null> {
+    if (!row.isGpuRack || !row.rackSerialNumber || !region) {
+        return null;
+    }
+
+    const availabilityDomainRegionPrefix =
+        region === "us-phoenix-1"
+            ? "phx"
+            : region === "us-ashburn-1"
+                ? "iad"
+                : region;
+    const availabilityDomains = [1, 2, 3].map(
+        (adNumber) => `${availabilityDomainRegionPrefix}-ad-${adNumber}`
+    );
+
+    for (const availabilityDomain of availabilityDomains) {
+        try {
+            const readinessUrl = new URL(`${API_URL}/rackHostCableValidationReadiness`);
+            readinessUrl.searchParams.set("rackSerialNumber", row.rackSerialNumber);
+            readinessUrl.searchParams.set("regionName", region);
+            readinessUrl.searchParams.set("availabilityDomain", availabilityDomain);
+            readinessUrl.searchParams.set("building", row.building);
+            readinessUrl.searchParams.set("block", row.block);
+
+            const response = await fetchWithRetry(readinessUrl.href, { method: "GET", signal });
+            if (!response.ok) {
+                continue;
+            }
+
+            const body = await response.text();
+            if (!body.trim()) {
+                continue;
+            }
+
+            const payload: unknown = JSON.parse(body);
+            if (getHostReadinessItems(payload).length > 0) {
+                return payload;
+            }
+        } catch (e) {
+            if ((e as any)?.name === "AbortError") {
+                throw e;
+            }
+        }
+    }
+
+    return null;
+}
+
 function buildRackStatusTokens(summary: RackValidationSummary): RackStatusToken[] {
     if (!summary.isValidated) {
         return [
@@ -169,6 +222,7 @@ function buildRackStatusTokens(summary: RackValidationSummary): RackStatusToken[
     if (
         summary.cableFailures === 0 &&
         summary.opticsFailures === 0 &&
+        summary.hostOpticsFailures === 0 &&
         summary.deviceFailures === 0
     ) {
         return [
@@ -195,6 +249,14 @@ function buildRackStatusTokens(summary: RackValidationSummary): RackStatusToken[
             className: "rack-status-chip optics-failure",
             label: `OPTICS:${summary.opticsFailures}`,
             title: `${summary.opticsFailures} optics validation failure${summary.opticsFailures === 1 ? "" : "s"}`,
+        });
+    }
+
+    if (summary.hostOpticsFailures > 0) {
+        tokens.push({
+            className: "rack-status-chip host-optics-failure",
+            label: `HOST_OPTICS:${summary.hostOpticsFailures}`,
+            title: `${summary.hostOpticsFailures} host transceiver optics/FEC-BER validation failure${summary.hostOpticsFailures === 1 ? "" : "s"}`,
         });
     }
 
@@ -234,27 +296,59 @@ async function fetchRackStatusSummary(
         return NOT_VALIDATED_SUMMARY;
     }
 
-    const cablingPayload = await fetchRackValidationPayload(row, region, signal);
+    const [cablingPayload, hostReadinessPayload] = await Promise.all([
+        fetchRackValidationPayload(row, region, signal),
+        fetchRackHostReadinessPayload(row, region, signal),
+    ]);
 
     const cablingFailuresByDevice = cablingPayload
         ? normalizeValidationFailuresPayload(cablingPayload, row.rackSerialNumber)
         : {};
 
-    return summarizeValidationFailuresByDevice(cablingFailuresByDevice);
+    return summarizeValidationFailuresByDevice(cablingFailuresByDevice, {
+        hostReadinessByDevice: getHostTransceiverReadinessByDevice(hostReadinessPayload),
+        requireHostTransceiverReadiness: row.isGpuRack === true,
+    });
+}
+
+function getHostReadinessItems(payload: unknown): Record<string, unknown>[] {
+    const payloadRecord = asRecord(payload);
+    if (!payloadRecord) {
+        return [];
+    }
+
+    return asArray(payloadRecord["hostReadiness"])
+        .map((rawItem) => asRecord(rawItem))
+        .filter((item): item is Record<string, unknown> => item !== null);
+}
+
+function getHostTransceiverReadinessByDevice(payload: unknown): Map<string, HostTransceiverReadiness> {
+    const readinessByDevice = new Map<string, HostTransceiverReadiness>();
+
+    getHostReadinessItems(payload).forEach((item) => {
+        const readiness = {
+            status: String(item["status"] ?? "").trim(),
+            instanceId: item["instanceId"] == null ? null : String(item["instanceId"]),
+        };
+        [
+            item["hostName"],
+            item["deviceName"],
+            item["host"],
+            item["hostSerial"],
+            item["serialNumber"],
+        ].forEach((rawName) => {
+            const deviceName = normalizeDeviceName(rawName == null ? "" : String(rawName));
+            if (deviceName) {
+                readinessByDevice.set(deviceName, readiness);
+            }
+        });
+    });
+
+    return readinessByDevice;
 }
 
 function summarizeHostReadinessPayload(payload: unknown): RackValidationReadySummary {
-    const payloadRecord = asRecord(payload);
-    if (!payloadRecord) {
-        return EMPTY_VALIDATION_READY_SUMMARY;
-    }
-
-    const hostReadiness = asArray(payloadRecord["hostReadiness"]);
-    const readyCount = hostReadiness.reduce<number>((count, rawItem) => {
-        const item = asRecord(rawItem);
-        if (!item) {
-            return count;
-        }
+    const readyCount = getHostReadinessItems(payload).reduce<number>((count, item) => {
         const status = String(item["status"] ?? "").trim().toUpperCase();
         return status === "LVV" ? count + 1 : count;
     }, 0);
@@ -263,19 +357,7 @@ function summarizeHostReadinessPayload(payload: unknown): RackValidationReadySum
 }
 
 function summarizeHostCountPayload(payload: unknown): RackHostCountSummary {
-    const payloadRecord = asRecord(payload);
-    if (!payloadRecord) {
-        return EMPTY_HOST_COUNT_SUMMARY;
-    }
-
-    const hostReadiness = asArray(payloadRecord["hostReadiness"]);
-
-    return hostReadiness.reduce<RackHostCountSummary>((summary, rawItem) => {
-        const item = asRecord(rawItem);
-        if (!item) {
-            return summary;
-        }
-
+    return getHostReadinessItems(payload).reduce<RackHostCountSummary>((summary, item) => {
         const status = String(item["status"] ?? "").trim().toUpperCase();
         if (status.startsWith("HOPS")) {
             summary.hopsCount += 1;
@@ -301,59 +383,8 @@ async function fetchRackValidationReadySummary(
     region: string,
     signal: AbortSignal
 ): Promise<RackValidationReadySummary> {
-    if (!row.isGpuRack || !row.rackSerialNumber || !region) {
-        return EMPTY_VALIDATION_READY_SUMMARY;
-    }
-
-    const availabilityDomainRegionPrefix =
-        region === "us-phoenix-1"
-            ? "phx"
-            : region === "us-ashburn-1"
-                ? "iad"
-                : region;
-    const availabilityDomains = [1, 2, 3].map(
-        (adNumber) => `${availabilityDomainRegionPrefix}-ad-${adNumber}`
-    );
-    let lastError: unknown = null;
-
-    for (const availabilityDomain of availabilityDomains) {
-        try {
-            const readinessUrl = new URL(`${API_URL}/rackHostCableValidationReadiness`);
-            readinessUrl.searchParams.set("rackSerialNumber", row.rackSerialNumber);
-            readinessUrl.searchParams.set("regionName", region);
-            readinessUrl.searchParams.set("availabilityDomain", availabilityDomain);
-            readinessUrl.searchParams.set("building", row.building);
-            readinessUrl.searchParams.set("block", row.block);
-
-            const response = await fetchWithRetry(readinessUrl.href, { method: "GET", signal });
-            if (!response.ok) {
-                throw new Error(`rackHostCableValidationReadiness query failed (${response.status} ${response.statusText})`);
-            }
-
-            const body = await response.text();
-            if (!body.trim()) {
-                continue;
-            }
-
-            const payload: unknown = JSON.parse(body);
-            const summary = summarizeHostReadinessPayload(payload);
-            const hasHostReadiness = asArray(asRecord(payload)?.["hostReadiness"]).length > 0;
-            if (hasHostReadiness) {
-                return summary;
-            }
-        } catch (e) {
-            if ((e as any)?.name === "AbortError") {
-                throw e;
-            }
-            lastError = e;
-        }
-    }
-
-    if (lastError) {
-        return EMPTY_VALIDATION_READY_SUMMARY;
-    }
-
-    return EMPTY_VALIDATION_READY_SUMMARY;
+    const payload = await fetchRackHostReadinessPayload(row, region, signal);
+    return payload ? summarizeHostReadinessPayload(payload) : EMPTY_VALIDATION_READY_SUMMARY;
 }
 
 async function fetchRackHostCountSummary(
@@ -361,52 +392,8 @@ async function fetchRackHostCountSummary(
     region: string,
     signal: AbortSignal
 ): Promise<RackHostCountSummary> {
-    if (!row.isGpuRack || !row.rackSerialNumber || !region) {
-        return EMPTY_HOST_COUNT_SUMMARY;
-    }
-
-    const availabilityDomainRegionPrefix =
-        region === "us-phoenix-1"
-            ? "phx"
-            : region === "us-ashburn-1"
-                ? "iad"
-                : region;
-    const availabilityDomains = [1, 2, 3].map(
-        (adNumber) => `${availabilityDomainRegionPrefix}-ad-${adNumber}`
-    );
-
-    for (const availabilityDomain of availabilityDomains) {
-        try {
-            const readinessUrl = new URL(`${API_URL}/rackHostCableValidationReadiness`);
-            readinessUrl.searchParams.set("rackSerialNumber", row.rackSerialNumber);
-            readinessUrl.searchParams.set("regionName", region);
-            readinessUrl.searchParams.set("availabilityDomain", availabilityDomain);
-            readinessUrl.searchParams.set("building", row.building);
-            readinessUrl.searchParams.set("block", row.block);
-
-            const response = await fetchWithRetry(readinessUrl.href, { method: "GET", signal });
-            if (!response.ok) {
-                continue;
-            }
-
-            const body = await response.text();
-            if (!body.trim()) {
-                continue;
-            }
-
-            const payload: unknown = JSON.parse(body);
-            const hasHostReadiness = asArray(asRecord(payload)?.["hostReadiness"]).length > 0;
-            if (hasHostReadiness) {
-                return summarizeHostCountPayload(payload);
-            }
-        } catch (e) {
-            if ((e as any)?.name === "AbortError") {
-                throw e;
-            }
-        }
-    }
-
-    return EMPTY_HOST_COUNT_SUMMARY;
+    const payload = await fetchRackHostReadinessPayload(row, region, signal);
+    return payload ? summarizeHostCountPayload(payload) : EMPTY_HOST_COUNT_SUMMARY;
 }
 
 const ProjectDetailsContainer = (props: Props) => {

@@ -1760,6 +1760,10 @@ function isSectionTitle(sectionTitle: string, expectedTitle: string): boolean {
     return normalizeSectionKey(sectionTitle) === normalizeSectionKey(expectedTitle);
 }
 
+function isHostTransceiverSectionTitle(sectionTitle: string): boolean {
+    return normalizeSectionKey(sectionTitle) === normalizeSectionKey("GPU Host Transceiver");
+}
+
 function getLookupValue(
     primary: unknown,
     fallback?: unknown
@@ -1785,6 +1789,8 @@ function buildNonLldpPatchPanelLookupKeys(row: ValidationTableRow): string[] {
             getLookupValue(row.remoteDeviceName, row.remoteDevice),
             getLookupValue(row.remoteDevicePort, row.remoteInterface),
         ],
+        [getLookupValue(row.validationDeviceName), getLookupValue(row["Port Name"])],
+        [getLookupValue(row["Host Name"]), getLookupValue(row["Port Name"])],
     ];
 
     candidates.forEach(([deviceName, devicePort]) => {
@@ -1974,7 +1980,8 @@ function isLookupPortValue(value: string | null | undefined): boolean {
         normalized !== "unknown" &&
         normalized !== "n/a" &&
         normalized !== "na" &&
-        normalized !== "-"
+        normalized !== "-" &&
+        normalized !== "null"
     );
 }
 
