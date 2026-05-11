@@ -6,6 +6,6 @@ export const IDE_API = getIdeApiBase();
 export const VALIDATION_TABLE_ACCESSIBILITY = { rowHeader: "ActionItems" } as const;
 
 export const POLLING = {
-  MAX_ATTEMPTS: 60,
+  MAX_ATTEMPTS: 30,
   INTERVAL_MS: 10000,
 };
