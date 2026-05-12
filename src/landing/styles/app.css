@@ -611,10 +611,46 @@
     color: #be123c;
 }
 
+.rack-status-chip.lldp-failure {
+    background: #f3e8ff;
+    border-color: #d8b4fe;
+    color: #7e22ce;
+}
+
+.rack-status-chip.interface-failure {
+    background: #fef9c3;
+    border-color: #fde047;
+    color: #a16207;
+}
+
+.rack-status-chip.host-opt-failure {
+    background: #ecfdf5;
+    color: #047857;
+    border-color: #a7f3d0;
+}
+
+.rack-status-chip.host-fec-ber-failure {
+    background: #fff1f2;
+    color: #be123c;
+    border-color: #fecdd3;
+}
+
 .rack-status-chip.optics-failure {
     background: #fff7ed;
     border-color: #fdba74;
     color: #c2410c;
+}
+
+.rack-status-chip.phoenix-optics-failure {
+    background: #dbeafe;
+    border-color: #93c5fd;
+    color: #1d4ed8;
+}
+
+.rack-status-chip.fec-ber-failure {
+    background: #ffedd5;
+    border-color: #fdba74;
+    color: #ea580c;
 }
 
 .rack-status-chip.host-optics-failure {
