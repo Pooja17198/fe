@@ -1035,10 +1035,6 @@ function buildHostTransceiverColumns(sectionTitle: string): any[] {
   const isOpticsSection = isHostTransceiverOpticsSection(sectionTitle);
   const metricField = isOpticsSection ? "RX Power (dBm)" : "Raw BER";
   const metricHeader = isOpticsSection ? "Rx Power" : "FEC BER";
-  const hostCountColumnSettings = {
-    headerStyle: "min-width: 120px; width: 120px;",
-    style: "min-width: 120px; width: 120px;",
-  };
   const statusField = isHostTransceiverOpticsSection(sectionTitle)
     ? "RX Status"
     : "Raw BER Status";
@@ -1054,14 +1050,7 @@ function buildHostTransceiverColumns(sectionTitle: string): any[] {
         ? { template: "rxPowerTemplate", ...RX_POWER_COLUMN_SETTINGS }
         : { template: "plainRawBerTemplate", ...RAW_BER_COLUMN_SETTINGS }),
     },
-    {
-      headerText: "Status",
-      field: statusField,
-      id: statusField,
-      resizable: "enabled",
-      sortable: "enabled",
-      ...hostCountColumnSettings,
-    },
+    { headerText: "Status", field: statusField, id: statusField, resizable: "enabled", sortable: "enabled" },
     {
       headerText: "Last Updated",
       field: "Last Updated",

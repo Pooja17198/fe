@@ -87,8 +87,6 @@ type RackStatusToken = {
     title: string;
 };
 
-const PHOENIX_REGION = "us-phoenix-1";
-
 type RackValidationReadySummary = {
     readyCount: number;
 };
@@ -210,7 +208,7 @@ async function fetchRackHostReadinessPayload(
     return null;
 }
 
-function buildRackStatusTokens(summary: RackValidationSummary, region?: string): RackStatusToken[] {
+function buildRackStatusTokens(summary: RackValidationSummary): RackStatusToken[] {
     if (!summary.isValidated) {
         return [
             {
@@ -238,80 +236,28 @@ function buildRackStatusTokens(summary: RackValidationSummary, region?: string):
 
     const tokens: RackStatusToken[] = [];
 
-    if (region === PHOENIX_REGION) {
-        if (summary.lldpFailures > 0) {
-            tokens.push({
-                className: "rack-status-chip lldp-failure",
-                label: `LLDP:${summary.lldpFailures}`,
-                title: `${summary.lldpFailures} LLDP validation failure${summary.lldpFailures === 1 ? "" : "s"}`,
-            });
-        }
+    if (summary.cableFailures > 0) {
+        tokens.push({
+            className: "rack-status-chip cable-failure",
+            label: `CABLE:${summary.cableFailures}`,
+            title: `${summary.cableFailures} cable validation failure${summary.cableFailures === 1 ? "" : "s"}`,
+        });
+    }
 
-        if (summary.interfaceFailures > 0) {
-            tokens.push({
-                className: "rack-status-chip interface-failure",
-                label: `INTERFACE:${summary.interfaceFailures}`,
-                title: `${summary.interfaceFailures} interface validation failure${summary.interfaceFailures === 1 ? "" : "s"}`,
-            });
-        }
-
-        if (summary.opticModuleFailures > 0) {
-            tokens.push({
-                className: "rack-status-chip phoenix-optics-failure",
-                label: `OPTICS:${summary.opticModuleFailures}`,
-                title: `${summary.opticModuleFailures} optics validation failure${summary.opticModuleFailures === 1 ? "" : "s"}`,
-            });
-        }
-
-        if (summary.fecBerFailures > 0) {
-            tokens.push({
-                className: "rack-status-chip fec-ber-failure",
-                label: `FEC BER:${summary.fecBerFailures}`,
-                title: `${summary.fecBerFailures} FEC BER validation failure${summary.fecBerFailures === 1 ? "" : "s"}`,
-            });
-        }
-    } else {
-        if (summary.cableFailures > 0) {
-            tokens.push({
-                className: "rack-status-chip cable-failure",
-                label: `CABLE:${summary.cableFailures}`,
-                title: `${summary.cableFailures} cable validation failure${summary.cableFailures === 1 ? "" : "s"}`,
-            });
-        }
-
-        if (summary.opticsFailures > 0) {
-            tokens.push({
-                className: "rack-status-chip optics-failure",
-                label: `OPTICS:${summary.opticsFailures}`,
-                title: `${summary.opticsFailures} optics validation failure${summary.opticsFailures === 1 ? "" : "s"}`,
-            });
-        }
+    if (summary.opticsFailures > 0) {
+        tokens.push({
+            className: "rack-status-chip optics-failure",
+            label: `OPTICS:${summary.opticsFailures}`,
+            title: `${summary.opticsFailures} optics validation failure${summary.opticsFailures === 1 ? "" : "s"}`,
+        });
     }
 
     if (summary.hostOpticsFailures > 0) {
-        if (region === PHOENIX_REGION) {
-            if (summary.hostOptFailures > 0) {
-                tokens.push({
-                    className: "rack-status-chip host-opt-failure",
-                    label: `HOST_OPT:${summary.hostOptFailures}`,
-                    title: `${summary.hostOptFailures} host transceiver optics validation failure${summary.hostOptFailures === 1 ? "" : "s"}`,
-                });
-            }
-
-            if (summary.hostFecBerFailures > 0) {
-                tokens.push({
-                    className: "rack-status-chip host-fec-ber-failure",
-                    label: `HOST_FEC_BER:${summary.hostFecBerFailures}`,
-                    title: `${summary.hostFecBerFailures} host transceiver FEC BER validation failure${summary.hostFecBerFailures === 1 ? "" : "s"}`,
-                });
-            }
-        } else {
-            tokens.push({
-                className: "rack-status-chip host-optics-failure",
-                label: `HOST_OPTICS:${summary.hostOpticsFailures}`,
-                title: `${summary.hostOpticsFailures} host transceiver optics/FEC-BER validation failure${summary.hostOpticsFailures === 1 ? "" : "s"}`,
-            });
-        }
+        tokens.push({
+            className: "rack-status-chip host-optics-failure",
+            label: `HOST_OPTICS:${summary.hostOpticsFailures}`,
+            title: `${summary.hostOpticsFailures} host transceiver optics/FEC-BER validation failure${summary.hostOpticsFailures === 1 ? "" : "s"}`,
+        });
     }
 
     if (summary.deviceFailures > 0) {
@@ -325,14 +271,14 @@ function buildRackStatusTokens(summary: RackValidationSummary, region?: string):
     return tokens;
 }
 
-function renderRackStatus(summary: RackValidationSummary | undefined, region?: string) {
+function renderRackStatus(summary: RackValidationSummary | undefined) {
     if (!summary) {
         return <span class="rack-status-text muted">Loading...</span>;
     }
 
     return (
         <span class="rack-status-cell">
-            {buildRackStatusTokens(summary, region).map((token) => (
+            {buildRackStatusTokens(summary).map((token) => (
                 <span key={token.label} class={token.className} title={token.title}>
                     {token.label}
                 </span>
@@ -965,7 +911,7 @@ const ProjectDetailsContainer = (props: Props) => {
 
     const validationStatusTemplate = (context: any) => {
         const row = (context?.item && context.item.data) || {};
-        return renderRackStatus(rackStatusByKey[row._key], props.region);
+        return renderRackStatus(rackStatusByKey[row._key]);
     };
 
     const validationReadyTemplate = (context: any) => {

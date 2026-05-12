@@ -17,13 +17,7 @@ export type RackValidationSummary = {
   isValidated: boolean;
   cableFailures: number;
   opticsFailures: number;
-  lldpFailures: number;
-  interfaceFailures: number;
-  opticModuleFailures: number;
-  fecBerFailures: number;
   hostOpticsFailures: number;
-  hostOptFailures: number;
-  hostFecBerFailures: number;
   deviceFailures: number;
 };
 
@@ -36,13 +30,7 @@ export const NOT_VALIDATED_SUMMARY: RackValidationSummary = {
   isValidated: false,
   cableFailures: 0,
   opticsFailures: 0,
-  lldpFailures: 0,
-  interfaceFailures: 0,
-  opticModuleFailures: 0,
-  fecBerFailures: 0,
   hostOpticsFailures: 0,
-  hostOptFailures: 0,
-  hostFecBerFailures: 0,
   deviceFailures: 0,
 };
 
@@ -273,13 +261,7 @@ export function summarizeValidationFailuresByDevice(
   let includedDeviceCount = 0;
   let cableFailures = 0;
   let opticsFailures = 0;
-  let lldpFailures = 0;
-  let interfaceFailures = 0;
-  let opticModuleFailures = 0;
-  let fecBerFailures = 0;
   let hostOpticsFailures = 0;
-  let hostOptFailures = 0;
-  let hostFecBerFailures = 0;
   let deviceFailures = 0;
 
   Object.entries(failuresByDevice).forEach(([deviceName, failures]) => {
@@ -292,23 +274,13 @@ export function summarizeValidationFailuresByDevice(
     }
 
     includedDeviceCount += 1;
-    const lldpCount = getSectionCount(failures, "LLDP Errors");
-    const interfaceCount = getSectionCount(failures, "Interface Errors");
-    const opticCount = getSectionCount(failures, "Optic Errors");
-    const fecBerCount = getSectionCount(failures, "FEC_BER Errors");
-
-    lldpFailures += lldpCount;
-    interfaceFailures += interfaceCount;
-    opticModuleFailures += opticCount;
-    fecBerFailures += fecBerCount;
-    cableFailures += lldpCount + interfaceCount;
-    opticsFailures += opticCount + fecBerCount;
+    cableFailures += getSectionCount(failures, "LLDP Errors");
+    cableFailures += getSectionCount(failures, "Interface Errors");
+    opticsFailures += getSectionCount(failures, "Optic Errors");
+    opticsFailures += getSectionCount(failures, "FEC_BER Errors");
     const hostReadiness = options.hostReadinessByDevice?.get(normalizedName);
     if (!options.requireHostTransceiverReadiness || shouldShowHostTransceiverSection(hostReadiness)) {
-      const hostTransceiverCounts = getHostTransceiverActionableCounts(failures);
-      hostOpticsFailures += hostTransceiverCounts.total;
-      hostOptFailures += hostTransceiverCounts.optics;
-      hostFecBerFailures += hostTransceiverCounts.fecBer;
+      hostOpticsFailures += getHostTransceiverActionableCount(failures);
     }
     deviceFailures += failures.counts.power;
     deviceFailures += getSectionCount(failures, "Fan Errors");
@@ -322,13 +294,7 @@ export function summarizeValidationFailuresByDevice(
     isValidated: true,
     cableFailures,
     opticsFailures,
-    lldpFailures,
-    interfaceFailures,
-    opticModuleFailures,
-    fecBerFailures,
     hostOpticsFailures,
-    hostOptFailures,
-    hostFecBerFailures,
     deviceFailures,
   };
 }
@@ -341,13 +307,7 @@ export function mergeRackValidationSummaries(
       isValidated: acc.isValidated || summary.isValidated,
       cableFailures: acc.cableFailures + summary.cableFailures,
       opticsFailures: acc.opticsFailures + summary.opticsFailures,
-      lldpFailures: acc.lldpFailures + summary.lldpFailures,
-      interfaceFailures: acc.interfaceFailures + summary.interfaceFailures,
-      opticModuleFailures: acc.opticModuleFailures + summary.opticModuleFailures,
-      fecBerFailures: acc.fecBerFailures + summary.fecBerFailures,
       hostOpticsFailures: acc.hostOpticsFailures + summary.hostOpticsFailures,
-      hostOptFailures: acc.hostOptFailures + summary.hostOptFailures,
-      hostFecBerFailures: acc.hostFecBerFailures + summary.hostFecBerFailures,
       deviceFailures: acc.deviceFailures + summary.deviceFailures,
     }),
     { ...NOT_VALIDATED_SUMMARY }
@@ -818,13 +778,11 @@ function isHostTransceiverActionableMetric(
   return validationStatus === "fail" || validationStatus === "stale";
 }
 
-function getHostTransceiverActionableCounts(
-  failures: DeviceValidationFailures
-): { optics: number; fecBer: number; total: number } {
-  return failures.sectionOrder.reduce((counts, sectionKey) => {
+function getHostTransceiverActionableCount(failures: DeviceValidationFailures): number {
+  return failures.sectionOrder.reduce((count, sectionKey) => {
     const section = failures.sections[sectionKey];
     if (!section || normalizeSectionKey(section.title) !== normalizeSectionKey("GPU Host Transceiver")) {
-      return counts;
+      return count;
     }
 
     const opticsCount = section.rows.filter((row) =>
@@ -834,12 +792,8 @@ function getHostTransceiverActionableCounts(
       isHostTransceiverActionableMetric(row, ["Raw BER"], ["Raw BER Status"])
     ).length;
 
-    return {
-      optics: counts.optics + opticsCount,
-      fecBer: counts.fecBer + fecBerCount,
-      total: counts.total + opticsCount + fecBerCount,
-    };
-  }, { optics: 0, fecBer: 0, total: 0 });
+    return count + opticsCount + fecBerCount;
+  }, 0);
 }
 
 function toNormalizedNameSet(
