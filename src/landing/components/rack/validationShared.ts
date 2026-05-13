@@ -628,13 +628,6 @@ function mapDynamicValidationRow(
     deviceARack: textOrEmpty(record["deviceARack"] ?? record["Device A Rack"]),
     deviceAName: textOrEmpty(record["deviceAName"] ?? record["Device A Name"]),
     deviceAPort: textOrEmpty(record["deviceAPort"] ?? record["Device A Port"]),
-    deviceAPortDisplayName: textOrEmpty(
-      record["deviceAPortDisplayName"] ??
-      record["Alt Device A Port"] ??
-      record[" Device A Port"] ??
-      record["Device A Port"] ??
-      record["deviceAPort"]
-    ),
     deviceALocation: textOrEmpty(record["deviceALocation"] ?? record["Device A Location"]),
     currentDeviceBRack: textOrEmpty(
       record["currentDeviceBRack"] ?? record["Current Device B Rack"]
@@ -645,13 +638,6 @@ function mapDynamicValidationRow(
     currentDeviceBPort: textOrEmpty(
       record["currentDeviceBPort"] ?? record["Current Device B Port"]
     ),
-    currentDeviceBPortDisplayName: textOrEmpty(
-      record["currentDeviceBPortDisplayName"] ??
-      record["Alt Current Device B Port"] ??
-      record[" Current Device B Port"] ??
-      record["Current Device B Port"] ??
-      record["currentDeviceBPort"]
-    ),
     currentBLocation: textOrEmpty(record["currentBLocation"] ?? record["Current B Location"]),
     expectedDeviceBRack: textOrEmpty(
       record["expectedDeviceBRack"] ?? record["Expected Device B Rack"]
@@ -661,13 +647,6 @@ function mapDynamicValidationRow(
     ),
     expectedDeviceBPort: textOrEmpty(
       record["expectedDeviceBPort"] ?? record["Expected Device B Port"]
-    ),
-    expectedDeviceBPortDisplayName: textOrEmpty(
-      record["expectedDeviceBPortDisplayName"] ??
-      record["Alt Expected Device B Port"] ??
-      record[" Expected Device B Port"] ??
-      record["Expected Device B Port"] ??
-      record["expectedDeviceBPort"]
     ),
     expectedBLocation: textOrEmpty(
       record["expectedBLocation"] ?? record["Expected B Location"]

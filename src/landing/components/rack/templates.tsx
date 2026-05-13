@@ -393,23 +393,13 @@ function buildGpuLldpDetailParts(
   location: unknown,
   port: unknown,
   name: unknown,
-  portDisplayName?: unknown,
   mapPortLabel: boolean = false
 ): string[] {
   const portValue = normalizeMissingValue(port);
-  const backendDisplayPortValue = normalizeMissingValue(portDisplayName);
-  const hasBackendDisplayPort =
-    backendDisplayPortValue !== "missing" &&
-    backendDisplayPortValue !== portValue;
-  const displayPortValue =
-    hasBackendDisplayPort
-      ? backendDisplayPortValue
-      : mapPortLabel
-        ? mapGpuComputePortToNicLabel(portValue) || portValue
-        : portValue;
+  const mappedPortValue = mapPortLabel ? mapGpuComputePortToNicLabel(portValue) || portValue : portValue;
   return [
     formatLocationValue(location),
-    displayPortValue,
+    mappedPortValue,
     `${normalizeMissingValue(name)}:${portValue}`,
   ];
 }
@@ -619,24 +609,17 @@ export const errorMessageClampTemplate = (context: any) => {
 
 export const gpuLldpErrorDetailsTemplate = (context: any) => {
   const row = (context?.item && context.item.data) || {};
-  const interfaceParts = buildGpuLldpDetailParts(
-    row.deviceALocation,
-    row.deviceAPort,
-    row.deviceAName,
-    row.deviceAPortDisplayName
-  );
+  const interfaceParts = buildGpuLldpDetailParts(row.deviceALocation, row.deviceAPort, row.deviceAName);
   const expectedParts = buildGpuLldpDetailParts(
     row.expectedBLocation,
     row.expectedDeviceBPort,
     row.expectedDeviceBName,
-    row.expectedDeviceBPortDisplayName,
     true
   );
   const observedParts = buildGpuLldpDetailParts(
     row.currentBLocation,
     row.currentDeviceBPort,
     row.currentDeviceBName,
-    row.currentDeviceBPortDisplayName,
     true
   );
   const [expectedRenderParts, observedRenderParts] = buildComparableRenderParts(expectedParts, observedParts);
