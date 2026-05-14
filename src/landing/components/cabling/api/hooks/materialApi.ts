@@ -1,4 +1,4 @@
-import { MockRoomLayoutApi } from "../mockAPI/MockRoomLayoutApi";
+import { MockRoomLayoutApi, MockRoomPlatformApi } from "../mockAPI/MockRoomLayoutApi";
 import {
   MaterialCollection,
   MaterialSummary,
@@ -10,10 +10,12 @@ import {
   RackViewResponse,
   RoomLayout,
   RoomMetadata,
+  RoomPlatform,
 } from "../../../../../../gen/clients/ide-lvv-client";
 import { useQuery } from "@ehrc/preact-hooks";
 import {
   RoomMetadataApiClient,
+  RoomMetadataByRoomApiClient,
   MaterialApiClient,
   PhysicalConnectionApiClient,
   RoomMetadataLayoutApiClient,
@@ -76,18 +78,18 @@ export const useListMaterial = (mockData?: boolean) => {
 };
 
 export const useConnections = (mockData?: boolean) => {
-  return useQuery<PhysicalConnectionCollection, [string]>({
+  return useQuery<PhysicalConnectionCollection, [string, string?]>({
     queryFn: mockData
       ? (roomName: string) =>
           MockConnectionsApi.getConnections({ roomName }).then(
             (response) => response.data,
           )
-      : (roomName: string) =>
+      : (roomName: string, blockName?: string) =>
           getListWithAllPages<PhysicalConnectionSummary>(
             PhysicalConnectionApiClient.listPhysicalConnections.bind(
               PhysicalConnectionApiClient,
             ),
-            { roomName, limit: 100 },
+            { roomName, blockName, limit: 100 },
           ).then((response) => response),
     enabled: false,
   });
@@ -152,6 +154,21 @@ export const useListGPURacks = (mockData?: boolean) => {
   });
 };
 
+export const usePlatformListByRoom = (mockData?: boolean) => {
+  return useQuery<RoomPlatform[], [string]>({
+    queryFn: mockData
+      ? (roomName: string) =>
+          MockRoomPlatformApi.getPlatformListByRoom({ roomName }).then(
+            (response) => response.data,
+          )
+      : (roomName: string) =>
+          RoomMetadataByRoomApiClient.getPlatformListByRoom({ roomName }).then(
+            (response) => response.data,
+          ),
+    enabled: false,
+  });
+};
+
 type ListFn<T> = (
   params: {
     roomName: string;
@@ -177,6 +194,7 @@ const getListWithAllPages = async <T>(
     limit?: number;
     page?: string;
     sortOrder?: string;
+    blockName?: string;
     sortBy?: string;
     opcRequestId?: string;
   },

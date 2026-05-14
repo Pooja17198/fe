@@ -81,3 +81,10 @@ export interface RawAtlasRoomData {
   updated_by: string;
   version: string;
 }
+
+export type RackFilters = {
+  platformName: string | null;
+  blockName: string | null;
+  deploymentGroup: string | null;
+  showOhrRacks: boolean;
+};

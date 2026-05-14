@@ -99,6 +99,7 @@ export interface PhysicalConnectionCollection {
     "roomName"?: string;
     "type"?: string;
     "items": Array<PhysicalConnectionSummary>;
+    "materials"?: MaterialSummary[];
 }
 export interface PhysicalConnectionImageResponse {
     "image": string;
@@ -171,6 +172,11 @@ export interface RoomMetadata {
 }
 export interface RoomMetadataCollection {
     "items"?: Array<RoomMetadata>;
+}
+export interface RoomPlatform {
+    "rackNumber"?: string;
+    "platformName"?: string;
+    "blockName"?: string;
 }
 export interface Version {
     "version"?: string;
@@ -342,6 +348,7 @@ export type PhysicalConnectionApiGetPhysicalConnectionImageReturnType = {
 };
 export interface PhysicalConnectionApiListPhysicalConnectionsArgs {
     "roomName": string;
+    "blockName"?: string;
     "bomId"?: number;
     "limit"?: number;
     "page"?: string;
@@ -366,6 +373,7 @@ export declare class PhysicalConnectionApi extends base.BaseAPI {
     }>;
     listPhysicalConnections(params: {
         "roomName": string;
+        "blockName"?: string;
         "bomId"?: number;
         "limit"?: number;
         "page"?: string;
@@ -451,6 +459,22 @@ export declare class RoomMetadataApi extends base.BaseAPI {
     getRoomMetadata(options?: any): Promise<{
         response: Response;
         data: RoomMetadataCollection;
+    }>;
+}
+export interface RoomMetadataByRoomApiGetPlatformListByRoomArgs {
+    "roomName": string;
+}
+export type RoomMetadataByRoomApiGetPlatformListByRoomReturnType = {
+    response: Response;
+    data: Array<RoomPlatform>;
+};
+export declare class RoomMetadataByRoomApi extends base.BaseAPI {
+    static createFromEndpointTemplate(fetch: base.Fetch, region: string, secondLevelDomain: string, config?: base.BaseApiConfig): RoomMetadataByRoomApi;
+    getPlatformListByRoom(params: {
+        "roomName": string;
+    }, options?: any): Promise<{
+        response: Response;
+        data: Array<RoomPlatform>;
     }>;
 }
 export interface RoomMetadataLayoutApiGetRoomMetadataLayoutArgs {

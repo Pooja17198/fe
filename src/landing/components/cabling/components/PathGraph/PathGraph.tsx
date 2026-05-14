@@ -14,7 +14,7 @@ import "oj-c/button";
 import { HighlightsInfo, GraphProp } from "./types";
 import "./style.scss";
 import { RoomObject } from "../../types";
-import { RoomLayout } from "gen/clients/ide-lvv-client";
+import { RoomLayout, RoomPlatform } from "gen/clients/ide-lvv-client";
 
 const IMAGE_WIDTH = 1000;
 const IMAGE_HEIGHT = 800;
@@ -38,8 +38,13 @@ const getRackId = (rack: Partial<RoomObject> | null | undefined) =>
 
 interface PathGraphProps {
   room: RoomLayout;
-  racksWithPhysicalCutsheet: string[];
-  onRackClick: (rackId: string, hasCutsheet: boolean) => void;
+  gpuRacks: string[];
+  roomPlatforms: RoomPlatform[] | undefined;
+  rackFilters: {
+    platformName: string | null;
+    blockName: string | null;
+  };
+  onRackClick: (rackId: string, isGpuRack: boolean) => void;
   hoverRackId: string | null;
   showOhrRacks?: boolean;
   // highlights: HighlightsInfo;
@@ -47,12 +52,95 @@ interface PathGraphProps {
 
 export const PathGraph = ({
   room,
-  racksWithPhysicalCutsheet,
+  gpuRacks,
+  roomPlatforms,
+  rackFilters,
   onRackClick,
   hoverRackId,
   showOhrRacks = false,
 }: PathGraphProps) => {
+  type RackPlatformInfo = {
+    platformName: string | null;
+    blockName: string | null;
+  };
+
   const [graphProp, setGraphProp] = useState<GraphProp>();
+  const gpuRackSet = useMemo(() => new Set(gpuRacks || []), [gpuRacks]);
+  const hasActiveRackFilters = !!(
+    rackFilters.platformName || rackFilters.blockName
+  );
+  const roomPlatformByRackIdRef = useRef<Map<string, RackPlatformInfo>>(
+    new Map(),
+  );
+  const roomPlatformByRackId = useMemo(() => {
+    const rackMap = new Map<string, RackPlatformInfo>();
+
+    (roomPlatforms || []).forEach((roomPlatform) => {
+      const rackNumber = roomPlatform.rackNumber?.trim();
+      if (!rackNumber) {
+        return;
+      }
+
+      rackMap.set(rackNumber, {
+        platformName: roomPlatform.platformName ?? null,
+        blockName: roomPlatform.blockName ?? null,
+      });
+    });
+
+    return rackMap;
+  }, [roomPlatforms]);
+  useEffect(() => {
+    roomPlatformByRackIdRef.current = roomPlatformByRackId;
+  }, [roomPlatformByRackId]);
+  const matchingFilteredRackIds = useMemo(() => {
+    if (!hasActiveRackFilters) {
+      return null;
+    }
+
+    const matchingRacks = new Set<string>();
+    (roomPlatforms || []).forEach((roomPlatform) => {
+      const rackNumber = roomPlatform.rackNumber?.trim();
+      if (!rackNumber) {
+        return;
+      }
+
+      if (
+        rackFilters.platformName &&
+        roomPlatform.platformName !== rackFilters.platformName
+      ) {
+        return;
+      }
+
+      if (
+        rackFilters.blockName &&
+        roomPlatform.blockName !== rackFilters.blockName
+      ) {
+        return;
+      }
+
+      matchingRacks.add(rackNumber);
+    });
+
+    return matchingRacks;
+  }, [
+    hasActiveRackFilters,
+    roomPlatforms,
+    rackFilters.platformName,
+    rackFilters.blockName,
+  ]);
+  const getRackOpacity = (
+    rack: string | Partial<RoomObject> | null | undefined,
+  ) => {
+    if(showOhrRacks && isOhrRack(rack as Partial<RoomObject>)) {
+      return '0.8';
+    }
+    const rackId =
+      typeof rack === "string" ? rack : getRackId(rack as Partial<RoomObject>);
+    if (!hasActiveRackFilters) {
+      return gpuRacks.includes(rackId) ? "0.9" : "0.8";
+    }
+    return matchingFilteredRackIds?.has(rackId) ? "1" : "0.1";
+  };
   const generateLine = d3
     .line()
     .x((p: any) => calculateScaledX(p.pointX, graphProp))
@@ -65,9 +153,10 @@ export const PathGraph = ({
 
   const svgRef = useRef<SVGSVGElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
-  const zoomBehaviorRef = useRef<
-    d3Zoom.ZoomBehavior<SVGSVGElement, unknown> | null
-  >(null);
+  const zoomBehaviorRef = useRef<d3Zoom.ZoomBehavior<
+    SVGSVGElement,
+    unknown
+  > | null>(null);
   const getSvgElement = () => d3.select(svgRef.current as SVGSVGElement);
   const getGraphLayer = () =>
     getSvgElement().select<SVGGElement>("g.graph-content");
@@ -99,15 +188,15 @@ export const PathGraph = ({
       })
       .join(" ");
   };
-  const rackHasCutsheet = (rack: Partial<RoomObject> | null | undefined) =>
-    racksWithPhysicalCutsheet.includes(getRackId(rack));
+  const rackIsGpu = (rack: Partial<RoomObject> | null | undefined) =>
+    gpuRackSet.has(getRackId(rack));
 
   const getRackStroke = (rack: Partial<RoomObject> | null | undefined) => {
     if (isOhrRack(rack)) {
       return OHR_RACK_STROKE;
     }
 
-    return rackHasCutsheet(rack) ? "darkgreen" : "darkgrey";
+    return rackIsGpu(rack) ? "darkgreen" : "darkgrey";
   };
 
   const getRackFill = (rack: Partial<RoomObject> | null | undefined) => {
@@ -115,11 +204,8 @@ export const PathGraph = ({
       return OHR_RACK_FILL;
     }
 
-    return rackHasCutsheet(rack) ? "green" : "lightblue";
+    return rackIsGpu(rack) ? "green" : "lightblue";
   };
-
-  const getRackOpacity = (rack: Partial<RoomObject> | null | undefined) =>
-    rackHasCutsheet(rack) ? "0.9" : "0.8";
 
   const getRackBounds = (coordinates: [number, number][]) => {
     if (!graphProp || !coordinates?.length) return null;
@@ -234,36 +320,60 @@ export const PathGraph = ({
     const graphLayer = getGraphLayer();
     if (graphLayer.empty()) return;
     const rackData = node?.["__data__"];
-    const rackInfo = rackData?.label || rackData?.id || "";
+    const rackId = String(rackData?.label || rackData?.id || "").trim();
     const bounds = getRackBounds(rackData?.coordinates || []);
     if (!bounds) return;
 
+    const rackPlatformInfo = roomPlatformByRackIdRef.current.get(rackId);
+    const rackType = rackData?.type || "N/A";
+    const hoverLines = [`Rack: ${rackId || "N/A"}`, `Type: ${rackType}`];
+    if (rackPlatformInfo?.platformName) {
+      hoverLines.push(`Platform: ${rackPlatformInfo?.platformName}`);
+    }
+    if (rackPlatformInfo?.blockName) {
+      hoverLines.push(`Block: ${rackPlatformInfo?.blockName || "N/A"}`);
+    }
+
+    const lineHeight = 16;
+    const paddingX = 8;
+    const paddingY = 4;
+    const hoverWidth =
+      Math.max(...hoverLines.map((line) => line.length), 0) * 7 + paddingX * 2;
+    const hoverHeight = hoverLines.length * lineHeight + paddingY * 2;
     const hoverX = bounds.maxX + RACK_HOVER_TEXT_OFFSET_X;
-    const hoverY = bounds.minY + (bounds.maxY - bounds.minY - 20) / 2;
-    if (!rackInfo) return;
-    graphLayer
+    const hoverY = bounds.minY + (bounds.maxY - bounds.minY - hoverHeight) / 2;
+
+    graphLayer.selectAll(".rack-hover-text").remove();
+
+    const hoverGroup = graphLayer
       .append("g")
       .attr("class", "rack-hover-text")
       .attr("key", rackData?.key || rackData?.label || rackData?.id || "")
+      .attr("transform", `translate(${hoverX},${hoverY})`);
+
+    hoverGroup
       .append("rect")
-      .attr("width", rackInfo.length * 10 + 15)
-      .attr("height", 20)
+      .attr("width", hoverWidth)
+      .attr("height", hoverHeight)
       .attr("stroke", "grey")
       .attr("stroke-width", "1")
       .attr("fill", "lightgrey")
-      .attr("x", hoverX)
-      .attr("y", hoverY);
+      .attr("x", 0)
+      .attr("y", 0);
 
-    graphLayer
-      .selectAll("g.rack-hover-text")
+    const hoverText = hoverGroup
       .append("text")
-      .attr("x", hoverX + 5)
-      .attr("y", hoverY)
-      .attr("font-size", "1em")
-      .html(
-        `<tspan x=${hoverX + 5} dy='1em'>${rackInfo || ""}</tspan>
-      `,
-      );
+      .attr("x", paddingX)
+      .attr("y", paddingY)
+      .attr("font-size", "12px");
+
+    hoverLines.forEach((line, index) => {
+      hoverText
+        .append("tspan")
+        .attr("x", paddingX)
+        .attr("dy", index === 0 ? "1em" : "1.2em")
+        .text(line);
+    });
 
     graphLayer.selectAll(`.rack-hover-text`).raise();
   };
@@ -306,11 +416,11 @@ export const PathGraph = ({
 
     graphLayer.selectAll(".rack-hover-text").remove();
   };
-  const raiseCutsheetRacks = () => {
+  const raiseHighlightedRacks = () => {
     const graphLayer = getGraphLayer();
     if (graphLayer.empty()) return;
 
-    racksWithPhysicalCutsheet.forEach((rackId) => {
+    matchingFilteredRackIds?.forEach((rackId) => {
       graphLayer.select(`g#node-group-rack-${rackId}`).raise();
     });
   };
@@ -380,7 +490,9 @@ export const PathGraph = ({
         d3.select(this)
           .transition()
           .duration(200)
-          .attr("points", (d: any) => getRackPolygonPoints(d.coordinates || []));
+          .attr("points", (d: any) =>
+            getRackPolygonPoints(d.coordinates || []),
+          );
         graphLayer.selectAll(".rack-hover-text").remove();
       });
     // basket trays connections
@@ -402,24 +514,22 @@ export const PathGraph = ({
       .attr("stroke", "darkgrey")
       .attr("fill", "lightgrey")
       .attr("stroke-width", "0.6")
-      .attr("opacity", "0.3");
+      .attr("opacity", "0.2");
 
     graphLayer.selectAll(".node-group").raise();
     graphLayer.selectAll(".edge").lower();
-    if (racksWithPhysicalCutsheet.length) {
-      racksWithPhysicalCutsheet.forEach((rackId) => {
+    if (matchingFilteredRackIds?.size) {
+      matchingFilteredRackIds.forEach((rackId) => {
         graphLayer
           .selectAll("g#node-group-rack-" + rackId + " polygon")
-          .attr("stroke", "darkgreen")
-          .attr("fill", "green")
-          .attr("opacity", "0.9")
+          .attr("opacity", (d: any) => getRackOpacity(d))
           .on("click", function (_event, d: any) {
             const rackId = getRackId(d);
-            const hasCutsheet = rackHasCutsheet(d);
-            onRackClick(rackId, hasCutsheet);
+            const isGpuRack = rackIsGpu(d);
+            onRackClick(rackId, isGpuRack);
           });
       });
-      raiseCutsheetRacks();
+      raiseHighlightedRacks();
     }
     raiseOhrRacks();
   }, [graphProp, showOhrRacks]);
@@ -437,13 +547,17 @@ export const PathGraph = ({
         if (isOhrRack(d)) return;
 
         const rackId = getRackId(d);
-        const hasCutsheet = rackHasCutsheet(d);
-        onRackClick(rackId, hasCutsheet);
+        const isGpuRack = rackIsGpu(d);
+        onRackClick(rackId, isGpuRack);
       });
 
-    raiseCutsheetRacks();
+    raiseHighlightedRacks();
     raiseOhrRacks();
-  }, [racksWithPhysicalCutsheet, showOhrRacks]);
+  }, [
+    gpuRacks,
+    hasActiveRackFilters,
+    matchingFilteredRackIds,
+    showOhrRacks]);
 
   // respond to hoverRackId from PhysicalCutsheetPanel
   const prevHoverRef = useRef<string | null>(null);
@@ -723,9 +837,12 @@ export const PathGraph = ({
               id="reset-button"
               onojAction={() => {
                 withZoom((svgElement, zoom) => {
-                svgElement
-                  .transition()
-                    .call(zoom.transform as any, d3.zoomIdentity.translate(50, 0));
+                  svgElement
+                    .transition()
+                    .call(
+                      zoom.transform as any,
+                      d3.zoomIdentity.translate(50, 0),
+                    );
                 });
               }}
             >

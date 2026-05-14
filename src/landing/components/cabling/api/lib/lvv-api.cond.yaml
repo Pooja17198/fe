@@ -333,6 +333,29 @@ paths:
           schema:
             $ref: '#/definitions/RoomLayout'
 
+  /roommetadata/{room_name}:
+    get:
+      tags: ['RoomMetadataByRoom']
+      summary: Gets the platform list in a room
+      description: Gets the platform list in a room
+      operationId: getPlatformListByRoom
+      produces:
+        - application/json
+      parameters:
+        - name: room_name
+          in: path
+          required: true
+          description: Room name identifier
+          schema:
+            type: string
+      responses:
+        200:
+          description: All platforms and corresponding details in a room
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/RoomPlatform'
+
   /materials:
     get:
       tags: ['material']
@@ -379,6 +402,7 @@ paths:
         Gets a list of Physical Connections.
       parameters:
         - $ref: '#/parameters/RoomNameQueryParam'
+        - $ref: '#/parameters/BlockNameQueryParam'
         - $ref: '#/parameters/BomIdQueryParam'
         - $ref: '#/parameters/PaginationLimitQueryParam'
         - $ref: '#/parameters/PaginationTokenQueryParam'
@@ -813,6 +837,20 @@ definitions:
       layout:
         type: object
         description: Layout of the room
+  
+  RoomPlatform:
+    type: object
+    description: Platform details for a rack in a room
+    properties:
+      rackNumber:
+        type: string
+        description: Rack number
+      platformName:
+        type: string
+        description: Platform name
+      blockName:
+        type: string
+        description: block name
 
   MaterialCatalog:
     type: object
@@ -1016,7 +1054,12 @@ definitions:
         type: array
         items:
           $ref: "#/definitions/PhysicalConnectionSummary"
-
+      materials:
+        type: array
+        description: Materials associated with the block-filtered physical connections. Returned only when blockName is specified.
+        items:
+          $ref: "#/definitions/MaterialSummary"
+  
   PhysicalConnectionImageResponse:
     type: object
     description: Image response for a physical connection.
@@ -1277,7 +1320,12 @@ parameters:
     description: Room name for filtering
     required: false
     type: string
-
+  BlockNameQueryParam:
+    in: query
+    name: blockName
+    required: false
+    type: string
+    description: Block name for filtering physical connections.
   BomIdQueryParam:
     in: query
     name: bomId

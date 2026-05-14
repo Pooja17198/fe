@@ -2,6 +2,7 @@ import {
   MaterialApi,
   PhysicalConnectionApi,
   RoomMetadataApi,
+  RoomMetadataByRoomApi,
   RoomMetadataLayoutApi,
   BuildArtifactsApi,
   PhysicalCutsheetApi,
@@ -42,6 +43,11 @@ export const PhysicalConnectionApiClient = new PhysicalConnectionApi(
 );
 
 export const RoomMetadataApiClient = new RoomMetadataApi(
+  window.fetch.bind(window),
+  paths.dxfPath,
+);
+
+export const RoomMetadataByRoomApiClient = new RoomMetadataByRoomApi(
   window.fetch.bind(window),
   paths.dxfPath,
 );

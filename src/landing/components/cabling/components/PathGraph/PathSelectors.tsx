@@ -16,8 +16,13 @@ import {
 import { FlattenedConnection, HighlightsInfo } from "./types";
 import { flattenConnections } from "./GraphUtil";
 import ArrayDataProvider from "ojs/ojarraydataprovider";
-import { PhysicalConnectionSummary } from "../../../../../../gen/clients/ide-lvv-client";
+import {
+  PhysicalConnectionSummary,
+  RoomLayout,
+  RoomPlatform,
+} from "../../../../../../gen/clients/ide-lvv-client";
 import mapping from "../../api/mockAPI/deployment-groups.json";
+import { RackFilters } from "../../types";
 interface Option {
   label: string;
   value: string;
@@ -25,8 +30,12 @@ interface Option {
 
 interface PathSelectorsProps {
   roomName?: string | null; // NEW
+  room?: RoomLayout;
   gpuRacks: string[];
   connections: PhysicalConnectionSummary[] | undefined;
+  roomPlatforms: RoomPlatform[] | undefined;
+  rackFilters: RackFilters;
+  onAutoEnableShowOhr?: () => void;
   //   highlights: HighlightsInfo;
   //   setHighlights: Dispatch<StateUpdater<HighlightsInfo>>;
   setRackToRack: Dispatch<
@@ -40,15 +49,17 @@ interface PathSelectorsProps {
 
   clearRackSelection: boolean;
   disableSrcRackSelect?: boolean;
-  onRackListChange?: (
-    racksInGroup: string[],
-  ) => void;
+  onRackListChange?: (racksInGroup: string[]) => void;
 }
 
 export const PathSelectors = ({
   roomName,
+  room,
   gpuRacks,
   connections,
+  roomPlatforms,
+  rackFilters,
+  onAutoEnableShowOhr,
   //   setHighlights,
   setRackToRack,
   clearRackSelection,
@@ -56,35 +67,58 @@ export const PathSelectors = ({
   onRackListChange,
 }: PathSelectorsProps) => {
   const [selected, setSelected] = useState<any>({
-    deploymentGroup: null,
     srcRack: null,
     destRack: null,
-    destRack2: null,
   });
   const [srcRackMapping, setSrcRackMapping] = useState<
     Map<string, Set<string>>
   >(new Map());
-  const [destOptions, setDestOptions] = useState<Option[]>([]);
+  const normalizeRackId = (rackId: string | null | undefined) =>
+    String(rackId || "").trim().toLowerCase();
+  const ohrRackIdSet = useMemo(() => {
+    const ohrRackIds = new Set<string>();
+
+    (room?.layout?.room?.objects || []).forEach((item: any) => {
+      const rackId = item?.label || item?.id;
+      const rackType = String(item?.type || "").toLowerCase();
+      if (!rackId || !rackType.includes("ohr")) {
+        return;
+      }
+      ohrRackIds.add(normalizeRackId(rackId));
+    });
+
+    return ohrRackIds;
+  }, [room]);
+  const isOhrRackId = (rackId: string | null | undefined) =>
+    ohrRackIdSet.has(normalizeRackId(rackId));
 
   useEffect(() => {
     setSelected({
-      deploymentGroup: null,
       srcRack: null,
       destRack: null,
-      destRack2: null,
     });
     // setHighlights({ items: {} });
     setRackToRack(null);
-    setDestOptions([]);
   }, [clearRackSelection]);
 
   useEffect(() => {
-    if (!connections || connections.length === 0) {
-      // Even if there are no connections, we still want to show GPU racks as selectable
-      const srcRackMappingLocal: Map<string, Set<string>> = new Map();
-      const destRackMappingLocal: Map<string, Set<string>> = new Map();
+    if (!roomName?.startsWith("aga5")) {
+      return;
+    }
 
-      // Seed mapping with GPU racks (no destinations yet)
+    setRackToRack(null);
+    setSelected((prev: any) => ({
+      ...prev,
+      srcRack: null,
+      destRack: null,
+    }));
+  }, [roomName, rackFilters.deploymentGroup]);
+
+  useEffect(() => {
+    const srcRackMappingLocal: Map<string, Set<string>> = new Map();
+
+    if (!connections || connections.length === 0) {
+      // Even if there are no connections, we still want to show racks as selectable.
       gpuRacks?.forEach((rack) => {
         if (!srcRackMappingLocal.has(rack)) {
           srcRackMappingLocal.set(rack, new Set());
@@ -92,20 +126,8 @@ export const PathSelectors = ({
       });
 
       setSrcRackMapping(srcRackMappingLocal);
-
-      setDestOptions(
-        Array.from(destRackMappingLocal.keys())
-          .sort()
-          .map((dest) => ({
-            label: dest,
-            value: dest,
-          })),
-      );
       return;
     }
-
-    const srcRackMappingLocal: Map<string, Set<string>> = new Map();
-    const destRackMappingLocal: Map<string, Set<string>> = new Map();
 
     connections.forEach((connection) => {
       const { sourceRackNumber, destinationRackNumber } = connection;
@@ -115,14 +137,9 @@ export const PathSelectors = ({
         srcRackMappingLocal.set(sourceRackNumber, new Set());
       }
       srcRackMappingLocal.get(sourceRackNumber)!.add(destinationRackNumber);
-
-      if (!destRackMappingLocal.has(destinationRackNumber)) {
-        destRackMappingLocal.set(destinationRackNumber, new Set());
-      }
-      destRackMappingLocal.get(destinationRackNumber)!.add(sourceRackNumber);
     });
 
-    // Ensure all GPU racks exist in the mapping (even if they didn't appear as a source)
+    // Ensure all GPU racks exist in the mapping (even if not in connections)
     gpuRacks?.forEach((rack) => {
       if (!srcRackMappingLocal.has(rack)) {
         srcRackMappingLocal.set(rack, new Set());
@@ -130,34 +147,125 @@ export const PathSelectors = ({
     });
 
     setSrcRackMapping(srcRackMappingLocal);
-    setDestOptions(
-      Array.from(destRackMappingLocal.keys())
-        .sort()
-        .map((dest) => ({
-          label: dest,
-          value: dest,
-        })),
-    );
   }, [connections, gpuRacks]);
+
+  const filteredSrcRackValues = useMemo(() => {
+    let candidateRacks = Array.from(srcRackMapping.keys());
+
+    if (!roomName) return [];
+    // If in aga5 and a specific group is chosen, filter by deployment group
+    if (roomName?.startsWith("aga5") && rackFilters.deploymentGroup) {
+      const group = mapping.groups.find(
+        (g) => String(g.placementGroup) === rackFilters.deploymentGroup,
+      );
+      if (!group || !group.rackPositions || group.rackPositions.length === 0) {
+        candidateRacks = [];
+      } else {
+        const allowedRacks = new Set(group.rackPositions);
+        candidateRacks = candidateRacks.filter((r) => allowedRacks.has(r));
+      }
+    }
+
+    if (rackFilters.platformName || rackFilters.blockName) {
+      const roomPlatformByRack = new Map<
+        string,
+        { platformName: string | null; blockName: string | null }
+      >();
+      (roomPlatforms || []).forEach((roomPlatform) => {
+        const rackNumber = roomPlatform.rackNumber?.trim();
+        if (!rackNumber) {
+          return;
+        }
+        roomPlatformByRack.set(rackNumber, {
+          platformName: roomPlatform.platformName ?? null,
+          blockName: roomPlatform.blockName ?? null,
+        });
+      });
+
+      candidateRacks = candidateRacks.filter((rack) => {
+        const rackPlatform = roomPlatformByRack.get(rack);
+        if (!rackPlatform) {
+          return false;
+        }
+        if (
+          rackFilters.platformName &&
+          rackPlatform.platformName !== rackFilters.platformName
+        ) {
+          return false;
+        }
+        if (
+          rackFilters.blockName &&
+          rackPlatform.blockName !== rackFilters.blockName
+        ) {
+          return false;
+        }
+        return true;
+      });
+    }
+
+    return candidateRacks.sort();
+  }, [
+    roomName,
+    rackFilters.deploymentGroup,
+    srcRackMapping,
+    roomPlatforms,
+    rackFilters.platformName,
+    rackFilters.blockName,
+  ]);
+
+  const filteredSrcOptions = useMemo(
+    () =>
+      filteredSrcRackValues.map((src) => {
+        const destinations = Array.from(srcRackMapping.get(src) || []).sort();
+        const label =
+          destinations.length > 0
+            ? `${src} - (${destinations.join(", ")})`
+            : src;
+        return {
+          label,
+          value: src,
+        };
+      }),
+    [filteredSrcRackValues, srcRackMapping],
+  );
+
+  const destOptions = useMemo(() => {
+    if (!selected.srcRack) {
+      return [];
+    }
+
+    return Array.from(srcRackMapping.get(selected.srcRack) || new Set<string>())
+      .sort()
+      .map((dest) => ({
+        label: dest,
+        value: dest,
+      }));
+  }, [selected.srcRack, srcRackMapping]);
+
+  useEffect(() => {
+    if (!selected.srcRack && selected.destRack) {
+      return;
+    }
+
+    const nextDestRack = destOptions.length > 0 ? destOptions[0].value : null;
+    if (selected.destRack === nextDestRack) {
+      return;
+    }
+
+    setSelected((prev: any) => ({
+      ...prev,
+      destRack: nextDestRack,
+    }));
+  }, [selected.srcRack]);
 
   useEffect(() => {
     if (selected.srcRack && selected.destRack) {
-      setDestOptions(
-        Array.from(srcRackMapping.get(selected.srcRack) || [])
-          ?.sort()
-          .map((dest: string) => ({
-            label: dest,
-            value: dest,
-          })),
-      );
       //   setHighlights({
       //     items: {
       //       id: connections?.filter((connection) => {
       //         return (
       //           connection.sourceRackNumber === selected.srcRack &&
-      //           (connection.destinationRackNumber === selected.destRack ||
-      //             connection.destinationRackNumber === selected.destRack2)
-      //         );
+      //           connection.destinationRackNumber === selected.destRack);
       //       }) || [],
       //     },
       //   });
@@ -169,7 +277,6 @@ export const PathSelectors = ({
       });
       onRackListChange?.([selected.srcRack]);
     } else if (selected.srcRack && !selected.destRack) {
-      setDestOptions([]);
       setRackToRack({
         sourceRack: selected.srcRack,
         destinationRack: null,
@@ -182,161 +289,121 @@ export const PathSelectors = ({
     }
   }, [selected, srcRackMapping]);
 
-  const deploymentGroupOptions: Option[] = useMemo(
-    () => [
-      { label: "All Racks", value: "" }, // explicit unselect
-      ...(mapping.groups || []).map((g) => ({
-        label:
-          String(g.placementGroup) +
-          " (" +
-          (g.rackPositions || []).join(", ") +
-          ")",
-        value: String(g.placementGroup),
-      })),
-    ],
-    [],
-  );
-
-  const filteredSrcOptions = useMemo(() => {
-    // Start from GPU racks only
-    const gpuRackSet = new Set(gpuRacks || []);
-
-    // base set: all GPU racks that have (or were added into) srcRackMapping
-    let candidateRacks = Array.from(srcRackMapping.keys()).filter((rack) =>
-      gpuRackSet.has(rack),
-    );
-
-    if(!roomName) return [];
-    // If in aga5.1 and a specific group is chosen, further filter by group
-    if (roomName?.startsWith("aga5") && selected.deploymentGroup) {
-      const group = mapping.groups.find(
-        (g) => String(g.placementGroup) === selected.deploymentGroup,
-      );
-      if (!group || !group.rackPositions || group.rackPositions.length === 0) {
-        candidateRacks = [];
-      } else {
-        const allowedRacks = new Set(group.rackPositions);
-        candidateRacks = candidateRacks.filter((r) => allowedRacks.has(r));
-      }
-    } else {
-      candidateRacks = Array.from(srcRackMapping.keys());
-    }
-
-    return candidateRacks.sort().map((src) => {
-      const destinations = Array.from(srcRackMapping.get(src) || []).sort();
-      const label =
-        destinations.length > 0 ? `${src} - (${destinations.join(", ")})` : src;
-      return {
-        label,
-        value: src,
-      };
-    });
-  }, [roomName, selected.deploymentGroup, srcRackMapping, gpuRacks]);
-
-  // Determine which GPU racks are in the selected deployment group
+  // Determine which GPU racks are in the selected filters
   useEffect(() => {
-    // if not aga5.1 or no callback, do nothing
-    if (!roomName || !roomName.startsWith("aga5") || !onRackListChange) {
+    if (!onRackListChange) {
       return;
     }
 
-    const groupId = selected.deploymentGroup;
+    let filteredRacks = [...(gpuRacks || [])];
 
-    // groupId empty string or null => "no group filter": send all gpuRacks
-    if (!groupId) {
-      onRackListChange(gpuRacks || []);
-      return;
+    if (roomName?.startsWith("aga5") && rackFilters.deploymentGroup) {
+      const group = mapping.groups.find(
+        (g) => String(g.placementGroup) === rackFilters.deploymentGroup,
+      );
+      if (!group || !group.rackPositions) {
+        onRackListChange([]);
+        return;
+      }
+
+      const allowedRacks = new Set(group.rackPositions);
+      filteredRacks = filteredRacks.filter((rack) => allowedRacks.has(rack));
     }
 
-    const group = mapping.groups.find(
-      (g) => String(g.placementGroup) === groupId,
-    );
-    if (!group || !group.rackPositions) {
-      onRackListChange([]); // nothing in group
-      return;
+    if (rackFilters.platformName || rackFilters.blockName) {
+      const roomPlatformByRack = new Map<
+        string,
+        { platformName: string | null; blockName: string | null }
+      >();
+
+      (roomPlatforms || []).forEach((roomPlatform) => {
+        const rackNumber = roomPlatform.rackNumber?.trim();
+        if (!rackNumber) {
+          return;
+        }
+
+        roomPlatformByRack.set(rackNumber, {
+          platformName: roomPlatform.platformName ?? null,
+          blockName: roomPlatform.blockName ?? null,
+        });
+      });
+
+      filteredRacks = filteredRacks.filter((rack) => {
+        const rackPlatform = roomPlatformByRack.get(rack);
+        if (!rackPlatform) {
+          return false;
+        }
+        if (
+          rackFilters.platformName &&
+          rackPlatform.platformName !== rackFilters.platformName
+        ) {
+          return false;
+        }
+        if (
+          rackFilters.blockName &&
+          rackPlatform.blockName !== rackFilters.blockName
+        ) {
+          return false;
+        }
+        return true;
+      });
     }
 
-    const allowedRacks = new Set(group.rackPositions);
-    const gpuInGroup = (gpuRacks || []).filter((r) => allowedRacks.has(r));
+    onRackListChange(filteredRacks);
+  }, [
+    roomName,
+    rackFilters.deploymentGroup,
+    rackFilters.platformName,
+    rackFilters.blockName,
+    gpuRacks,
+    roomPlatforms,
+  ]);
 
-    onRackListChange(gpuInGroup);
-  }, [roomName, selected.deploymentGroup, gpuRacks]);
+  const isDestRackSelectDisabled =
+    !selected.srcRack || !selected.destRack;
 
   return (
-    <div className="region-dropdown-group">
-      {roomName?.startsWith("aga5") && (
-        <oj-c-select-single
-          id="deploymentGroupSelect"
-          class="rack-select"
-          data={
-            new ArrayDataProvider<Option["value"], Option>(
-              deploymentGroupOptions,
-              {
-                keyAttributes: "value",
-              },
-            )
-          }
-          item-text="label"
-          label-hint="Deployment Group"
-          placeholder="Select a deployment group"
-          value={selected.deploymentGroup ?? ""} // map null -> "" for "All"
-          onvalueChanged={(event) => {
-            const newGroup = event.detail.value as string | null;
-            // Reset racks when deployment group changes
-            setRackToRack(null);
-            setSelected({
-              deploymentGroup: newGroup,
-              srcRack: null,
-              destRack: null,
-              destRack2: null,
-            });
-          }}
-        />
-      )}
+    <div className="path-selectors-group">
       <oj-c-select-single
         id="srcRackSelect"
-        class="rack-select"
         data={
           new ArrayDataProvider(filteredSrcOptions, { keyAttributes: "value" })
         }
-        item-text="label"
-        label-hint="Source Rack ID"
+        itemText="label"
+        labelHint="Source Rack ID"
         placeholder={"Choose a single source"}
+        width={"sm"}
         onvalueChanged={(event) => {
           //   setHighlights({ items: {} });
           const selectedSrcRack = event.detail.value;
+          if (isOhrRackId(selectedSrcRack)) {
+            onAutoEnableShowOhr?.();
+          }
           setRackToRack(null);
-          const destRackSet = srcRackMapping.get(selectedSrcRack);
-          const destRack = destRackSet
-            ? Array.from(destRackSet).sort()[0]
-            : null;
           setSelected({
             ...selected,
             srcRack: selectedSrcRack,
-            destRack: destRack,
-            destRack2: null,
+            destRack: null
           });
         }}
         value={selected.srcRack}
         disabled={!!disableSrcRackSelect}
       />
-      <oj-c-select-single
-        id="destRackSelect"
-        class="rack-select"
-        data={new ArrayDataProvider(destOptions, { keyAttributes: "value" })}
-        item-text="label"
-        label-hint="Dest Rack ID"
-        placeholder={"Choose a destination rack"}
-        onvalueChanged={(event) =>
-          setSelected({ ...selected, destRack: event.detail.value })
-        }
-        value={selected.destRack}
-        disabled={
-          !selected.srcRack ||
-          !!disableSrcRackSelect ||
-          destOptions.length === 0
-        }
-      />
+      {!isDestRackSelectDisabled && (
+        <oj-c-select-single
+          id="destRackSelect"
+          data={new ArrayDataProvider(destOptions, { keyAttributes: "value" })}
+          itemText="label"
+          labelHint="Dest Rack ID"
+          placeholder={"Choose a destination rack"}
+          width={"sm"}
+          onvalueChanged={(event) =>
+            setSelected({ ...selected, destRack: event.detail.value })
+          }
+          value={selected.destRack}
+          disabled={isDestRackSelectDisabled}
+        />
+      )}
     </div>
   );
 };

@@ -1,4 +1,7 @@
+import { useState } from "preact/hooks";
+import "oj-c/button";
 import { MaterialSummary } from "gen/clients/ide-lvv-client";
+import { MaterialFieldSelectorDialog } from "./MaterialFieldSelectorDialog";
 
 interface MaterialPanelProps {
   materials: MaterialSummary[] | undefined;
@@ -11,6 +14,8 @@ export const MaterialPanel = ({
   loading,
   headerText,
 }: MaterialPanelProps) => {
+  const [fieldDialogOpen, setFieldDialogOpen] = useState(false);
+
   return (
     <div className="material-panel">
       {loading ? null : !materials || materials?.length === 0 ? (
@@ -19,10 +24,16 @@ export const MaterialPanel = ({
         </p>
       ) : (
         <>
-          <h5 className="rack-detail-header">
-            Matrials for {headerText}
-          </h5>
-
+          <div className="rack-detail-header">
+            <h5 className="oj-sm-margin-0">Materials for {headerText}</h5>
+            <oj-c-button
+              chroming="borderless"
+              onojAction={() => setFieldDialogOpen(true)}
+              label="Export materials"
+            >
+              <span slot="startIcon" class="oj-ux-ico-download"></span>
+            </oj-c-button>
+          </div>
           {materials?.map((material: MaterialSummary, index: number) => {
             return (
               <div key={material.id} className="material-info">
@@ -64,6 +75,12 @@ export const MaterialPanel = ({
           })}
         </>
       )}
+      <MaterialFieldSelectorDialog
+        opened={fieldDialogOpen}
+        onClose={() => setFieldDialogOpen(false)}
+        headerText={headerText}
+        materials={materials}
+      />
     </div>
   );
 };

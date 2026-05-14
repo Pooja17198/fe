@@ -44,40 +44,40 @@ module.exports = {
    * @returns {object|undefined}
    */
   webpack: ({ context, config }) => {
-      const requestedDevServerPort = Number.parseInt(
-        process.env.OJET_DEV_SERVER_PORT || process.env.PORT || "",
-        10
-      );
-      config.output.path = path.resolve(__dirname, './web');
-      config.output.publicPath = '';
-      config.output.clean = false;
-      config.plugins.push(
-              new CopyWebpackPlugin({
-                patterns: [
-                  {
-                    from: path.resolve(__dirname, 'src/landing/resources'),
-                    to: path.resolve(__dirname, 'web/landing/resources')
-                  }
-                ]
-              })
-            );
-      config.resolve.alias = {
-        ...config.resolve.alias,
-        '@oracle/oraclejet-preact': path.resolve(__dirname, 'node_modules/@oracle/oraclejet-preact/amd'),
-        '@oracle/oraclejet-core-pack': path.resolve(__dirname, 'node_modules/@oracle/oraclejet-core-pack/oj-c'),
-        'oj-c': path.resolve(__dirname, 'node_modules/@oracle/oraclejet-core-pack/oj-c'),
-      };
+    const requestedDevServerPort = Number.parseInt(
+      process.env.OJET_DEV_SERVER_PORT || process.env.PORT || "",
+      10
+    );
+    config.output.path = path.resolve(__dirname, './web');
+    config.output.publicPath = '';
+    config.output.clean = false;
+    config.plugins.push(
+      new CopyWebpackPlugin({
+        patterns: [
+          {
+            from: path.resolve(__dirname, 'src/landing/resources'),
+            to: path.resolve(__dirname, 'web/landing/resources')
+          }
+        ]
+      })
+    );
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      '@oracle/oraclejet-preact': path.resolve(__dirname, 'node_modules/@oracle/oraclejet-preact/amd'),
+      '@oracle/oraclejet-core-pack': path.resolve(__dirname, 'node_modules/@oracle/oraclejet-core-pack/oj-c'),
+      'oj-c': path.resolve(__dirname, 'node_modules/@oracle/oraclejet-core-pack/oj-c'),
+    };
     if (context.buildType === 'release') {
-      config.optimization = {minimize: true, splitChunks: { chunks: 'all' }};
+      config.optimization = { minimize: true, splitChunks: { chunks: 'all' } };
       config.optimization.minimizer = [
-      new TerserPlugin({
-        parallel: true,
-      }),
-    ];
+        new TerserPlugin({
+          parallel: true,
+        }),
+      ];
       const htmlPlugin = config.plugins.find(
         p => p instanceof HtmlWebpackPlugin
       );
-      
+
       if (htmlPlugin) {
         htmlPlugin.options.inlineSource = '.(js|css)$';
       }
@@ -89,6 +89,18 @@ module.exports = {
         config.devServer = {
           ...(config.devServer || {}),
           port: requestedDevServerPort,
+          client: {
+            overlay: {
+              runtimeErrors: (error) => {
+                if (error?.message === "ResizeObserver loop completed with undelivered notifications.") {
+                  console.error(error)
+                  return false;
+                }
+                return true;
+              },
+            },
+          },
+
         };
       }
     }

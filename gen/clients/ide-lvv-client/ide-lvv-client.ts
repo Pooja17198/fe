@@ -341,6 +341,10 @@ export interface PhysicalConnectionCollection {
      * List of PhysicalConnectionSummary.
      */
     "items": Array<PhysicalConnectionSummary>;
+    /**
+     * Materials associated with the block-filtered physical connections. Returned only when blockName is specified.
+     */
+    "materials"?: MaterialSummary[];
 }
 
 /**
@@ -590,6 +594,24 @@ export interface RoomMetadataCollection {
      * Room metadata list
      */
     "items"?: Array<RoomMetadata>;
+}
+
+/**
+ * Platform details for a rack in a room
+ */
+export interface RoomPlatform {
+    /**
+     * Rack number
+     */
+    "rackNumber"?: string;
+    /**
+     * Platform name
+     */
+    "platformName"?: string;
+    /**
+     * block name
+     */
+    "blockName"?: string;
 }
 
 export interface Version {
@@ -1061,6 +1083,7 @@ export type PhysicalConnectionApiGetPhysicalConnectionImageReturnType = { respon
 
 export interface PhysicalConnectionApiListPhysicalConnectionsArgs {
      "roomName": string;
+     "blockName"?: string;
      "bomId"?: number;
      "limit"?: number;
      "page"?: string;
@@ -1127,6 +1150,7 @@ export class PhysicalConnectionApi extends base.BaseAPI {
      * Gets a list of Physical Connections. Either &#x60;roomName&#x60; or &#x60;bomId&#x60; is required.
      * Gets a list of Physical Connections. 
      * @param roomName Room name for filtering
+     * @param blockName Block name for filtering physical connections.
      * @param bomId BOM ID for filtering
      * @param limit Max items per page
      * @param page Pagination token
@@ -1134,7 +1158,7 @@ export class PhysicalConnectionApi extends base.BaseAPI {
      * @param sortBy Sort field
      * @param opcRequestId Request ID for idempotency
      */
-    public listPhysicalConnections(params: {  "roomName": string; "bomId"?: number; "limit"?: number; "page"?: string; "sortOrder"?: string; "sortBy"?: string; "opcRequestId"?: string; }, options?: any): Promise<{ response: Response, data: PhysicalConnectionCollection }> {
+    public listPhysicalConnections(params: {  "roomName": string; "blockName"?: string; "bomId"?: number; "limit"?: number; "page"?: string; "sortOrder"?: string; "sortBy"?: string; "opcRequestId"?: string; }, options?: any): Promise<{ response: Response, data: PhysicalConnectionCollection }> {
         base.validateRequiredParameters([
             "roomName",
         ], "listPhysicalConnections", params);
@@ -1147,6 +1171,7 @@ export class PhysicalConnectionApi extends base.BaseAPI {
 
             queryParameters: {
                     "roomName": { values: params["roomName"] },
+                    "blockName": { values: params["blockName"] },
                     "bomId": { values: params["bomId"] },
                     "limit": { values: params["limit"] },
                     "page": { values: params["page"] },
@@ -1236,7 +1261,6 @@ export class PhysicalCutsheetApi extends base.BaseAPI {
             httpMethod: "GET"
         });
     }
-    
     /** 
      * Gets a list of Physical Cutsheets.
      * Gets a list of Physical Cutsheets.  At least one of &#x60;buildingName&#x60;, &#x60;roomName&#x60;, &#x60;rackNumber&#x60;, &#x60;deviceName&#x60;, or &#x60;devicePort&#x60; must be provided to ensure the query is bounded and does not scan the entire database. 
@@ -1372,6 +1396,55 @@ export class RoomMetadataApi extends base.BaseAPI {
             parseResponseBody: true,
 
             operationName: "getRoomMetadata",
+            httpMethod: "GET"
+        });
+    }
+};
+
+export interface RoomMetadataByRoomApiGetPlatformListByRoomArgs {
+     "roomName": string
+}
+export type RoomMetadataByRoomApiGetPlatformListByRoomReturnType = { response: Response, data: Array<RoomPlatform> };
+
+
+/**
+ * RoomMetadataByRoomApi - object-oriented interface
+ */
+export class RoomMetadataByRoomApi extends base.BaseAPI {
+    public static createFromEndpointTemplate(fetch: base.Fetch, region: string, secondLevelDomain: string, config?: base.BaseApiConfig): RoomMetadataByRoomApi {
+        const endpoint = base.buildEndpointFromTemplate(
+            "https://infradeliveryengineering.{region}.oci.{secondLevelDomain}",
+            "/idelvv",
+            region,
+            secondLevelDomain
+        );
+
+        return new RoomMetadataByRoomApi(fetch, endpoint, config);
+    }
+
+    /** 
+     * Gets the platform list in a room
+     * Gets the platform list in a room
+     * @param roomName Room name identifier
+     */
+    public getPlatformListByRoom(params: {  "roomName": string; }, options?: any): Promise<{ response: Response, data: Array<RoomPlatform> }> {
+        base.validateRequiredParameters([
+            "roomName"
+        ], "getPlatformListByRoom", params);
+
+        const path = `${this.basePath}/roommetadata/{room_name}`
+            .replace(`{${"room_name"}}`, `${ params["roomName"] }`);
+
+        return this.request<Array<RoomPlatform>>({
+            options,
+            path,
+
+
+
+
+            parseResponseBody: true,
+
+            operationName: "getPlatformListByRoom",
             httpMethod: "GET"
         });
     }

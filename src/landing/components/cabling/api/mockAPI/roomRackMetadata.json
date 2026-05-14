@@ -1,0 +1,2860 @@
+[
+  { "rackNumber": "4601", "blockName": "0" },
+  { "rackNumber": "4602", "blockName": "0" },
+  { "rackNumber": "4603", "blockName": "0" },
+  { "rackNumber": "4604", "blockName": "0" },
+  { "rackNumber": "4605", "blockName": "0" },
+  {
+    "rackNumber": "4606",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "30"
+  },
+  {
+    "rackNumber": "4607",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "30"
+  },
+  {
+    "rackNumber": "4608",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "30"
+  },
+  {
+    "rackNumber": "4609",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.02",
+    "blockName": "30"
+  },
+  {
+    "rackNumber": "4610",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.02",
+    "blockName": "30"
+  },
+  {
+    "rackNumber": "4611",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.02",
+    "blockName": "30"
+  },
+  {
+    "rackNumber": "4612",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.02",
+    "blockName": "30"
+  },
+  {
+    "rackNumber": "4613",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.02",
+    "blockName": "30"
+  },
+  {
+    "rackNumber": "4614",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.02",
+    "blockName": "30"
+  },
+  {
+    "rackNumber": "4615",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.02",
+    "blockName": "30"
+  },
+  { "rackNumber": "4616", "blockName": "0" },
+  { "rackNumber": "4617", "blockName": "0" },
+  { "rackNumber": "4618", "blockName": "0" },
+  { "rackNumber": "4619", "blockName": "0" },
+  { "rackNumber": "4620", "blockName": "0" },
+  { "rackNumber": "4621", "blockName": "0" },
+  { "rackNumber": "4627", "blockName": "0" },
+  { "rackNumber": "4628", "blockName": "0" },
+  { "rackNumber": "4629", "blockName": "0" },
+  { "rackNumber": "4630", "blockName": "0" },
+  { "rackNumber": "4631", "blockName": "0" },
+  { "rackNumber": "4632", "blockName": "0" },
+  {
+    "rackNumber": "4633",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.02",
+    "blockName": "30"
+  },
+  {
+    "rackNumber": "4634",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.02",
+    "blockName": "30"
+  },
+  {
+    "rackNumber": "4635",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.02",
+    "blockName": "30"
+  },
+  {
+    "rackNumber": "4636",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.02",
+    "blockName": "30"
+  },
+  {
+    "rackNumber": "4637",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.02",
+    "blockName": "30"
+  },
+  {
+    "rackNumber": "4638",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.02",
+    "blockName": "30"
+  },
+  {
+    "rackNumber": "4639",
+    "platformName": "COM_NVMELM_E5-2C_24200_R.01",
+    "blockName": "30"
+  },
+  {
+    "rackNumber": "4640",
+    "platformName": "COM_NVME_E5-2C_21200_R.02",
+    "blockName": "30"
+  },
+  {
+    "rackNumber": "4641",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "30"
+  },
+  {
+    "rackNumber": "4642",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "30"
+  },
+  { "rackNumber": "4643", "blockName": "0" },
+  { "rackNumber": "4644", "blockName": "0" },
+  { "rackNumber": "4645", "blockName": "0" },
+  { "rackNumber": "4646", "blockName": "0" },
+  { "rackNumber": "4647", "blockName": "0" },
+  { "rackNumber": "4701", "blockName": "0" },
+  { "rackNumber": "4702", "blockName": "0" },
+  { "rackNumber": "4703", "blockName": "0" },
+  { "rackNumber": "4704", "blockName": "0" },
+  { "rackNumber": "4705", "blockName": "0" },
+  {
+    "rackNumber": "4706",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "30"
+  },
+  {
+    "rackNumber": "4707",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "30"
+  },
+  {
+    "rackNumber": "4708",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "30"
+  },
+  {
+    "rackNumber": "4709",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.02",
+    "blockName": "30"
+  },
+  {
+    "rackNumber": "4710",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.02",
+    "blockName": "30"
+  },
+  {
+    "rackNumber": "4711",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.02",
+    "blockName": "30"
+  },
+  {
+    "rackNumber": "4712",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.02",
+    "blockName": "30"
+  },
+  {
+    "rackNumber": "4713",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.02",
+    "blockName": "30"
+  },
+  {
+    "rackNumber": "4714",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.02",
+    "blockName": "30"
+  },
+  {
+    "rackNumber": "4715",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.02",
+    "blockName": "30"
+  },
+  { "rackNumber": "4716", "blockName": "0" },
+  { "rackNumber": "4717", "blockName": "0" },
+  { "rackNumber": "4718", "blockName": "0" },
+  { "rackNumber": "4719", "blockName": "0" },
+  { "rackNumber": "4720", "blockName": "0" },
+  { "rackNumber": "4721", "blockName": "0" },
+  { "rackNumber": "4727", "blockName": "0" },
+  { "rackNumber": "4728", "blockName": "0" },
+  { "rackNumber": "4729", "blockName": "0" },
+  { "rackNumber": "4730", "blockName": "0" },
+  { "rackNumber": "4731", "blockName": "0" },
+  { "rackNumber": "4732", "blockName": "0" },
+  {
+    "rackNumber": "4733",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.02",
+    "blockName": "30"
+  },
+  {
+    "rackNumber": "4734",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.02",
+    "blockName": "30"
+  },
+  {
+    "rackNumber": "4735",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.02",
+    "blockName": "30"
+  },
+  {
+    "rackNumber": "4736",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.02",
+    "blockName": "30"
+  },
+  {
+    "rackNumber": "4737",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.02",
+    "blockName": "30"
+  },
+  {
+    "rackNumber": "4738",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.02",
+    "blockName": "30"
+  },
+  {
+    "rackNumber": "4739",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.02",
+    "blockName": "30"
+  },
+  {
+    "rackNumber": "4740",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.02",
+    "blockName": "30"
+  },
+  {
+    "rackNumber": "4741",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.02",
+    "blockName": "30"
+  },
+  {
+    "rackNumber": "4742",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "30"
+  },
+  { "rackNumber": "4743", "blockName": "0" },
+  { "rackNumber": "4744", "blockName": "0" },
+  { "rackNumber": "4745", "blockName": "0" },
+  { "rackNumber": "4746", "blockName": "0" },
+  { "rackNumber": "4747", "blockName": "0" },
+  {
+    "rackNumber": "4802",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "20"
+  },
+  {
+    "rackNumber": "4804",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "20"
+  },
+  {
+    "rackNumber": "4806",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "20"
+  },
+  {
+    "rackNumber": "4808",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "20"
+  },
+  {
+    "rackNumber": "4810",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "20"
+  },
+  {
+    "rackNumber": "4812",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "20"
+  },
+  {
+    "rackNumber": "4813",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "20"
+  },
+  {
+    "rackNumber": "4816",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "20"
+  },
+  {
+    "rackNumber": "4817",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "13"
+  },
+  {
+    "rackNumber": "4819",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "13"
+  },
+  {
+    "rackNumber": "4830",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "13"
+  },
+  {
+    "rackNumber": "4831",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "15"
+  },
+  {
+    "rackNumber": "4833",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "18"
+  },
+  {
+    "rackNumber": "4835",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "18"
+  },
+  {
+    "rackNumber": "4837",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "18"
+  },
+  {
+    "rackNumber": "4839",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "18"
+  },
+  {
+    "rackNumber": "4841",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "18"
+  },
+  {
+    "rackNumber": "4842",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "18"
+  },
+  {
+    "rackNumber": "4844",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "18"
+  },
+  {
+    "rackNumber": "4845",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "18"
+  },
+  {
+    "rackNumber": "4902",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "20"
+  },
+  {
+    "rackNumber": "4904",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "20"
+  },
+  {
+    "rackNumber": "4907",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "20"
+  },
+  {
+    "rackNumber": "4908",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "20"
+  },
+  {
+    "rackNumber": "4910",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "20"
+  },
+  {
+    "rackNumber": "4912",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "20"
+  },
+  {
+    "rackNumber": "4913",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "20"
+  },
+  {
+    "rackNumber": "4916",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "20"
+  },
+  {
+    "rackNumber": "4917",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "13"
+  },
+  {
+    "rackNumber": "4919",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "13"
+  },
+  {
+    "rackNumber": "4930",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "13"
+  },
+  {
+    "rackNumber": "4931",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "13"
+  },
+  {
+    "rackNumber": "4933",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "18"
+  },
+  {
+    "rackNumber": "4935",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "18"
+  },
+  {
+    "rackNumber": "4937",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "18"
+  },
+  {
+    "rackNumber": "4939",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "18"
+  },
+  {
+    "rackNumber": "4941",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "18"
+  },
+  {
+    "rackNumber": "4942",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "18"
+  },
+  {
+    "rackNumber": "4944",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "18"
+  },
+  {
+    "rackNumber": "4945",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "18"
+  },
+  {
+    "rackNumber": "5001",
+    "platformName": "net.ad_gfab6_t1_1.03",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "5002",
+    "platformName": "net.ad_gfab6_t1_1.03",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "5003",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "20"
+  },
+  {
+    "rackNumber": "5004",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "21"
+  },
+  {
+    "rackNumber": "5005",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "21"
+  },
+  {
+    "rackNumber": "5006",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "20"
+  },
+  {
+    "rackNumber": "5011",
+    "platformName": "net.ad_cfab_t0_1.04",
+    "blockName": "20"
+  },
+  {
+    "rackNumber": "5012",
+    "platformName": "net.ad_cfab_t0_1.04",
+    "blockName": "21"
+  },
+  {
+    "rackNumber": "5013",
+    "platformName": "net.ad_cfab_v2_t1_t2_5.01",
+    "blockName": "20"
+  },
+  {
+    "rackNumber": "5014",
+    "platformName": "net.ad_cfab_v2_t1_t2_5.01",
+    "blockName": "21"
+  },
+  {
+    "rackNumber": "5015",
+    "platformName": "net.ad_cfab_v2_t1_t2_1.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "5016",
+    "platformName": "net.ad_cfab_v2_t1_t2_1.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "5021",
+    "platformName": "net.ad_cfab_v2_t1_t2_1.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "5022",
+    "platformName": "net.ad_cfab_v2_t1_t2_1.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "5023",
+    "platformName": "net.ad_cfab_v2_t1_t2_5.01",
+    "blockName": "19"
+  },
+  {
+    "rackNumber": "5024",
+    "platformName": "net.ad_cfab_v2_t1_t2_5.01",
+    "blockName": "18"
+  },
+  {
+    "rackNumber": "5025",
+    "platformName": "net.ad_cfab_t0_1.04",
+    "blockName": "19"
+  },
+  {
+    "rackNumber": "5026",
+    "platformName": "net.ad_cfab_t0_1.04",
+    "blockName": "18"
+  },
+  {
+    "rackNumber": "5031",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "18"
+  },
+  {
+    "rackNumber": "5032",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "19"
+  },
+  {
+    "rackNumber": "5033",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "19"
+  },
+  {
+    "rackNumber": "5034",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "18"
+  },
+  {
+    "rackNumber": "5035",
+    "platformName": "net.ad_gfab6_t1_1.03",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "5036",
+    "platformName": "net.ad_gfab6_t1_1.03",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "5101",
+    "platformName": "net.ad_gfab6_t1_1.03",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "5102",
+    "platformName": "net.ad_gfab6_t1_1.03",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "5103",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "20"
+  },
+  {
+    "rackNumber": "5104",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "21"
+  },
+  {
+    "rackNumber": "5105",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "21"
+  },
+  {
+    "rackNumber": "5106",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "20"
+  },
+  {
+    "rackNumber": "5111",
+    "platformName": "net.ad_cfab_t0_1.04",
+    "blockName": "20"
+  },
+  {
+    "rackNumber": "5112",
+    "platformName": "net.ad_cfab_t0_1.04",
+    "blockName": "21"
+  },
+  {
+    "rackNumber": "5113",
+    "platformName": "net.ad_cfab_v2_t1_t2_6.01",
+    "blockName": "20"
+  },
+  {
+    "rackNumber": "5114",
+    "platformName": "net.ad_cfab_v2_t1_t2_6.01",
+    "blockName": "21"
+  },
+  {
+    "rackNumber": "5115",
+    "platformName": "net.ad_cfab_v2_t1_t2_2.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "5116",
+    "platformName": "net.ad_cfab_v2_t1_t2_2.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "5121",
+    "platformName": "net.ad_cfab_v2_t1_t2_2.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "5122",
+    "platformName": "net.ad_cfab_v2_t1_t2_2.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "5123",
+    "platformName": "net.ad_cfab_v2_t1_t2_6.01",
+    "blockName": "19"
+  },
+  {
+    "rackNumber": "5124",
+    "platformName": "net.ad_cfab_v2_t1_t2_6.01",
+    "blockName": "18"
+  },
+  {
+    "rackNumber": "5125",
+    "platformName": "net.ad_cfab_t0_1.04",
+    "blockName": "19"
+  },
+  {
+    "rackNumber": "5126",
+    "platformName": "net.ad_cfab_t0_1.04",
+    "blockName": "18"
+  },
+  {
+    "rackNumber": "5131",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "18"
+  },
+  {
+    "rackNumber": "5132",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "19"
+  },
+  {
+    "rackNumber": "5133",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "19"
+  },
+  {
+    "rackNumber": "5134",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "18"
+  },
+  {
+    "rackNumber": "5135",
+    "platformName": "net.ad_gfab6_t1_1.03",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "5136",
+    "platformName": "net.ad_gfab6_t1_1.03",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "5202",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "21"
+  },
+  {
+    "rackNumber": "5204",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "21"
+  },
+  {
+    "rackNumber": "5206",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "21"
+  },
+  {
+    "rackNumber": "5208",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "21"
+  },
+  {
+    "rackNumber": "5210",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "21"
+  },
+  {
+    "rackNumber": "5212",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "21"
+  },
+  {
+    "rackNumber": "5213",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "21"
+  },
+  {
+    "rackNumber": "5216",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "21"
+  },
+  {
+    "rackNumber": "5217",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "14"
+  },
+  {
+    "rackNumber": "5219",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "14"
+  },
+  {
+    "rackNumber": "5230",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "13"
+  },
+  {
+    "rackNumber": "5231",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "13"
+  },
+  {
+    "rackNumber": "5233",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "19"
+  },
+  {
+    "rackNumber": "5235",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "19"
+  },
+  {
+    "rackNumber": "5237",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "19"
+  },
+  {
+    "rackNumber": "5239",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "19"
+  },
+  {
+    "rackNumber": "5241",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "19"
+  },
+  {
+    "rackNumber": "5242",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "19"
+  },
+  {
+    "rackNumber": "5244",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "19"
+  },
+  {
+    "rackNumber": "5245",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "19"
+  },
+  {
+    "rackNumber": "5302",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "21"
+  },
+  {
+    "rackNumber": "5304",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "21"
+  },
+  {
+    "rackNumber": "5306",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "21"
+  },
+  {
+    "rackNumber": "5308",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "21"
+  },
+  {
+    "rackNumber": "5310",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "21"
+  },
+  {
+    "rackNumber": "5312",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "21"
+  },
+  {
+    "rackNumber": "5313",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "21"
+  },
+  {
+    "rackNumber": "5316",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "21"
+  },
+  {
+    "rackNumber": "5317",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "14"
+  },
+  {
+    "rackNumber": "5319",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "14"
+  },
+  {
+    "rackNumber": "5330",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "13"
+  },
+  {
+    "rackNumber": "5331",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "15"
+  },
+  {
+    "rackNumber": "5333",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "19"
+  },
+  {
+    "rackNumber": "5335",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "19"
+  },
+  {
+    "rackNumber": "5337",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "19"
+  },
+  {
+    "rackNumber": "5339",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "19"
+  },
+  {
+    "rackNumber": "5341",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "19"
+  },
+  {
+    "rackNumber": "5342",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "19"
+  },
+  {
+    "rackNumber": "5344",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "19"
+  },
+  {
+    "rackNumber": "5345",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "19"
+  },
+  { "rackNumber": "5401", "blockName": "0" },
+  { "rackNumber": "5402", "blockName": "0" },
+  { "rackNumber": "5403", "blockName": "0" },
+  { "rackNumber": "5404", "blockName": "0" },
+  { "rackNumber": "5405", "blockName": "0" },
+  {
+    "rackNumber": "5406",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "30"
+  },
+  {
+    "rackNumber": "5407",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "30"
+  },
+  {
+    "rackNumber": "5408",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "30"
+  },
+  {
+    "rackNumber": "5409",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "30"
+  },
+  {
+    "rackNumber": "5410",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "30"
+  },
+  {
+    "rackNumber": "5411",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "30"
+  },
+  {
+    "rackNumber": "5412",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "30"
+  },
+  {
+    "rackNumber": "5413",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "30"
+  },
+  {
+    "rackNumber": "5414",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "30"
+  },
+  {
+    "rackNumber": "5415",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "30"
+  },
+  { "rackNumber": "5416", "blockName": "0" },
+  { "rackNumber": "5417", "blockName": "0" },
+  { "rackNumber": "5418", "blockName": "0" },
+  { "rackNumber": "5419", "blockName": "0" },
+  { "rackNumber": "5420", "blockName": "0" },
+  { "rackNumber": "5421", "blockName": "0" },
+  {
+    "rackNumber": "5427",
+    "platformName": "net.ad_cfab_t0_1.04",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "5428",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "34"
+  },
+  {
+    "rackNumber": "5429",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "19"
+  },
+  {
+    "rackNumber": "5430",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "18"
+  },
+  {
+    "rackNumber": "5431",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "13"
+  },
+  {
+    "rackNumber": "5432",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "13"
+  },
+  {
+    "rackNumber": "5441",
+    "platformName": "net.ad_cfab_v2_t1_t2_1.15",
+    "blockName": "30"
+  },
+  {
+    "rackNumber": "5442",
+    "platformName": "net.ad_cfab_t0_1.04",
+    "blockName": "0"
+  },
+  { "rackNumber": "5443", "blockName": "0" },
+  {
+    "rackNumber": "5444",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "30"
+  },
+  {
+    "rackNumber": "5445",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "30"
+  },
+  { "rackNumber": "5446", "blockName": "0" },
+  { "rackNumber": "5447", "blockName": "0" },
+  { "rackNumber": "5501", "blockName": "0" },
+  { "rackNumber": "5502", "blockName": "0" },
+  { "rackNumber": "5503", "blockName": "0" },
+  { "rackNumber": "5504", "blockName": "0" },
+  { "rackNumber": "5505", "blockName": "0" },
+  {
+    "rackNumber": "5506",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "30"
+  },
+  {
+    "rackNumber": "5507",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "30"
+  },
+  {
+    "rackNumber": "5508",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "30"
+  },
+  {
+    "rackNumber": "5509",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "30"
+  },
+  {
+    "rackNumber": "5510",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "30"
+  },
+  {
+    "rackNumber": "5511",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "30"
+  },
+  {
+    "rackNumber": "5512",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "30"
+  },
+  {
+    "rackNumber": "5513",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "30"
+  },
+  {
+    "rackNumber": "5514",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "30"
+  },
+  {
+    "rackNumber": "5515",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "30"
+  },
+  { "rackNumber": "5516", "blockName": "0" },
+  { "rackNumber": "5517", "blockName": "0" },
+  { "rackNumber": "5518", "blockName": "0" },
+  { "rackNumber": "5519", "blockName": "0" },
+  { "rackNumber": "5520", "blockName": "0" },
+  { "rackNumber": "5521", "blockName": "0" },
+  {
+    "rackNumber": "5527",
+    "platformName": "net.ad_cfab_t0_1.04",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "5528",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "34"
+  },
+  {
+    "rackNumber": "5529",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "19"
+  },
+  {
+    "rackNumber": "5530",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "18"
+  },
+  {
+    "rackNumber": "5531",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "13"
+  },
+  {
+    "rackNumber": "5532",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "13"
+  },
+  {
+    "rackNumber": "5541",
+    "platformName": "net.ad_cfab_v2_t1_t2_2.15",
+    "blockName": "30"
+  },
+  {
+    "rackNumber": "5542",
+    "platformName": "net.ad_cfab_t0_1.04",
+    "blockName": "0"
+  },
+  { "rackNumber": "5543", "blockName": "0" },
+  {
+    "rackNumber": "5544",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "30"
+  },
+  {
+    "rackNumber": "5545",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "30"
+  },
+  { "rackNumber": "5546", "blockName": "0" },
+  { "rackNumber": "5547", "blockName": "0" },
+  { "rackNumber": "6101", "blockName": "0" },
+  { "rackNumber": "6102", "blockName": "0" },
+  { "rackNumber": "6103", "blockName": "0" },
+  { "rackNumber": "6104", "blockName": "0" },
+  { "rackNumber": "6105", "blockName": "0" },
+  { "rackNumber": "6106", "blockName": "0" },
+  { "rackNumber": "6107", "blockName": "0" },
+  {
+    "rackNumber": "6108",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "6109",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "6110",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "6111",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "6112",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "6113",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "6114",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  { "rackNumber": "6115", "blockName": "0" },
+  { "rackNumber": "6116", "blockName": "0" },
+  { "rackNumber": "6117", "blockName": "0" },
+  { "rackNumber": "6118", "blockName": "0" },
+  { "rackNumber": "6119", "blockName": "0" },
+  { "rackNumber": "6120", "blockName": "0" },
+  { "rackNumber": "6121", "blockName": "0" },
+  { "rackNumber": "6127", "blockName": "0" },
+  { "rackNumber": "6128", "blockName": "0" },
+  { "rackNumber": "6129", "blockName": "0" },
+  { "rackNumber": "6130", "blockName": "0" },
+  { "rackNumber": "6131", "blockName": "0" },
+  { "rackNumber": "6132", "blockName": "0" },
+  {
+    "rackNumber": "6133",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "6134",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "6135",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "6136",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "6137",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "6138",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "6139",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "6140",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "6141",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  { "rackNumber": "6142", "blockName": "0" },
+  { "rackNumber": "6143", "blockName": "0" },
+  { "rackNumber": "6144", "blockName": "0" },
+  { "rackNumber": "6145", "blockName": "0" },
+  { "rackNumber": "6146", "blockName": "0" },
+  { "rackNumber": "6147", "blockName": "0" },
+  { "rackNumber": "6201", "blockName": "0" },
+  { "rackNumber": "6202", "blockName": "0" },
+  { "rackNumber": "6203", "blockName": "0" },
+  { "rackNumber": "6204", "blockName": "0" },
+  { "rackNumber": "6205", "blockName": "0" },
+  { "rackNumber": "6206", "blockName": "0" },
+  { "rackNumber": "6207", "blockName": "0" },
+  {
+    "rackNumber": "6208",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "6209",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "6210",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "6211",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "6212",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "6213",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "6214",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  { "rackNumber": "6215", "blockName": "0" },
+  { "rackNumber": "6216", "blockName": "0" },
+  { "rackNumber": "6217", "blockName": "0" },
+  { "rackNumber": "6218", "blockName": "0" },
+  { "rackNumber": "6219", "blockName": "0" },
+  { "rackNumber": "6220", "blockName": "0" },
+  { "rackNumber": "6221", "blockName": "0" },
+  { "rackNumber": "6227", "blockName": "0" },
+  { "rackNumber": "6228", "blockName": "0" },
+  { "rackNumber": "6229", "blockName": "0" },
+  { "rackNumber": "6230", "blockName": "0" },
+  { "rackNumber": "6231", "blockName": "0" },
+  { "rackNumber": "6232", "blockName": "0" },
+  {
+    "rackNumber": "6233",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "6234",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "6235",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "6236",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "6237",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "6238",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "6239",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "6240",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "6241",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  { "rackNumber": "6242", "blockName": "0" },
+  { "rackNumber": "6243", "blockName": "0" },
+  { "rackNumber": "6244", "blockName": "0" },
+  { "rackNumber": "6245", "blockName": "0" },
+  { "rackNumber": "6246", "blockName": "0" },
+  { "rackNumber": "6247", "blockName": "0" },
+  {
+    "rackNumber": "6302",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "24"
+  },
+  {
+    "rackNumber": "6304",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "24"
+  },
+  {
+    "rackNumber": "6307",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "24"
+  },
+  {
+    "rackNumber": "6308",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "24"
+  },
+  {
+    "rackNumber": "6310",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "24"
+  },
+  {
+    "rackNumber": "6312",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "24"
+  },
+  {
+    "rackNumber": "6313",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "24"
+  },
+  {
+    "rackNumber": "6316",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "24"
+  },
+  {
+    "rackNumber": "6317",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "14"
+  },
+  {
+    "rackNumber": "6319",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "14"
+  },
+  {
+    "rackNumber": "6330",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "14"
+  },
+  {
+    "rackNumber": "6331",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "15"
+  },
+  {
+    "rackNumber": "6333",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "22"
+  },
+  {
+    "rackNumber": "6335",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "22"
+  },
+  {
+    "rackNumber": "6337",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "22"
+  },
+  {
+    "rackNumber": "6339",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "22"
+  },
+  {
+    "rackNumber": "6341",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "22"
+  },
+  {
+    "rackNumber": "6342",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "22"
+  },
+  {
+    "rackNumber": "6344",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "22"
+  },
+  {
+    "rackNumber": "6345",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "22"
+  },
+  {
+    "rackNumber": "6402",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "24"
+  },
+  {
+    "rackNumber": "6404",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "24"
+  },
+  {
+    "rackNumber": "6407",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "24"
+  },
+  {
+    "rackNumber": "6408",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "24"
+  },
+  {
+    "rackNumber": "6410",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "24"
+  },
+  {
+    "rackNumber": "6412",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "24"
+  },
+  {
+    "rackNumber": "6413",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "24"
+  },
+  {
+    "rackNumber": "6416",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "24"
+  },
+  {
+    "rackNumber": "6417",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "14"
+  },
+  {
+    "rackNumber": "6419",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "14"
+  },
+  {
+    "rackNumber": "6430",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "14"
+  },
+  {
+    "rackNumber": "6431",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "14"
+  },
+  {
+    "rackNumber": "6433",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "22"
+  },
+  {
+    "rackNumber": "6435",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "22"
+  },
+  {
+    "rackNumber": "6437",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "22"
+  },
+  {
+    "rackNumber": "6439",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "22"
+  },
+  {
+    "rackNumber": "6441",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "22"
+  },
+  {
+    "rackNumber": "6442",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "22"
+  },
+  {
+    "rackNumber": "6444",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "22"
+  },
+  {
+    "rackNumber": "6445",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "22"
+  },
+  {
+    "rackNumber": "6501",
+    "platformName": "net.ad_gfab6_t1_1.03",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "6502",
+    "platformName": "net.ad_gfab6_t1_1.03",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "6503",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "24"
+  },
+  {
+    "rackNumber": "6504",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "25"
+  },
+  {
+    "rackNumber": "6505",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "25"
+  },
+  {
+    "rackNumber": "6506",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "24"
+  },
+  {
+    "rackNumber": "6511",
+    "platformName": "net.ad_cfab_t0_1.04",
+    "blockName": "24"
+  },
+  {
+    "rackNumber": "6512",
+    "platformName": "net.ad_cfab_t0_1.04",
+    "blockName": "25"
+  },
+  {
+    "rackNumber": "6513",
+    "platformName": "net.ad_cfab_v2_t1_t2_5.01",
+    "blockName": "24"
+  },
+  {
+    "rackNumber": "6514",
+    "platformName": "net.ad_cfab_v2_t1_t2_5.01",
+    "blockName": "25"
+  },
+  {
+    "rackNumber": "6515",
+    "platformName": "net.ad_cfab_v2_t1_t2_5.01",
+    "blockName": "22"
+  },
+  {
+    "rackNumber": "6516",
+    "platformName": "net.ad_cfab_v2_t1_t2_5.01",
+    "blockName": "23"
+  },
+  {
+    "rackNumber": "6521",
+    "platformName": "net.ad_gfab6_t1_1.03",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "6522",
+    "platformName": "net.ad_cfab_t0_1.04",
+    "blockName": "14"
+  },
+  {
+    "rackNumber": "6523",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "14"
+  },
+  {
+    "rackNumber": "6524",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "14"
+  },
+  {
+    "rackNumber": "6525",
+    "platformName": "net.ad_cfab_t0_1.04",
+    "blockName": "23"
+  },
+  {
+    "rackNumber": "6526",
+    "platformName": "net.ad_cfab_t0_1.04",
+    "blockName": "22"
+  },
+  {
+    "rackNumber": "6539",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "22"
+  },
+  {
+    "rackNumber": "6540",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "23"
+  },
+  {
+    "rackNumber": "6541",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "23"
+  },
+  {
+    "rackNumber": "6542",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "22"
+  },
+  {
+    "rackNumber": "6543",
+    "platformName": "net.ad_gfab6_t1_1.03",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "6544",
+    "platformName": "net.ad_gfab6_t1_1.03",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "6601",
+    "platformName": "net.ad_gfab6_t1_1.03",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "6602",
+    "platformName": "net.ad_gfab6_t1_1.03",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "6603",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "24"
+  },
+  {
+    "rackNumber": "6604",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "25"
+  },
+  {
+    "rackNumber": "6605",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "25"
+  },
+  {
+    "rackNumber": "6606",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "24"
+  },
+  {
+    "rackNumber": "6611",
+    "platformName": "net.ad_cfab_t0_1.04",
+    "blockName": "24"
+  },
+  {
+    "rackNumber": "6612",
+    "platformName": "net.ad_cfab_t0_1.04",
+    "blockName": "25"
+  },
+  {
+    "rackNumber": "6613",
+    "platformName": "net.ad_cfab_v2_t1_t2_6.01",
+    "blockName": "24"
+  },
+  {
+    "rackNumber": "6614",
+    "platformName": "net.ad_cfab_v2_t1_t2_6.01",
+    "blockName": "25"
+  },
+  {
+    "rackNumber": "6615",
+    "platformName": "net.ad_cfab_v2_t1_t2_6.01",
+    "blockName": "22"
+  },
+  {
+    "rackNumber": "6616",
+    "platformName": "net.ad_cfab_v2_t1_t2_6.01",
+    "blockName": "23"
+  },
+  {
+    "rackNumber": "6621",
+    "platformName": "net.ad_gfab6_t1_1.03",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "6622",
+    "platformName": "net.ad_cfab_t0_1.04",
+    "blockName": "14"
+  },
+  {
+    "rackNumber": "6623",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "14"
+  },
+  {
+    "rackNumber": "6624",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "14"
+  },
+  {
+    "rackNumber": "6625",
+    "platformName": "net.ad_cfab_t0_1.04",
+    "blockName": "23"
+  },
+  {
+    "rackNumber": "6626",
+    "platformName": "net.ad_cfab_t0_1.04",
+    "blockName": "22"
+  },
+  {
+    "rackNumber": "6631",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "22"
+  },
+  {
+    "rackNumber": "6632",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "23"
+  },
+  {
+    "rackNumber": "6633",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "23"
+  },
+  {
+    "rackNumber": "6634",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "22"
+  },
+  {
+    "rackNumber": "6635",
+    "platformName": "net.ad_gfab6_t1_1.03",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "6636",
+    "platformName": "net.ad_gfab6_t1_1.03",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "6702",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "25"
+  },
+  {
+    "rackNumber": "6704",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "25"
+  },
+  {
+    "rackNumber": "6706",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "25"
+  },
+  {
+    "rackNumber": "6708",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "25"
+  },
+  {
+    "rackNumber": "6710",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "25"
+  },
+  {
+    "rackNumber": "6712",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "25"
+  },
+  {
+    "rackNumber": "6713",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "25"
+  },
+  {
+    "rackNumber": "6716",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "25"
+  },
+  {
+    "rackNumber": "6717",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "14"
+  },
+  {
+    "rackNumber": "6719",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "29"
+  },
+  {
+    "rackNumber": "6730",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "14"
+  },
+  {
+    "rackNumber": "6731",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "14"
+  },
+  {
+    "rackNumber": "6733",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "23"
+  },
+  {
+    "rackNumber": "6735",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "23"
+  },
+  {
+    "rackNumber": "6737",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "23"
+  },
+  {
+    "rackNumber": "6739",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "23"
+  },
+  {
+    "rackNumber": "6741",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "23"
+  },
+  {
+    "rackNumber": "6742",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "23"
+  },
+  {
+    "rackNumber": "6744",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "23"
+  },
+  {
+    "rackNumber": "6745",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "23"
+  },
+  {
+    "rackNumber": "6802",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "25"
+  },
+  {
+    "rackNumber": "6804",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "25"
+  },
+  {
+    "rackNumber": "6806",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "25"
+  },
+  {
+    "rackNumber": "6808",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "25"
+  },
+  {
+    "rackNumber": "6810",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "25"
+  },
+  {
+    "rackNumber": "6812",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "25"
+  },
+  {
+    "rackNumber": "6813",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "25"
+  },
+  {
+    "rackNumber": "6816",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "25"
+  },
+  {
+    "rackNumber": "6817",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "14"
+  },
+  {
+    "rackNumber": "6819",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "29"
+  },
+  {
+    "rackNumber": "6830",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "14"
+  },
+  {
+    "rackNumber": "6831",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "15"
+  },
+  {
+    "rackNumber": "6833",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "23"
+  },
+  {
+    "rackNumber": "6835",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "23"
+  },
+  {
+    "rackNumber": "6837",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "23"
+  },
+  {
+    "rackNumber": "6839",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "23"
+  },
+  {
+    "rackNumber": "6841",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "23"
+  },
+  {
+    "rackNumber": "6842",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "23"
+  },
+  {
+    "rackNumber": "6844",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "23"
+  },
+  {
+    "rackNumber": "6845",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "23"
+  },
+  { "rackNumber": "6901", "blockName": "0" },
+  { "rackNumber": "6902", "blockName": "0" },
+  { "rackNumber": "6903", "blockName": "0" },
+  { "rackNumber": "6904", "blockName": "0" },
+  { "rackNumber": "6905", "blockName": "0" },
+  { "rackNumber": "6906", "blockName": "0" },
+  { "rackNumber": "6907", "blockName": "0" },
+  {
+    "rackNumber": "6908",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "6909",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "6910",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "6911",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "6912",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "6913",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "6914",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  { "rackNumber": "6915", "blockName": "0" },
+  { "rackNumber": "6916", "blockName": "0" },
+  { "rackNumber": "6917", "blockName": "0" },
+  { "rackNumber": "6918", "blockName": "0" },
+  { "rackNumber": "6919", "blockName": "0" },
+  { "rackNumber": "6920", "blockName": "0" },
+  { "rackNumber": "6921", "blockName": "0" },
+  { "rackNumber": "6928", "blockName": "7" },
+  { "rackNumber": "6929", "blockName": "7" },
+  { "rackNumber": "6930", "blockName": "7" },
+  { "rackNumber": "6931", "blockName": "7" },
+  { "rackNumber": "6932", "blockName": "0" },
+  { "rackNumber": "6933", "blockName": "0" },
+  {
+    "rackNumber": "6934",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "6935",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "6936",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "6937",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "6938",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "6939",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "6940",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "6941",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "6942",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  { "rackNumber": "6943", "blockName": "0" },
+  { "rackNumber": "6944", "blockName": "0" },
+  { "rackNumber": "6945", "blockName": "0" },
+  { "rackNumber": "6946", "blockName": "0" },
+  { "rackNumber": "6947", "blockName": "0" },
+  { "rackNumber": "7001", "blockName": "0" },
+  { "rackNumber": "7002", "blockName": "0" },
+  { "rackNumber": "7003", "blockName": "0" },
+  { "rackNumber": "7004", "blockName": "0" },
+  { "rackNumber": "7005", "blockName": "0" },
+  { "rackNumber": "7006", "blockName": "0" },
+  { "rackNumber": "7007", "blockName": "0" },
+  {
+    "rackNumber": "7008",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "7009",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "7010",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "7011",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "7012",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "7013",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "7014",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  { "rackNumber": "7015", "blockName": "0" },
+  { "rackNumber": "7016", "blockName": "0" },
+  { "rackNumber": "7017", "blockName": "0" },
+  { "rackNumber": "7018", "blockName": "0" },
+  { "rackNumber": "7019", "blockName": "0" },
+  { "rackNumber": "7020", "blockName": "0" },
+  { "rackNumber": "7021", "blockName": "0" },
+  { "rackNumber": "7028", "blockName": "7" },
+  { "rackNumber": "7029", "blockName": "7" },
+  { "rackNumber": "7030", "blockName": "7" },
+  { "rackNumber": "7031", "blockName": "7" },
+  { "rackNumber": "7032", "blockName": "0" },
+  { "rackNumber": "7033", "blockName": "0" },
+  {
+    "rackNumber": "7034",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "7035",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "7036",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "7037",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "7038",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "7039",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "7040",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "7041",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "7042",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "0"
+  },
+  { "rackNumber": "7043", "blockName": "0" },
+  { "rackNumber": "7044", "blockName": "0" },
+  { "rackNumber": "7045", "blockName": "0" },
+  { "rackNumber": "7046", "blockName": "0" },
+  { "rackNumber": "7047", "blockName": "0" },
+  { "rackNumber": "7601", "blockName": "0" },
+  { "rackNumber": "7602", "blockName": "0" },
+  { "rackNumber": "7603", "blockName": "0" },
+  { "rackNumber": "7604", "blockName": "0" },
+  { "rackNumber": "7605", "blockName": "0" },
+  {
+    "rackNumber": "7606",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "31"
+  },
+  {
+    "rackNumber": "7607",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "31"
+  },
+  {
+    "rackNumber": "7608",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "31"
+  },
+  {
+    "rackNumber": "7609",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "31"
+  },
+  {
+    "rackNumber": "7610",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "31"
+  },
+  {
+    "rackNumber": "7611",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "31"
+  },
+  {
+    "rackNumber": "7612",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "31"
+  },
+  {
+    "rackNumber": "7613",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "31"
+  },
+  {
+    "rackNumber": "7614",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "31"
+  },
+  {
+    "rackNumber": "7615",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "31"
+  },
+  { "rackNumber": "7616", "blockName": "0" },
+  { "rackNumber": "7617", "blockName": "0" },
+  { "rackNumber": "7618", "blockName": "0" },
+  { "rackNumber": "7619", "blockName": "0" },
+  { "rackNumber": "7620", "blockName": "0" },
+  { "rackNumber": "7621", "blockName": "0" },
+  { "rackNumber": "7627", "blockName": "0" },
+  { "rackNumber": "7628", "blockName": "0" },
+  { "rackNumber": "7629", "blockName": "0" },
+  { "rackNumber": "7630", "blockName": "0" },
+  { "rackNumber": "7631", "blockName": "0" },
+  { "rackNumber": "7632", "blockName": "0" },
+  {
+    "rackNumber": "7633",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "31"
+  },
+  {
+    "rackNumber": "7634",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "31"
+  },
+  {
+    "rackNumber": "7635",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "31"
+  },
+  {
+    "rackNumber": "7636",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "31"
+  },
+  {
+    "rackNumber": "7637",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "31"
+  },
+  {
+    "rackNumber": "7638",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "31"
+  },
+  {
+    "rackNumber": "7639",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "31"
+  },
+  {
+    "rackNumber": "7640",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "31"
+  },
+  {
+    "rackNumber": "7641",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "31"
+  },
+  { "rackNumber": "7642", "blockName": "0" },
+  { "rackNumber": "7643", "blockName": "0" },
+  { "rackNumber": "7644", "blockName": "0" },
+  { "rackNumber": "7645", "blockName": "0" },
+  { "rackNumber": "7646", "blockName": "0" },
+  { "rackNumber": "7647", "blockName": "0" },
+  { "rackNumber": "7701", "blockName": "0" },
+  { "rackNumber": "7702", "blockName": "0" },
+  { "rackNumber": "7703", "blockName": "0" },
+  { "rackNumber": "7704", "blockName": "0" },
+  { "rackNumber": "7705", "blockName": "0" },
+  {
+    "rackNumber": "7706",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "31"
+  },
+  {
+    "rackNumber": "7707",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "31"
+  },
+  {
+    "rackNumber": "7708",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "31"
+  },
+  {
+    "rackNumber": "7709",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "31"
+  },
+  {
+    "rackNumber": "7710",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "31"
+  },
+  {
+    "rackNumber": "7711",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "31"
+  },
+  {
+    "rackNumber": "7712",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "31"
+  },
+  {
+    "rackNumber": "7713",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "31"
+  },
+  {
+    "rackNumber": "7714",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "31"
+  },
+  {
+    "rackNumber": "7715",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "31"
+  },
+  { "rackNumber": "7716", "blockName": "0" },
+  { "rackNumber": "7717", "blockName": "0" },
+  { "rackNumber": "7718", "blockName": "0" },
+  { "rackNumber": "7719", "blockName": "0" },
+  { "rackNumber": "7720", "blockName": "0" },
+  { "rackNumber": "7721", "blockName": "0" },
+  { "rackNumber": "7727", "blockName": "0" },
+  { "rackNumber": "7728", "blockName": "0" },
+  { "rackNumber": "7729", "blockName": "0" },
+  { "rackNumber": "7730", "blockName": "0" },
+  { "rackNumber": "7731", "blockName": "0" },
+  { "rackNumber": "7732", "blockName": "0" },
+  {
+    "rackNumber": "7733",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "31"
+  },
+  {
+    "rackNumber": "7734",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "31"
+  },
+  {
+    "rackNumber": "7735",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "31"
+  },
+  {
+    "rackNumber": "7736",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "31"
+  },
+  {
+    "rackNumber": "7737",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "31"
+  },
+  {
+    "rackNumber": "7738",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "31"
+  },
+  {
+    "rackNumber": "7739",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "31"
+  },
+  {
+    "rackNumber": "7740",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "31"
+  },
+  {
+    "rackNumber": "7741",
+    "platformName": "COM_NVMELM_E5-2C_23200_R.01",
+    "blockName": "31"
+  },
+  {
+    "rackNumber": "7742",
+    "platformName": "SERVERRESERVED16KW.01",
+    "blockName": "31"
+  },
+  { "rackNumber": "7743", "blockName": "0" },
+  { "rackNumber": "7744", "blockName": "0" },
+  { "rackNumber": "7745", "blockName": "0" },
+  { "rackNumber": "7746", "blockName": "0" },
+  { "rackNumber": "7747", "blockName": "0" },
+  {
+    "rackNumber": "7802",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "28"
+  },
+  {
+    "rackNumber": "7804",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "28"
+  },
+  {
+    "rackNumber": "7806",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "28"
+  },
+  {
+    "rackNumber": "7808",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "28"
+  },
+  {
+    "rackNumber": "7810",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "28"
+  },
+  {
+    "rackNumber": "7812",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "28"
+  },
+  {
+    "rackNumber": "7813",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "28"
+  },
+  {
+    "rackNumber": "7816",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "28"
+  },
+  {
+    "rackNumber": "7817",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "29"
+  },
+  {
+    "rackNumber": "7819",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "29"
+  },
+  {
+    "rackNumber": "7830",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "29"
+  },
+  {
+    "rackNumber": "7831",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "15"
+  },
+  {
+    "rackNumber": "7833",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "26"
+  },
+  {
+    "rackNumber": "7835",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "26"
+  },
+  {
+    "rackNumber": "7837",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "26"
+  },
+  {
+    "rackNumber": "7839",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "26"
+  },
+  {
+    "rackNumber": "7841",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "26"
+  },
+  {
+    "rackNumber": "7842",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "26"
+  },
+  {
+    "rackNumber": "7844",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "26"
+  },
+  {
+    "rackNumber": "7845",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "26"
+  },
+  {
+    "rackNumber": "7902",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "28"
+  },
+  {
+    "rackNumber": "7904",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "28"
+  },
+  {
+    "rackNumber": "7906",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "28"
+  },
+  {
+    "rackNumber": "7908",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "28"
+  },
+  {
+    "rackNumber": "7910",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "28"
+  },
+  {
+    "rackNumber": "7912",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "28"
+  },
+  {
+    "rackNumber": "7913",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "28"
+  },
+  {
+    "rackNumber": "7916",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "28"
+  },
+  {
+    "rackNumber": "7917",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "29"
+  },
+  {
+    "rackNumber": "7919",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "29"
+  },
+  {
+    "rackNumber": "7930",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "29"
+  },
+  {
+    "rackNumber": "7931",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "29"
+  },
+  {
+    "rackNumber": "7933",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "26"
+  },
+  {
+    "rackNumber": "7935",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "26"
+  },
+  {
+    "rackNumber": "7937",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "26"
+  },
+  {
+    "rackNumber": "7939",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "26"
+  },
+  {
+    "rackNumber": "7941",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "26"
+  },
+  {
+    "rackNumber": "7942",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "26"
+  },
+  {
+    "rackNumber": "7944",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "26"
+  },
+  {
+    "rackNumber": "7945",
+    "platformName": "GPU_GB300_NVL72_R.03",
+    "blockName": "26"
+  },
+  {
+    "rackNumber": "8001",
+    "platformName": "net.ad_ifabv1_t0_1.05",
+    "blockName": "34"
+  },
+  {
+    "rackNumber": "8002",
+    "platformName": "net.ad_ifabv1_t0_1.05",
+    "blockName": "34"
+  },
+  {
+    "rackNumber": "8003",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "28"
+  },
+  {
+    "rackNumber": "8004",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "15"
+  },
+  {
+    "rackNumber": "8005",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "15"
+  },
+  {
+    "rackNumber": "8006",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "28"
+  },
+  {
+    "rackNumber": "8011",
+    "platformName": "net.ad_cfab_t0_1.04",
+    "blockName": "28"
+  },
+  {
+    "rackNumber": "8012",
+    "platformName": "net.ad_cfab_t0_1.04",
+    "blockName": "29"
+  },
+  {
+    "rackNumber": "8013",
+    "platformName": "net.ad_cfab_v2_t1_t2_5.01",
+    "blockName": "28"
+  },
+  {
+    "rackNumber": "8014",
+    "platformName": "net.ad_cfab_v2_t1_t2_5.01",
+    "blockName": "29"
+  },
+  {
+    "rackNumber": "8015",
+    "platformName": "net.ad_cfab_v2_t1_t2_1.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "8016",
+    "platformName": "net.ad_cfab_v2_t1_t2_1.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "8021",
+    "platformName": "net.ad_cfab_v2_t1_t2_1.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "8022",
+    "platformName": "net.ad_cfab_v2_t1_t2_1.01",
+    "blockName": "0"
+  },
+  { "rackNumber": "8023", "blockName": "27" },
+  { "rackNumber": "8024", "blockName": "26" },
+  {
+    "rackNumber": "8025",
+    "platformName": "net.ad_cfab_t0_1.04",
+    "blockName": "27"
+  },
+  {
+    "rackNumber": "8026",
+    "platformName": "net.ad_cfab_t0_1.04",
+    "blockName": "26"
+  },
+  {
+    "rackNumber": "8031",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "26"
+  },
+  {
+    "rackNumber": "8032",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "27"
+  },
+  {
+    "rackNumber": "8033",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "27"
+  },
+  {
+    "rackNumber": "8034",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "26"
+  },
+  {
+    "rackNumber": "8035",
+    "platformName": "net.ad_gfab6_t1_1.03",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "8036",
+    "platformName": "net.ad_gfab6_t1_1.03",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "8101",
+    "platformName": "net.ad_ifabv1_t0_1.05",
+    "blockName": "34"
+  },
+  {
+    "rackNumber": "8102",
+    "platformName": "net.ad_ifabv1_t0_1.05",
+    "blockName": "34"
+  },
+  {
+    "rackNumber": "8103",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "28"
+  },
+  {
+    "rackNumber": "8104",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "15"
+  },
+  {
+    "rackNumber": "8105",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "15"
+  },
+  {
+    "rackNumber": "8106",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "28"
+  },
+  {
+    "rackNumber": "8111",
+    "platformName": "net.ad_cfab_t0_1.04",
+    "blockName": "28"
+  },
+  {
+    "rackNumber": "8112",
+    "platformName": "net.ad_cfab_t0_1.04",
+    "blockName": "29"
+  },
+  {
+    "rackNumber": "8113",
+    "platformName": "net.ad_cfab_v2_t1_t2_6.01",
+    "blockName": "28"
+  },
+  {
+    "rackNumber": "8114",
+    "platformName": "net.ad_cfab_v2_t1_t2_6.01",
+    "blockName": "29"
+  },
+  {
+    "rackNumber": "8115",
+    "platformName": "net.ad_cfab_v2_t1_t2_2.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "8116",
+    "platformName": "net.ad_cfab_v2_t1_t2_2.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "8121",
+    "platformName": "net.ad_cfab_v2_t1_t2_2.01",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "8122",
+    "platformName": "net.ad_cfab_v2_t1_t2_2.01",
+    "blockName": "0"
+  },
+  { "rackNumber": "8123", "blockName": "27" },
+  { "rackNumber": "8124", "blockName": "26" },
+  {
+    "rackNumber": "8125",
+    "platformName": "net.ad_cfab_t0_1.04",
+    "blockName": "27"
+  },
+  {
+    "rackNumber": "8126",
+    "platformName": "net.ad_cfab_t0_1.04",
+    "blockName": "26"
+  },
+  {
+    "rackNumber": "8131",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "26"
+  },
+  {
+    "rackNumber": "8132",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "27"
+  },
+  {
+    "rackNumber": "8133",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "27"
+  },
+  {
+    "rackNumber": "8134",
+    "platformName": "net.ad_spc4_planar_qfab_t0_1.01",
+    "blockName": "26"
+  },
+  {
+    "rackNumber": "8135",
+    "platformName": "net.ad_gfab6_t1_1.03",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "8136",
+    "platformName": "net.ad_gfab6_t1_1.03",
+    "blockName": "0"
+  },
+  {
+    "rackNumber": "8202",
+    "platformName": "GPU_GB200_NVL36_R.01",
+    "blockName": "34"
+  },
+  {
+    "rackNumber": "8204",
+    "platformName": "GPU_GB200_NVL36_R.01",
+    "blockName": "34"
+  },
+  {
+    "rackNumber": "8206",
+    "platformName": "GPU_GB200_NVL36_R.01",
+    "blockName": "34"
+  },
+  {
+    "rackNumber": "8208",
+    "platformName": "GPU_GB200_NVL36_R.01",
+    "blockName": "34"
+  }
+]
