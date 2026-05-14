@@ -570,6 +570,7 @@ function getValidationTableContainerHeight(
 ): number {
   const headerHeightPx = 58;
   const maxExpandedTableHeightPx = 720;
+  const hostTransceiverRowHeightPx = 52;
   const rowCount = sectionRows.length;
   if (rowCount === 0) {
     return headerHeightPx;
@@ -590,7 +591,7 @@ function getValidationTableContainerHeight(
   }
 
   if (isHostTransceiverDisplaySection(sectionTitle)) {
-    return Math.min(maxExpandedTableHeightPx, headerHeightPx + rowCount * 84);
+    return Math.min(maxExpandedTableHeightPx, headerHeightPx + rowCount * hostTransceiverRowHeightPx);
   }
 
   return Math.min(maxExpandedTableHeightPx, headerHeightPx + rowCount * 96);
@@ -2120,7 +2121,7 @@ const DeviceAccordion = (props: Props) => {
     const hostReadinessByDevice = new Map<string, HostTransceiverReadiness>(
       props.devices.map((device) => [
         device.deviceName,
-        { status: device.hostReadinessStatus, instanceId: device.hostInstanceId },
+        { computePool: device.hostComputePool },
       ])
     );
     const linkFailures = values.reduce((sum, item) => sum + countT0ToHostRows(item), 0);
@@ -2487,8 +2488,7 @@ const DeviceAccordion = (props: Props) => {
                       ? applyStableHostTransceiverTimestamps(
                           device.deviceName,
                           buildValidationSectionGroups(visibleSections, {
-                            status: device.hostReadinessStatus,
-                            instanceId: device.hostInstanceId,
+                            computePool: device.hostComputePool,
                           }),
                           stableHostTransceiverTimestampRef.current,
                           validationReferenceTimeMs
@@ -2585,8 +2585,7 @@ const DeviceAccordion = (props: Props) => {
 
                             <span className="device-col errors">
                               {renderErrorCount(deviceFailures, {
-                                status: device.hostReadinessStatus,
-                                instanceId: device.hostInstanceId,
+                                computePool: device.hostComputePool,
                               })}
                             </span>
 

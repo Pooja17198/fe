@@ -401,8 +401,7 @@ function getHostTransceiverReadinessByDevice(payload: unknown): Map<string, Host
 
     getHostReadinessItems(payload).forEach((item) => {
         const readiness = {
-            status: String(item["status"] ?? "").trim(),
-            instanceId: item["instanceId"] == null ? null : String(item["instanceId"]),
+            computePool: item["computePool"] == null ? null : String(item["computePool"]),
         };
         [
             item["hostName"],

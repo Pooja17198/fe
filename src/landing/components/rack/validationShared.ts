@@ -28,8 +28,7 @@ export type RackValidationSummary = {
 };
 
 export type HostTransceiverReadiness = {
-  status?: string;
-  instanceId?: string | null;
+  computePool?: string | null;
 };
 
 export const NOT_VALIDATED_SUMMARY: RackValidationSummary = {
@@ -46,13 +45,7 @@ export const NOT_VALIDATED_SUMMARY: RackValidationSummary = {
   deviceFailures: 0,
 };
 
-const HOST_TRANSCEIVER_ALLOWED_STATES = new Set([
-  "CPV-EMPTY",
-  "CPV-INIT",
-  "LVV",
-  "CPV-TESTING",
-  "CPV-REPAIR",
-]);
+const HOST_TRANSCEIVER_BROKEN_COMPUTE_POOL = "broken_pool";
 const LAST_VALIDATED_SECTION_TITLE = "Last Validated";
 const POWER_SECTION_TITLE = "Power Errors";
 const DEVICE_REACHABILITY_SECTION_TITLE = "Device Reachability";
@@ -76,14 +69,8 @@ export function normalizeDeviceName(deviceName: string | null | undefined): stri
   return String(deviceName || "").trim().toLowerCase();
 }
 
-export function hasAttachedInstance(instanceId?: string | null): boolean {
-  const normalized = String(instanceId || "").trim();
-  return normalized !== "" && normalized !== "-";
-}
-
 export function shouldShowHostTransceiverSection(readiness?: HostTransceiverReadiness): boolean {
-  return HOST_TRANSCEIVER_ALLOWED_STATES.has(String(readiness?.status || "").trim().toUpperCase()) &&
-    hasAttachedInstance(readiness?.instanceId);
+  return String(readiness?.computePool || "").trim().toLowerCase() === HOST_TRANSCEIVER_BROKEN_COMPUTE_POOL;
 }
 
 export function pick(
