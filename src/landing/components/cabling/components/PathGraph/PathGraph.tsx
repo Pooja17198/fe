@@ -22,12 +22,26 @@ const IMAGE_BORDER_SPACE = 100;
 const PAN_DISTANCE = 50;
 const RACK_HOVER_SCALE = 2;
 const RACK_HOVER_TEXT_OFFSET_X = 15;
+const OHR_RACK_FILL = "red";
+const OHR_RACK_STROKE = "darkred";
+
+const isOhrRack = (rack: Partial<RoomObject> | null | undefined) =>
+  String(rack?.type || "").toLowerCase().includes("ohr");
+
+const isRackObject = (item: Partial<RoomObject> | null | undefined) => {
+  const type = String(item?.type || "");
+  return type.endsWith("Rack") || isOhrRack(item);
+};
+
+const getRackId = (rack: Partial<RoomObject> | null | undefined) =>
+  rack?.label || rack?.id || "";
 
 interface PathGraphProps {
   room: RoomLayout;
   racksWithPhysicalCutsheet: string[];
   onRackClick: (rackId: string, hasCutsheet: boolean) => void;
   hoverRackId: string | null;
+  showOhrRacks?: boolean;
   // highlights: HighlightsInfo;
 }
 
@@ -36,6 +50,7 @@ export const PathGraph = ({
   racksWithPhysicalCutsheet,
   onRackClick,
   hoverRackId,
+  showOhrRacks = false,
 }: PathGraphProps) => {
   const [graphProp, setGraphProp] = useState<GraphProp>();
   const generateLine = d3
@@ -69,7 +84,7 @@ export const PathGraph = ({
 
     if (scaleFactor === 1) {
       return screenPoints.map((pt) => `${pt.x},${pt.y}`).join(" ");
-  }
+    }
 
     const centerX =
       screenPoints.reduce((sum, pt) => sum + pt.x, 0) / screenPoints.length;
@@ -84,6 +99,28 @@ export const PathGraph = ({
       })
       .join(" ");
   };
+  const rackHasCutsheet = (rack: Partial<RoomObject> | null | undefined) =>
+    racksWithPhysicalCutsheet.includes(getRackId(rack));
+
+  const getRackStroke = (rack: Partial<RoomObject> | null | undefined) => {
+    if (isOhrRack(rack)) {
+      return OHR_RACK_STROKE;
+    }
+
+    return rackHasCutsheet(rack) ? "darkgreen" : "darkgrey";
+  };
+
+  const getRackFill = (rack: Partial<RoomObject> | null | undefined) => {
+    if (isOhrRack(rack)) {
+      return OHR_RACK_FILL;
+    }
+
+    return rackHasCutsheet(rack) ? "green" : "lightblue";
+  };
+
+  const getRackOpacity = (rack: Partial<RoomObject> | null | undefined) =>
+    rackHasCutsheet(rack) ? "0.9" : "0.8";
+
   const getRackBounds = (coordinates: [number, number][]) => {
     if (!graphProp || !coordinates?.length) return null;
 
@@ -130,18 +167,26 @@ export const PathGraph = ({
     svgElement.call(zoom.transform as any, d3.zoomIdentity.translate(50, 0));
 
     const racks: RoomObject[] = [];
+    const ohrRacks: RoomObject[] = [];
     const basketTrays: RoomObject[] = [];
     room?.layout?.room?.objects.forEach((item: any, index: number) => {
-      if (item.type.startsWith("BasketTray")) {
+      if (String(item?.type || "").startsWith("BasketTray")) {
         basketTrays.push({
           ...item,
           id: index + "",
         });
-      } else if (item.type.endsWith("Rack")) {
-        racks.push(item);
+      } else if (isRackObject(item)) {
+        if (isOhrRack(item)) {
+          ohrRacks.push(item);
+        } else {
+          racks.push(item);
+        }
       }
     });
-    if (!racks.length) {
+
+    const rackBoundsObjects = showOhrRacks ? [...racks, ...ohrRacks] : racks;
+
+    if (!rackBoundsObjects.length) {
       setGraphProp(undefined);
       return;
     }
@@ -150,7 +195,7 @@ export const PathGraph = ({
     let minY = Infinity;
     let maxY = -Infinity;
 
-    racks.forEach((rack) => {
+    rackBoundsObjects.forEach((rack) => {
       minX = Math.min(minX, rack.coordinates[0][0], rack.coordinates[1][0]);
       maxX = Math.max(maxX, rack.coordinates[0][0], rack.coordinates[1][0]);
       minY = Math.min(minY, rack.coordinates[0][1], rack.coordinates[1][1]);
@@ -180,9 +225,10 @@ export const PathGraph = ({
       imageWidth: IMAGE_WIDTH,
       imageHeight: IMAGE_HEIGHT,
       racks,
+      ohrRacks,
       basketTrays,
     });
-  }, [room]);
+  }, [room, showOhrRacks]);
 
   const renderRackInfo = (node: any) => {
     const graphLayer = getGraphLayer();
@@ -269,6 +315,13 @@ export const PathGraph = ({
     });
   };
 
+  const raiseOhrRacks = () => {
+    const graphLayer = getGraphLayer();
+    if (graphLayer.empty()) return;
+
+    graphLayer.selectAll("g.node-group-ohr-rack").raise();
+  };
+
   // inital node rendering
   useEffect(() => {
     const graphLayer = getGraphLayer();
@@ -276,24 +329,32 @@ export const PathGraph = ({
     graphLayer.selectAll("*").remove();
     if (!graphProp) return;
 
+    const visibleRacks = showOhrRacks
+      ? [...(graphProp?.racks || []), ...(graphProp?.ohrRacks || [])]
+      : graphProp?.racks || [];
+
     // rack node group handles the mouse over/out event
     graphLayer
       .selectAll("g.node-group-rack")
-      .data(graphProp?.racks || [])
+      .data(visibleRacks)
       .enter()
       .append("g")
-      .attr("key", (d) => d.label || d.id || "")
-      .attr("class", "node-group node-group-rack")
-      .attr("id", (d) => "node-group-rack-" + d.label || d.id || "");
+      .attr("key", (d) => getRackId(d))
+      .attr("class", (d) =>
+        isOhrRack(d)
+          ? "node-group node-group-rack node-group-ohr-rack"
+          : "node-group node-group-rack",
+      )
+      .attr("id", (d) => "node-group-rack-" + getRackId(d));
 
     graphLayer
       .selectAll("g.basket-tray-group")
       .data(graphProp?.basketTrays || [])
       .enter()
       .append("g")
-      .attr("key", (d) => d.label || d.id || "")
+      .attr("key", (d) => getRackId(d))
       .attr("class", "basket-tray-group")
-      .attr("id", (d) => "basket-tray-" + d.id || d.label || "");
+      .attr("id", (d) => "basket-tray-" + (d.id || d.label || ""));
 
     graphLayer
       .selectAll("g.node-group")
@@ -301,28 +362,10 @@ export const PathGraph = ({
       .attr("class", "rack-node-rect")
       .attr("id", (d: any) => d.id)
       .attr("points", (d: any) => getRackPolygonPoints(d.coordinates || []))
-      .attr("stroke", (d: any) => {
-        const rackId = d.label || d.id || "";
-        if (racksWithPhysicalCutsheet.includes(rackId)) {
-          return "darkgreen";
-        }
-        return "darkgrey";
-      })
-      .attr("fill", (d: any) => {
-        const rackId = d.label || d.id || "";
-        if (racksWithPhysicalCutsheet.includes(rackId)) {
-          return "green";
-        }
-        return "lightblue";
-      })
+      .attr("stroke", (d: any) => getRackStroke(d))
+      .attr("fill", (d: any) => getRackFill(d))
       .attr("stroke-width", "0.6")
-      .attr("opacity", (d: any) => {
-        const rackId = d.label || d.id || "";
-        if (racksWithPhysicalCutsheet.includes(rackId)) {
-          return "0.9";
-        }
-        return "0.8";
-      })
+      .attr("opacity", (d: any) => getRackOpacity(d))
       .on("mouseover", function (d) {
         d3.select(this)
           .transition()
@@ -371,14 +414,15 @@ export const PathGraph = ({
           .attr("fill", "green")
           .attr("opacity", "0.9")
           .on("click", function (_event, d: any) {
-            const rackId = d.label || d.id || "";
-            const hasCutsheet = racksWithPhysicalCutsheet.includes(rackId);
+            const rackId = getRackId(d);
+            const hasCutsheet = rackHasCutsheet(d);
             onRackClick(rackId, hasCutsheet);
           });
       });
       raiseCutsheetRacks();
     }
-  }, [graphProp]);
+    raiseOhrRacks();
+  }, [graphProp, showOhrRacks]);
 
   useEffect(() => {
     const graphLayer = getGraphLayer();
@@ -386,29 +430,20 @@ export const PathGraph = ({
 
     graphLayer
       .selectAll("g.node-group polygon")
-      .attr("stroke", (d: any) => {
-        const rackId = d.label || d.id || "";
-        if (racksWithPhysicalCutsheet.includes(rackId)) {
-          return "darkgreen";
-        }
-        return "darkgrey";
-      })
-      .attr("fill", (d: any) => {
-        const rackId = d.label || d.id || "";
-        if (racksWithPhysicalCutsheet.includes(rackId)) {
-          return "green";
-        }
-        return "lightblue";
-      })
-      .attr("opacity", "0.9")
+      .attr("stroke", (d: any) => getRackStroke(d))
+      .attr("fill", (d: any) => getRackFill(d))
+      .attr("opacity", (d: any) => getRackOpacity(d))
       .on("click", function (_event, d: any) {
-        const rackId = d.label || d.id || "";
-        const hasCutsheet = racksWithPhysicalCutsheet.includes(rackId);
+        if (isOhrRack(d)) return;
+
+        const rackId = getRackId(d);
+        const hasCutsheet = rackHasCutsheet(d);
         onRackClick(rackId, hasCutsheet);
       });
 
     raiseCutsheetRacks();
-  }, [racksWithPhysicalCutsheet]);
+    raiseOhrRacks();
+  }, [racksWithPhysicalCutsheet, showOhrRacks]);
 
   // respond to hoverRackId from PhysicalCutsheetPanel
   const prevHoverRef = useRef<string | null>(null);

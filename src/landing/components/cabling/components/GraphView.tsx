@@ -38,6 +38,9 @@ import { PhysicalCutsheetPanel } from "./PhysicalCutsheetPanel";
 //   : false; // toggle this to switch between mock and real API data
 export const UseMockData = false;
 
+const isOhrRackObject = (item: any) =>
+  String(item?.type || "").toLowerCase().includes("ohr");
+
 export const GraphView = () => {
   const [selectedRoom, setSelectedRoom] = useState<DataCenterRoom | null>(null);
   const [materialPanelOpen, setMaterialPanelOpen] = useState<boolean>(false);
@@ -50,6 +53,7 @@ export const GraphView = () => {
     string | null
   >(null);
   const [hoverRackId, setHoverRackId] = useState<string | null>(null);
+  const [showOhrRacks, setShowOhrRacks] = useState<boolean>(false);
 
   const [selectedRackToRack, setSelectedRackToRack] = useState<{
     sourceRack: string;
@@ -191,6 +195,19 @@ export const GraphView = () => {
           ? []
           : materials?.items;
 
+  const hasOhrRacks = useMemo(() => {
+    const objects = roomLayout?.layout?.room?.objects || [];
+    return objects.some(isOhrRackObject);
+  }, [roomLayout]);
+
+  const shouldShowOhrRacks = hasOhrRacks && showOhrRacks;
+
+  useEffect(() => {
+    if (!hasOhrRacks && showOhrRacks) {
+      setShowOhrRacks(false);
+    }
+  }, [hasOhrRacks, showOhrRacks]);
+
   useEffect(() => {
     const roomName = selectedRoom?.roomName || null;
 
@@ -211,6 +228,7 @@ export const GraphView = () => {
       setFilteredGpuRacks(null);
       setMaterialPanelOpen(false);
       setPhysicalCutsheetsPanelOpen(false);
+      setShowOhrRacks(false);
     }
   }, [selectedRoom?.roomName, activeTab]);
 
@@ -291,6 +309,7 @@ export const GraphView = () => {
     setFilteredGpuRacks(null);
     setMaterialPanelOpen(false);
     setPhysicalCutsheetsPanelOpen(false);
+    setShowOhrRacks(false);
   };
 
   return (
@@ -389,6 +408,7 @@ export const GraphView = () => {
                   setPhysicalCutsheetsPanelOpen(true);
                 }}
                 hoverRackId={hoverRackId}
+                showOhrRacks={shouldShowOhrRacks}
               />
             )}
             {/* <PathGraph room={roomLayout} highlights={highlights} /> */}
@@ -407,6 +427,16 @@ export const GraphView = () => {
                     {selectedRackToRack?.showRackToRackImageView
                       ? "Show Layout View"
                       : "Show Path Image View"}
+                  </oj-button>
+                )}
+                {hasOhrRacks && (
+                  <oj-button
+                    class="oj-md-padding-2x-horizontal"
+                    onojAction={() => {
+                      setShowOhrRacks((current) => !current);
+                    }}
+                  >
+                    {`${showOhrRacks ? "Hide" : "View"} OhrRacks`}
                   </oj-button>
                 )}
                 <oj-button

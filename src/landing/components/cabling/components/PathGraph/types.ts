@@ -139,6 +139,7 @@ export type GraphProp = {
   imageWidth: number;
   imageHeight: number;
   racks: RoomObject[];
+  ohrRacks: RoomObject[];
   basketTrays: RoomObject[];
 };
 
