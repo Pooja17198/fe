@@ -139,7 +139,7 @@ export function Header({ appName, userLogin, vendorName, regionValue, page, onRe
     { path: "home", label: "Rack Validation" },
   ];
   const isCabling = Boolean(page?.includes("cabling"));
-  const [activeTab, setActiveTab] = useState<string>(tabs[0].path);
+  const [activeTab, setActiveTab] = useState<string>(() => page === "cabling" ? tabs[0].path : tabs[1].path);
 
   const tabItemTemplate = (item: ojTabBar.ItemContext<Tab["path"], Tab>) => (
     <li>
@@ -150,6 +150,13 @@ export function Header({ appName, userLogin, vendorName, regionValue, page, onRe
   );
 
   const loadTabContent = (event: ojTabBar.selectionChanged<Tab["path"], Tab>) => {
+    if (event.detail.value === activeTab) {
+      return;
+    }
+    if (page?.includes("rack") && event.detail.value === "home") {
+      setActiveTab(tabs[1].path);
+      return;
+    }
     if (event.detail.value === "home") {
       onPageChanged({ path: "home" });
       setActiveTab(tabs[1].path);

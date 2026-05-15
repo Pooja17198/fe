@@ -88,6 +88,9 @@ module.exports = {
       if (Number.isFinite(requestedDevServerPort) && requestedDevServerPort > 0) {
         config.devServer = {
           ...(config.devServer || {}),
+          historyApiFallback: {
+            index: '/index.html',
+          },
           port: requestedDevServerPort,
           client: {
             overlay: {

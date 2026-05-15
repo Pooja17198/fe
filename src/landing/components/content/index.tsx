@@ -17,6 +17,12 @@ import HomeContainer from "../home/index";
 import "oj-c/input-text";
 import "ojs/ojformlayout";
 import Cabling from "../cabling/index";
+import {
+  getStoredVendorName,
+  hydrateRackUrlContext,
+  RackMetadata,
+  resolveCurrentUserType,
+} from "./rackContext";
 
 
 type Props = {
@@ -29,81 +35,6 @@ type Props = {
 };
 
 let INIT_DEFAULT: any | null = null;
-
-type RackMetadata = {
-  building: string;
-  block: string;
-  rack: string;
-  rackState?: string;
-  project?: string;
-  ticket: string;
-  rackSerialNumber?: string;
-  isGpuRack?: boolean;
-  availabilityDomain?: string;
-  resolveEnabled?: boolean;
-  resolveDisabledReason?: string;
-  userType?: "master" | "vendor";
-}
-
-function getStoredVendorName(): string {
-  const storedVendor = sessionStorage.getItem("X-Oracle-Vendor") || "";
-  if (storedVendor.trim() !== "") {
-    return storedVendor;
-  }
-
-  return "";
-}
-
-function decodeRackUrlContext(): Partial<RackMetadata> {
-  // URL format: /rack/{rackSerialNumber}?region=...&project=...&building=...&block=...&rack=...&rackState=...&ticket=...&resolveEnabled=...&resolveDisabledReason=...
-  const match = window.location.pathname.match(/^\/rack\/([^/]+)\/?$/);
-  if (!match) return {};
-  const [, id] = match;
-  const params = new URLSearchParams(window.location.search);
-
-  const building = params.get("building") ? decodeURIComponent(params.get("building") as string) : "";
-  const block = params.get("block") ? decodeURIComponent(params.get("block") as string) : "";
-  const rack = params.get("rack") ? decodeURIComponent(params.get("rack") as string) : "";
-  const rackState = params.get("rackState") ? decodeURIComponent(params.get("rackState") as string) : "";
-  const project = params.get("project") ? decodeURIComponent(params.get("project") as string) : "";
-  const isGpuRack = params.get("isGpuRack") === "true";
-  const availabilityDomain = params.get("availabilityDomain")
-    ? decodeURIComponent(params.get("availabilityDomain") as string)
-    : "";
-  const userTypeParam = params.get("userType");
-  const userType = userTypeParam === "master" ? "master" : "vendor";
-  const ticketParam = params.get("ticket");
-  const ticket = ticketParam && ticketParam.trim() !== "" ? decodeURIComponent(ticketParam) : undefined;
-
-  // If ticket is present: force resolveEnabled=true and resolveDisabledReason=null
-  // If ticket is absent: use resolveEnabled/resolveDisabledReason from URL, and treat ticket as null/undefined
-  const result: Partial<RackMetadata> = {
-    rackSerialNumber: decodeURIComponent(id),
-    project,
-    building,
-    block,
-    rack,
-    rackState,
-    isGpuRack,
-    availabilityDomain,
-    userType,
-  };
-
-  if (ticket) {
-    result.ticket = ticket;
-    result.resolveEnabled = true;
-    // intentionally do not set resolveDisabledReason (keeps it null in state)
-  } else {
-    // No ticket: read resolve fields from URL
-    result.resolveEnabled = params.get("resolveEnabled") === "true";
-    result.resolveDisabledReason = params.get("resolveDisabledReason")
-      ? decodeURIComponent(params.get("resolveDisabledReason") as string)
-      : "";
-    // and do not set ticket (remains null in state)
-  }
-
-  return result;
-}
 
 const Content = (props: Props) => {
   const [selectedPage, setSelectedPage] = useState<string>("");
@@ -118,10 +49,14 @@ const Content = (props: Props) => {
   const [selectedAvailabilityDomain, setSelectedAvailabilityDomain] = useState(INIT_DEFAULT);
   const [selectedVendor, setSelectedVendor] = useState(INIT_DEFAULT);
   const [selectedUserType, setSelectedUserType] = useState<"master" | "vendor">("vendor");
+  const [selectedRackRegion, setSelectedRackRegion] = useState(INIT_DEFAULT);
   const [selectedResolveEnabled, setSelectedResolveEnabled] = useState<boolean>(false);
   const [selectedResolveDisabledReason, setSelectedResolveDisabledReason] = useState<string>("");
   const [rackReady, setRackReady] = useState<boolean>(false);
+  const [rackLoadError, setRackLoadError] = useState<string>("");
   const [rackSNVersion, setRackSNVersion] = useState(0);
+  const rackHydrationKeyRef = useRef<string>("");
+  const directRackUrlRef = useRef<boolean>(/^\/rack\/[^/]+\/?$/.test(window.location.pathname));
 
 
   useEffect(() => {
@@ -131,33 +66,82 @@ const Content = (props: Props) => {
     setSelectedUserType(sessionStorage.getItem("LVV_USER_TYPE") === "master" ? "master" : "vendor");
   }, [selectedVendor]);
 
-  // Hydrate rack context from URL when user refreshes /rack/{id}
+  // Hydrate rack context from URL when user refreshes or opens /rack/{id} directly.
   useEffect(() => {
-    const isRackUrl = window.location.pathname.includes("/rack/");
-    if (!isRackUrl) return;
+    const isRackUrl = /^\/rack\/[^/]+\/?$/.test(window.location.pathname);
+    const isRackPage = Boolean(props.page?.includes("rack"));
+    if (!isRackUrl || !isRackPage) return;
+    if (!directRackUrlRef.current && selectedRackSerialNumber) return;
 
-    // Only hydrate if we don't already have rack context
-    if (selectedRackSerialNumber && selectedBuilding && selectedBlock && selectedRack) return;
+    const hydrationKey = `${window.location.pathname}${window.location.search}`;
+    if (rackHydrationKeyRef.current === hydrationKey && selectedRackSerialNumber) return;
 
-    const ctx = decodeRackUrlContext();
-    if (ctx.rackSerialNumber) setSelectedRackSerialNumber(ctx.rackSerialNumber);
-    // If URL region differs from current selected region, we currently keep the app's selected region.
-    // Region in URL is mainly for hydration / sharing; selection is still controlled by Header.
-    if (ctx.building) setSelectedBuilding(ctx.building);
-    if (ctx.block) setSelectedBlock(ctx.block);
-    if (ctx.rack) setSelectedRack(ctx.rack);
-    if (typeof ctx.rackState === "string") setSelectedRackState(ctx.rackState);
-    if (ctx.project) setSelectedProject(ctx.project);
-    if (typeof ctx.isGpuRack === "boolean") setSelectedIsGpuRack(Boolean(ctx.isGpuRack));
-    if (typeof ctx.availabilityDomain === "string") setSelectedAvailabilityDomain(ctx.availabilityDomain);
-    if (typeof ctx.ticket === "string") setSelectedTicket(ctx.ticket);
-    if (ctx.userType) setSelectedUserType(ctx.userType);
-    if (typeof ctx.resolveEnabled === "boolean") setSelectedResolveEnabled(Boolean(ctx.resolveEnabled));
-    if (typeof ctx.resolveDisabledReason === "string") setSelectedResolveDisabledReason(String(ctx.resolveDisabledReason || ""));
+    let cancelled = false;
+    let userTypeAc: AbortController | null = null;
+    rackHydrationKeyRef.current = hydrationKey;
+    setRackLoadError("");
 
-    // Bump version so downstream effects (rackReady/navigation) can proceed
-    setRackSNVersion((v) => v + 1);
-  }, [selectedRackSerialNumber, selectedBuilding, selectedBlock, selectedRack]);
+    const hydrate = async () => {
+      try {
+        const result = await hydrateRackUrlContext();
+        if (cancelled || !result.isRackUrl) {
+          return;
+        }
+        if (result.error || !result.metadata) {
+          setRackLoadError(result.error || "Unable to load rack context from URL.");
+          return;
+        }
+
+        const ctx = result.metadata;
+        setSelectedRackSerialNumber(ctx.rackSerialNumber || "");
+        setSelectedRackRegion(result.region || props.region || "");
+        setSelectedBuilding(ctx.building);
+        setSelectedBlock(ctx.block);
+        setSelectedRack(ctx.rack);
+        setSelectedRackState(String(ctx.rackState || ""));
+        setSelectedProject(String(ctx.project || ""));
+        setSelectedIsGpuRack(Boolean(ctx.isGpuRack));
+        setSelectedAvailabilityDomain(String(ctx.availabilityDomain || ""));
+        setSelectedTicket(ctx.ticket || "");
+        if (ctx.userType) {
+          setSelectedUserType(ctx.userType === "master" ? "master" : "vendor");
+        }
+        setSelectedResolveEnabled(Boolean(ctx.resolveEnabled));
+        setSelectedResolveDisabledReason(String(ctx.resolveDisabledReason || ""));
+        setRackSNVersion((v) => v + 1);
+
+        if (!ctx.userType) {
+          const currentUserTypeAc = new AbortController();
+          userTypeAc = currentUserTypeAc;
+          void resolveCurrentUserType(result.region || props.region || "", currentUserTypeAc.signal)
+            .then((userType) => {
+              if (cancelled || currentUserTypeAc.signal.aborted) {
+                return;
+              }
+              sessionStorage.setItem("LVV_USER_TYPE", userType);
+              setSelectedUserType(userType);
+            })
+            .catch((error) => {
+              if ((error as any)?.name !== "AbortError") {
+                console.warn("Unable to resolve rack URL user type.", error);
+              }
+            });
+        }
+      } catch (error) {
+        if (cancelled && (error as any)?.name === "AbortError") {
+          return;
+        }
+        setRackLoadError((error as Error)?.message || "Unable to load rack context.");
+      }
+    };
+
+    void hydrate();
+
+    return () => {
+      cancelled = true;
+      userTypeAc?.abort();
+    };
+  }, [props.page]);
 
   const rackChangedHandler = (value: any) => {
     console.log("Rack value passed is ", value);
@@ -173,6 +157,9 @@ const Content = (props: Props) => {
     setSelectedResolveEnabled(value.resolveEnabled !== false);
     setSelectedResolveDisabledReason(String(value.resolveDisabledReason || ""));
     setSelectedRackSerialNumber(value.rackSerialNumber);
+    setSelectedRackRegion(props.region);
+    setRackLoadError("");
+    directRackUrlRef.current = false;
     sessionStorage.setItem("LVV_USER_TYPE", value.userType === "master" ? "master" : "vendor");
 
     // If re-selecting the same serial number, also bump:
@@ -188,13 +175,10 @@ const Content = (props: Props) => {
   // Navigate to rack only after all required state is set, preventing undefined props on first render
   useEffect(() => {
     console.log("Trying to navigate to next page,", rackReady);
-    if (rackReady && !(props.page && props.page.includes("rack"))) {
-      // Build query according to rules:
-      // - If ticket is present (non-empty), include ticket only; omit resolveEnabled/resolveDisabledReason
-      // - If ticket is absent, include resolveEnabled and resolveDisabledReason; omit ticket
+    if (rackReady && !directRackUrlRef.current && !(props.page && props.page.includes("rack"))) {
       const hasTicket = String(selectedTicket || "").trim() !== "";
       const queryObj: Record<string, string> = {
-        region: String(props.region || ""),
+        region: String(selectedRackRegion || props.region || ""),
         project: String(selectedProject || ""),
         building: String(selectedBuilding || ""),
         block: String(selectedBlock || ""),
@@ -237,7 +221,9 @@ const Content = (props: Props) => {
       </div>
       {isRack && (
         <>
-          {rackReady ? (
+          {rackLoadError ? (
+            <div style={{ padding: '16px' }}>{rackLoadError}</div>
+          ) : rackReady ? (
             <Rack
                 key={String(selectedRackSerialNumber)}
                 onPageChanged={props.onPageChanged}
@@ -254,10 +240,13 @@ const Content = (props: Props) => {
                 userType={selectedUserType}
                 resolveEnabled={selectedResolveEnabled}
                 resolveDisabledReason={selectedResolveDisabledReason}
-                region={props.region}
+                region={String(selectedRackRegion || props.region || "")}
             />
           ) : (
-            <div style={{ padding: '16px' }}>Loading rack context…</div>
+            <div class="rack-url-loading" role="status" aria-live="polite">
+              <oj-progress-circle size="md" value={-1} />
+              <div class="rack-url-loading-text">Loading rack...</div>
+            </div>
           )}
         </>
       )}

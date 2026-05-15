@@ -89,7 +89,12 @@ const pageChangeHandler = async (route: Route) => {
   // 2) If route.query provided, add those params
   // 3) Normalize home to '/'
   try {
-    const basePath = route.path === 'home' ? '/' : window.location.pathname;
+    const basePath =
+      route.path === 'home'
+        ? '/'
+        : route.path === 'rack' && route.id
+          ? `/rack/${encodeURIComponent(route.id)}`
+          : window.location.pathname;
     const u = new URL(window.location.origin + basePath);
     if (route.query) {
       Object.entries(route.query).forEach(([k, v]) => {

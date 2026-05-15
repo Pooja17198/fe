@@ -96,6 +96,21 @@
     font-size: 1.03em;
 }
 
+.rack-url-loading {
+    min-height: 240px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 12px;
+    color: #4f4f4f;
+}
+
+.rack-url-loading-text {
+    font-size: 0.95rem;
+    font-weight: 500;
+}
+
 .home-container {
     text-align: center;
 }
