@@ -27,10 +27,6 @@ export type RackValidationSummary = {
   deviceFailures: number;
 };
 
-export type HostTransceiverReadiness = {
-  computePool?: string | null;
-};
-
 export const NOT_VALIDATED_SUMMARY: RackValidationSummary = {
   isValidated: false,
   cableFailures: 0,
@@ -45,7 +41,6 @@ export const NOT_VALIDATED_SUMMARY: RackValidationSummary = {
   deviceFailures: 0,
 };
 
-const HOST_TRANSCEIVER_BROKEN_COMPUTE_POOL = "broken_pool";
 const LAST_VALIDATED_SECTION_TITLE = "Last Validated";
 const POWER_SECTION_TITLE = "Power Errors";
 const DEVICE_REACHABILITY_SECTION_TITLE = "Device Reachability";
@@ -67,10 +62,6 @@ export function normalizeSectionKey(title: string): string {
 
 export function normalizeDeviceName(deviceName: string | null | undefined): string {
   return String(deviceName || "").trim().toLowerCase();
-}
-
-export function shouldShowHostTransceiverSection(readiness?: HostTransceiverReadiness): boolean {
-  return String(readiness?.computePool || "").trim().toLowerCase() === HOST_TRANSCEIVER_BROKEN_COMPUTE_POOL;
 }
 
 export function pick(
@@ -250,8 +241,6 @@ export function summarizeValidationFailuresByDevice(
   options: {
     includeDeviceNames?: Iterable<string>;
     excludeDeviceNames?: Iterable<string>;
-    hostReadinessByDevice?: Map<string, HostTransceiverReadiness>;
-    requireHostTransceiverReadiness?: boolean;
   } = {}
 ): RackValidationSummary {
   const includeNames = toNormalizedNameSet(options.includeDeviceNames);
@@ -290,13 +279,10 @@ export function summarizeValidationFailuresByDevice(
     fecBerFailures += fecBerCount;
     cableFailures += lldpCount + interfaceCount;
     opticsFailures += opticCount + fecBerCount;
-    const hostReadiness = options.hostReadinessByDevice?.get(normalizedName);
-    if (!options.requireHostTransceiverReadiness || shouldShowHostTransceiverSection(hostReadiness)) {
-      const hostTransceiverCounts = getHostTransceiverActionableCounts(failures);
-      hostOpticsFailures += hostTransceiverCounts.total;
-      hostOptFailures += hostTransceiverCounts.optics;
-      hostFecBerFailures += hostTransceiverCounts.fecBer;
-    }
+    const hostTransceiverCounts = getHostTransceiverActionableCounts(failures);
+    hostOpticsFailures += hostTransceiverCounts.total;
+    hostOptFailures += hostTransceiverCounts.optics;
+    hostFecBerFailures += hostTransceiverCounts.fecBer;
     deviceFailures += failures.counts.power;
     deviceFailures += getSectionCount(failures, "Fan Errors");
   });

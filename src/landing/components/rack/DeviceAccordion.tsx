@@ -52,8 +52,6 @@ import {
   isDeviceStatusCompleted,
   isGpuComputeDevice
 } from "./utils";
-import type { HostTransceiverReadiness } from "./validationShared";
-import { shouldShowHostTransceiverSection } from "./validationShared";
 type ValidationAgeColor = "green" | "orange" | "red";
 
 const VALIDATION_AGE_THRESHOLDS_MS = {
@@ -741,14 +739,11 @@ function orderT0ToHostSections(sections: ValidationSection[]): ValidationSection
 }
 
 function buildValidationSectionGroups(
-  visibleSections: ValidationSection[],
-  hostReadiness?: HostTransceiverReadiness
+  visibleSections: ValidationSection[]
 ): ValidationSectionGroup[] {
-  const hostTransceiverSections = shouldShowHostTransceiverSection(hostReadiness)
-    ? visibleSections
-      .filter((section) => isHostTransceiverSection(section.title))
-      .flatMap(splitHostTransceiverSections)
-    : [];
+  const hostTransceiverSections = visibleSections
+    .filter((section) => isHostTransceiverSection(section.title))
+    .flatMap(splitHostTransceiverSections);
   const t0ToHostSections = orderT0ToHostSections(
     visibleSections.filter((section) => !isHostTransceiverSection(section.title))
   );
@@ -784,13 +779,8 @@ type ErrorCountChip = {
 };
 
 function getHostTransceiverErrorChips(
-  deviceFailures: DeviceValidationFailures,
-  hostReadiness?: HostTransceiverReadiness
+  deviceFailures: DeviceValidationFailures
 ): ErrorCountChip[] {
-  if (!shouldShowHostTransceiverSection(hostReadiness)) {
-    return [];
-  }
-
   return deviceFailures.sectionOrder
     .flatMap((sectionKey) => {
       const section = deviceFailures.sections[sectionKey];
@@ -862,16 +852,11 @@ function getHostTransceiverRowSummaryStatus(row: ValidationTableRow): "pass" | "
 }
 
 function summarizeHostTransceiverRows(
-  failuresByDevice: ValidationFailuresByDevice,
-  hostReadinessByDevice: Map<string, HostTransceiverReadiness>
+  failuresByDevice: ValidationFailuresByDevice
 ): HostTransceiverSummaryCounts {
   const counts: HostTransceiverSummaryCounts = { pass: 0, fail: 0, stale: 0, total: 0 };
 
   Object.values(failuresByDevice).forEach((deviceFailures) => {
-    if (!shouldShowHostTransceiverSection(hostReadinessByDevice.get(deviceFailures.deviceName))) {
-      return;
-    }
-
     deviceFailures.sectionOrder.forEach((sectionKey) => {
       const section = deviceFailures.sections[sectionKey];
       if (!section || !isHostTransceiverSection(section.title)) {
@@ -2118,12 +2103,6 @@ const DeviceAccordion = (props: Props) => {
 
   const summaryCounts = useMemo(() => {
     const values = Object.values(filteredFailuresByDevice);
-    const hostReadinessByDevice = new Map<string, HostTransceiverReadiness>(
-      props.devices.map((device) => [
-        device.deviceName,
-        { computePool: device.hostComputePool },
-      ])
-    );
     const linkFailures = values.reduce((sum, item) => sum + countT0ToHostRows(item), 0);
     const powerFailures = values.filter(
         (item) => !isGpuComputeDevice(item.deviceName, props.isGpuRack) && item.hasPsuFailure
@@ -2131,13 +2110,12 @@ const DeviceAccordion = (props: Props) => {
     return {
       linkFailures,
       powerFailures,
-      hostTransceiver: summarizeHostTransceiverRows(filteredFailuresByDevice, hostReadinessByDevice),
+      hostTransceiver: summarizeHostTransceiverRows(filteredFailuresByDevice),
     };
-  }, [filteredFailuresByDevice, props.devices, props.isGpuRack]);
+  }, [filteredFailuresByDevice, props.isGpuRack]);
 
   const renderErrorCount = (
-      deviceFailures: DeviceValidationFailures,
-      hostReadiness?: HostTransceiverReadiness
+      deviceFailures: DeviceValidationFailures
   ) => {
     const isGpuCompute = isGpuComputeDevice(deviceFailures.deviceName, props.isGpuRack);
     const t0ToHostChips = deviceFailures.sectionOrder
@@ -2154,7 +2132,7 @@ const DeviceAccordion = (props: Props) => {
         .filter((entry): entry is { label: string; count: number; typeClass: string } =>
             Boolean(entry && entry.count > 0)
         );
-    const hostTransceiverChips = getHostTransceiverErrorChips(deviceFailures, hostReadiness);
+    const hostTransceiverChips = getHostTransceiverErrorChips(deviceFailures);
 
     if (t0ToHostChips.length === 0 && hostTransceiverChips.length === 0) {
       const zeroClass = `device-accordion-failure-count ${
@@ -2487,9 +2465,7 @@ const DeviceAccordion = (props: Props) => {
                   const validationSectionGroups = isGpuCompute
                       ? applyStableHostTransceiverTimestamps(
                           device.deviceName,
-                          buildValidationSectionGroups(visibleSections, {
-                            computePool: device.hostComputePool,
-                          }),
+                          buildValidationSectionGroups(visibleSections),
                           stableHostTransceiverTimestampRef.current,
                           validationReferenceTimeMs
                       )
@@ -2584,9 +2560,7 @@ const DeviceAccordion = (props: Props) => {
                       </span>
 
                             <span className="device-col errors">
-                              {renderErrorCount(deviceFailures, {
-                                computePool: device.hostComputePool,
-                              })}
+                              {renderErrorCount(deviceFailures)}
                             </span>
 
                             {showReachabilityColumn ? (
