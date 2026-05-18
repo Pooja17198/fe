@@ -71,108 +71,29 @@ export const patchPanelMatrixTemplate = (context: any) => {
   return <div class="patch-panel-matrix-cell">{value}</div>;
 };
 
-type RawBerToken = {
-  key: string;
-  value: string;
-};
-
-function parseRawBerEntry(rawEntry: string): RawBerToken[] {
-  const normalized = rawEntry.replace(/\s+/g, " ").trim();
-  if (!normalized) {
-    return [];
-  }
-
-  const tokens: RawBerToken[] = [];
-  const pattern = /([a-zA-Z_][a-zA-Z0-9_]*)\s*:\s*(.*?)(?=\s+[a-zA-Z_][a-zA-Z0-9_]*\s*:|$)/g;
-
-  for (const match of normalized.matchAll(pattern)) {
-    const key = (match[1] || "").trim();
-    const value = (match[2] || "").trim();
-    if (key) {
-      tokens.push({ key, value: value || "Not Available" });
-    }
-  }
-
-  if (tokens.length > 0) {
-    return tokens;
-  }
-
-  return [{ key: "value", value: normalized }];
-}
-
-function getRawBerStatusClass(status: string): string {
-  const normalized = status.trim().toLowerCase();
-  if (["pass", "passed", "success", "ok", "healthy"].includes(normalized)) {
-    return "raw-ber-token-value-status-pass";
-  }
-  if (["fail", "failed", "error", "down", "critical"].includes(normalized)) {
-    return "raw-ber-token-value-status-fail";
-  }
-  return "raw-ber-token-value-status-neutral";
-}
-
-function formatRawBerEntries(rawValue: unknown): RawBerToken[][] {
-  const normalized = `${rawValue ?? ""}`.trim().replace(/\\n/g, "\n");
-  if (!normalized) {
-    return [];
-  }
-
-  return normalized
-    .split(/\s*,\s*/)
-    .map((entry) => parseRawBerEntry(entry))
-    .filter((entry) => entry.length > 0);
-}
-
 function firstNonEmptyValue(...values: unknown[]): unknown {
   return values.find((value) => `${value ?? ""}`.trim() !== "");
 }
 
+function formatRawBerValue(rawValue: unknown): string {
+  const value = `${rawValue ?? ""}`.trim().replace(/\\n/g, "\n");
+  if (!value) {
+    return "";
+  }
+
+  return value
+    .replace(/\s*\|\s*/g, "\n")
+    .replace(/\s*;\s*/g, "\n")
+    .replace(/\s*,\s*/g, "\n");
+}
+
 export const opticalRawBerTemplate = (context: any) => {
   const row = (context?.item && context.item.data) || {};
-  const entries = formatRawBerEntries(
+  const value = formatRawBerValue(
     firstNonEmptyValue(row.opticalRawBer, row["Optical RawBer"], row.raw_ber, row.rawBer, row["Raw BER"])
   );
 
-  if (entries.length === 0) {
-    return <div class="raw-ber-cell-empty">Not Available</div>;
-  }
-
-  return (
-    <div class="raw-ber-cell">
-      {entries.map((entry, entryIndex) => (
-        <div class="raw-ber-entry" key={`raw-ber-entry-${entryIndex}`}>
-          {entry.map((token, tokenIndex) => {
-            const isStatusToken = token.key.trim().toLowerCase() === "status";
-            const isPlainValueToken = token.key.trim().toLowerCase() === "value";
-            const valueClass = isStatusToken
-              ? getRawBerStatusClass(token.value)
-              : "raw-ber-token-value";
-            if (isPlainValueToken) {
-              return (
-                <span
-                  class={valueClass}
-                  key={`raw-ber-value-${entryIndex}-${tokenIndex}`}
-                >
-                  {token.value}
-                </span>
-              );
-            }
-            return [
-              <span class="raw-ber-token-key" key={`raw-ber-key-${entryIndex}-${tokenIndex}`}>
-                {token.key}:
-              </span>,
-              <span
-                class={valueClass}
-                key={`raw-ber-value-${entryIndex}-${tokenIndex}`}
-              >
-                {token.value}
-              </span>,
-            ];
-          })}
-        </div>
-      ))}
-    </div>
-  );
+  return <div class="gpu-multiline-value-cell">{value || "Not Available"}</div>;
 };
 
 export const plainRawBerTemplate = (context: any) => {

@@ -1184,65 +1184,6 @@
   word-break: break-word;
 }
 
-.raw-ber-cell {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.raw-ber-cell-empty {
-  color: #64748b;
-}
-
-.raw-ber-entry {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px 8px;
-  padding: 6px 8px;
-  border-radius: 10px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  line-height: 1.4;
-  word-break: break-word;
-}
-
-.raw-ber-token-key {
-  color: #475569;
-  font-weight: 700;
-  text-transform: capitalize;
-}
-
-.raw-ber-token-value {
-  color: #0f172a;
-  font-family: Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-}
-
-.raw-ber-token-value-status-pass,
-.raw-ber-token-value-status-fail,
-.raw-ber-token-value-status-neutral {
-  display: inline-flex;
-  align-items: center;
-  padding: 1px 8px;
-  border-radius: 999px;
-  font-weight: 700;
-  font-family: inherit;
-}
-
-.raw-ber-token-value-status-pass {
-  background: #dcfce7;
-  color: #166534;
-}
-
-.raw-ber-token-value-status-fail {
-  background: #fee2e2;
-  color: #b91c1c;
-}
-
-.raw-ber-token-value-status-neutral {
-  background: #e2e8f0;
-  color: #334155;
-}
-
 .gpu-lldp-error-details-cell {
   display: grid;
   grid-template-columns: max-content max-content max-content max-content;
