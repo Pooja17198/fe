@@ -718,6 +718,245 @@
     font-weight: 600;
 }
 
+.rack-status-text.success {
+    color: #166534;
+}
+
+.deployment-group-page {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 16px 0 32px;
+}
+
+.deployment-group-heading {
+    margin: 0 0 18px;
+    text-align: center;
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: #22364d;
+}
+
+.deployment-group-panel {
+    border: 1px solid #d6dfe9;
+    border-radius: 8px;
+    background-color: #f8fafc;
+    padding: 16px;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+    margin-bottom: 14px;
+}
+
+.deployment-group-panel-header {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 14px;
+}
+
+.deployment-group-panel-header h3 {
+    margin: 0;
+    color: #224b7a;
+    font-size: 1.1rem;
+    font-weight: 700;
+}
+
+.deployment-group-selector-grid {
+    display: grid;
+    grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr) auto;
+    align-items: end;
+    gap: 12px;
+}
+
+.deployment-group-rack-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 32px;
+    padding: 0 12px;
+    border-radius: 999px;
+    font-weight: 700;
+    color: #2b4ea1;
+    background: #e7efff;
+    border: 1px solid #d5e3ff;
+    white-space: nowrap;
+}
+
+.deployment-group-actions {
+    display: flex;
+    justify-content: center;
+    margin-top: 18px;
+}
+
+.deployment-group-muted {
+    margin-top: 12px;
+    color: #5f6368;
+    text-align: center;
+}
+
+.deployment-group-title-box {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(90deg, #e4edf5 0%, #fcfcfd 100%);
+    border: 1.5px solid #cfd8e3;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(60, 110, 180, 0.09);
+    padding: 14px 20px;
+    margin: 0 auto 18px;
+    min-height: 52px;
+    gap: 14px;
+}
+
+.deployment-group-title-box h2 {
+    margin: 0;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #315278;
+}
+
+.deployment-group-title-box h2 span {
+    color: #0b4c8c;
+}
+
+.deployment-group-title-divider {
+    margin: 0 10px;
+    color: #8ba3bf !important;
+}
+
+.deployment-group-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.deployment-group-run-label,
+.deployment-group-summary-label {
+    color: #6b7280;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.deployment-group-run-status,
+.deployment-group-summary-value {
+    color: #1f2937;
+    font-size: 1rem;
+    font-weight: 700;
+    margin-top: 2px;
+}
+
+.deployment-group-summary-value .device-accordion-failure-count {
+    margin-left: 0;
+}
+
+.deployment-group-aggregated-errors .rack-status-cell {
+    justify-content: flex-start;
+}
+
+.deployment-group-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+}
+
+.deployment-group-summary-cell {
+    min-height: 74px;
+    border: 1px solid #d6dfe9;
+    border-radius: 6px;
+    padding: 10px;
+    background: #ffffff;
+    box-sizing: border-box;
+}
+
+.deployment-group-update-note {
+    margin-top: 10px;
+    color: #5f6368;
+    font-size: 0.82rem;
+}
+
+.deployment-group-filter-row {
+    display: grid;
+    grid-template-columns: minmax(220px, 1fr) minmax(180px, 240px) auto;
+    gap: 12px;
+    align-items: end;
+    margin-bottom: 14px;
+}
+
+.deployment-group-filter-row label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 0.84rem;
+    font-weight: 700;
+    color: #374151;
+}
+
+.deployment-group-filter-row input[type="text"] {
+    height: 34px;
+    min-width: 0;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    padding: 0 9px;
+    box-sizing: border-box;
+}
+
+.deployment-group-filter-row .deployment-group-checkbox {
+    flex-direction: row;
+    align-items: center;
+    min-height: 34px;
+    white-space: nowrap;
+}
+
+.deployment-group-filter-row input[type="checkbox"] {
+    margin-right: 6px;
+}
+
+.deployment-group-table-wrap {
+    width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.deployment-group-results-table {
+    display: block;
+    width: 100%;
+    min-width: 920px;
+}
+
+.deployment-group-table-link {
+    color: #00688c;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.deployment-group-table-link:hover {
+    text-decoration: underline;
+}
+
+.deployment-group-access-denied {
+    margin: 20px auto;
+    max-width: 680px;
+    border: 1px solid #fca5a5;
+    border-radius: 8px;
+    background: #fff1f2;
+    color: #be123c;
+    padding: 14px 16px;
+    font-weight: 700;
+    text-align: center;
+}
+
+.deployment-group-loading {
+    display: flex;
+    min-height: 180px;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    color: #4b5563;
+    font-weight: 700;
+}
+
 .rack-status-text.muted {
     color: #64748b;
 }

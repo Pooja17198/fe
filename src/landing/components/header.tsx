@@ -21,13 +21,14 @@ type Props = Readonly<{
   appName: string,
   userLogin: string,
   vendorName: string,
+  userType?: "master" | "vendor",
   regionValue?: string,
   page: string,
   onRegionChanged?: (region: string) => void
   onPageChanged: (value: any) => void;
 }>;
 
-export function Header({ appName, userLogin, vendorName, regionValue, page, onRegionChanged, onPageChanged }: Props) {
+export function Header({ appName, userLogin, vendorName, userType, regionValue, page, onRegionChanged, onPageChanged }: Props) {
   const mediaQueryRef = useRef<MediaQueryList>(window.matchMedia(ResponsiveUtils.getFrameworkQuery("sm-only")!));
 
   const [isSmallWidth, setIsSmallWidth] = useState(mediaQueryRef.current.matches);
@@ -134,9 +135,11 @@ export function Header({ appName, userLogin, vendorName, regionValue, page, onRe
     label: string;
   };
 
+  const isMasterUser = userType === "master";
   const tabs: Tab[] = [
     { path: "cabling", label: "Cabling and Materials" },
     { path: "home", label: "Rack Validation" },
+    ...(isMasterUser ? [{ path: "deployment-group-validation", label: "Deployment Group Validation" }] : []),
   ];
   const isCabling = Boolean(page?.includes("cabling"));
   const [activeTab, setActiveTab] = useState<string>(() => page === "cabling" ? tabs[0].path : tabs[1].path);
@@ -150,29 +153,48 @@ export function Header({ appName, userLogin, vendorName, regionValue, page, onRe
   );
 
   const loadTabContent = (event: ojTabBar.selectionChanged<Tab["path"], Tab>) => {
-    if (event.detail.value === activeTab) {
-      return;
-    }
-    if (page?.includes("rack") && event.detail.value === "home") {
+    const selectedPath = event.detail.value;
+    if (selectedPath === activeTab) {
+          return;
+        }
+    if (page?.includes("rack") && selectedPath === "home") {
       setActiveTab(tabs[1].path);
       return;
     }
-    if (event.detail.value === "home") {
+    if (selectedPath === "home") {
       onPageChanged({ path: "home" });
-      setActiveTab(tabs[1].path);
-    } else {
-      onPageChanged({ path: "cabling"});
-      setActiveTab(tabs[0].path)
+      setActiveTab("home");
+      return;
     }
-  }
+    if (selectedPath === "deployment-group-validation") {
+      if (!isMasterUser) {
+        onPageChanged({ path: "home" });
+        setActiveTab("home");
+        return;
+      }
+      onPageChanged({ path: "deployment-group-validation" });
+      setActiveTab("deployment-group-validation");
+      return;
+    }
+    onPageChanged({ path: "cabling" });
+    setActiveTab("cabling");
+  };
 
   useEffect(() => {
-    if (page === "cabling") {
-      setActiveTab(tabs[0].path);
-    } else {
-      setActiveTab(tabs[1].path);
+    if (page?.includes("cabling")) {
+      setActiveTab("cabling");
+      return;
     }
-  }, [page]);
+    if (page?.includes("deployment-group-validation")) {
+      if (!isMasterUser) {
+        setActiveTab("home");
+        return;
+      }
+      setActiveTab("deployment-group-validation");
+      return;
+    }
+    setActiveTab("home");
+  }, [page, isMasterUser]);
 
   const tabbarDP = new MutableArrayDataProvider<Tab["path"], Tab>(
     tabs.slice(0),

@@ -6,6 +6,11 @@ import ProjectDetailsContainer from "./projectDetails";
 import { ProjectLoadMeasurement } from "./types";
 import "ojs/ojprogress-circle";
 import { getLvvApiBase } from "../../config/api";
+import {
+    applyLocalMasterUserTypeOverride,
+    getStoredLvvUserType,
+    LVV_USER_TYPE_SESSION_KEY,
+} from "./userType";
 
 
 let INIT_SELECTEDPROJECT: any | null = null;
@@ -14,6 +19,7 @@ let INIT_SELECTEDPROJECT: any | null = null;
 type Props = {
   isActive?: boolean;
   onRackChanged: (value: RackMetadata) => void;
+  onUserTypeChanged?: (userType: "master" | "vendor") => void;
   vendor?: string;
   region: string;
 }
@@ -123,8 +129,14 @@ const HomeContainer = (props: Props) => {
                 return;
             }
 
-            sessionStorage.setItem("LVV_USER_TYPE", resolvedUserType);
-            setUserType(resolvedUserType);
+            const nextUserType = applyLocalMasterUserTypeOverride({
+                resolvedUserType,
+                isLocalDesktop,
+                storedUserType: getStoredLvvUserType(),
+            });
+            sessionStorage.setItem(LVV_USER_TYPE_SESSION_KEY, nextUserType);
+            setUserType(nextUserType);
+            props.onUserTypeChanged?.(nextUserType);
             setProjectList(projects);
             setIsLoading(false);
         };

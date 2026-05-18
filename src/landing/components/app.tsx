@@ -14,6 +14,7 @@ import { Footer } from "./footer";
 import { Header } from "./header";
 import Content from "./content/index";
 import UrlPathParamAdapter = require("ojs/ojurlpathparamadapter");
+import { getInitialLvvUserType } from "./home/userType";
 
 type Props = {
   appName?: string;
@@ -32,6 +33,18 @@ const routeArray: Array<any> = [
     path: "home",
     detail: {
       label: "Home"
+    },
+  },
+  {
+    path: "deployment-group-validation",
+    detail: {
+      label: "Deployment Group Validation"
+    },
+  },
+  {
+    path: "deployment-group-validation-page",
+    detail: {
+      label: "Deployment Group Validation Page"
     },
   },
   {
@@ -94,7 +107,9 @@ const pageChangeHandler = async (route: Route) => {
         ? '/'
         : route.path === 'rack' && route.id
           ? `/rack/${encodeURIComponent(route.id)}`
-          : window.location.pathname;
+          : route.path
+            ? `/${route.path}`
+            : window.location.pathname;
     const u = new URL(window.location.origin + basePath);
     if (route.query) {
       Object.entries(route.query).forEach(([k, v]) => {
@@ -111,6 +126,9 @@ const pageChangeHandler = async (route: Route) => {
 export const App = registerCustomElement("app-root", (props: Props) => {
     const [selectedVendor, setSelectedVendor] = useState<string>(getStoredVendorName);
     const [selectedRegion, setSelectedRegion] = useState<string>("us-phoenix-1");
+    const [selectedUserType, setSelectedUserType] = useState<"master" | "vendor">(() =>
+      getInitialLvvUserType(isLocalhost())
+    );
 
     props.appName = "LVV Portal";
     props.userLogin = sessionStorage.getItem("X-Oracle-Vendor-Email") || "";
@@ -134,6 +152,11 @@ export const App = registerCustomElement("app-root", (props: Props) => {
 
     const regionChangedHandler = (region: string) => {
       setSelectedRegion(region);
+    };
+
+    const userTypeChangedHandler = (userType: "master" | "vendor") => {
+      sessionStorage.setItem("LVV_USER_TYPE", userType);
+      setSelectedUserType(userType);
     };
 
     const redirectToLogin = () => {
@@ -210,23 +233,25 @@ export const App = registerCustomElement("app-root", (props: Props) => {
         stopTokenRefresh();
       };
     }, []);
-    
+
     return (
       <div id="appContainer" class="oj-web-applayout-page">
         <Header
           appName={props.appName}
           userLogin={props.userLogin}
           vendorName={selectedVendor}
+          userType={selectedUserType}
           regionValue={selectedRegion}
           page={routePath}
           onRegionChanged={regionChangedHandler}
           onPageChanged={pageChangeHandler}
         />
-        <Content 
+        <Content
           page={routePath}
-          pagerouter={router} 
+          pagerouter={router}
           onPageChanged={pageChangeHandler}
           onVendorChanged={vendorChangedHandler}
+          onUserTypeChanged={userTypeChangedHandler}
           region={selectedRegion}
           routes={routeArray}/>
         <Footer />

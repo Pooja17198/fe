@@ -16,13 +16,18 @@ import HomeContainer from "../home/index";
 //For the transpiled javascript to load the element's module, import as below
 import "oj-c/input-text";
 import "ojs/ojformlayout";
+import "ojs/ojprogress-circle";
 import Cabling from "../cabling/index";
 import {
   getStoredVendorName,
   hydrateRackUrlContext,
-  RackMetadata,
   resolveCurrentUserType,
 } from "./rackContext";
+import {
+  DeploymentGroupSelectionPage,
+  DeploymentGroupValidationPage,
+} from "../deployment-group-validation";
+import { getInitialLvvUserType } from "../home/userType";
 
 
 type Props = {
@@ -31,10 +36,15 @@ type Props = {
   routes: Array<object>;
   onPageChanged: (value: any) => void;
   onVendorChanged: (vendor: string) => void;
+  onUserTypeChanged: (userType: "master" | "vendor") => void;
   region: string;
 };
 
 let INIT_DEFAULT: any | null = null;
+
+function isLocalhost(): boolean {
+  return ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
+}
 
 const Content = (props: Props) => {
   const [selectedPage, setSelectedPage] = useState<string>("");
@@ -48,7 +58,10 @@ const Content = (props: Props) => {
   const [selectedIsGpuRack, setSelectedIsGpuRack] = useState<boolean>(false);
   const [selectedAvailabilityDomain, setSelectedAvailabilityDomain] = useState(INIT_DEFAULT);
   const [selectedVendor, setSelectedVendor] = useState(INIT_DEFAULT);
-  const [selectedUserType, setSelectedUserType] = useState<"master" | "vendor">("vendor");
+  const [selectedUserType, setSelectedUserType] = useState<"master" | "vendor">(() =>
+    getInitialLvvUserType(isLocalhost())
+  );
+  const [deploymentGroupAccessLoading, setDeploymentGroupAccessLoading] = useState(false);
   const [selectedRackRegion, setSelectedRackRegion] = useState(INIT_DEFAULT);
   const [selectedResolveEnabled, setSelectedResolveEnabled] = useState<boolean>(false);
   const [selectedResolveDisabledReason, setSelectedResolveDisabledReason] = useState<string>("");
@@ -63,8 +76,43 @@ const Content = (props: Props) => {
     Context.getPageContext().getBusyContext().applicationBootstrapComplete();
     setSelectedPage(props.page as string)
     setSelectedVendor(getStoredVendorName());
-    setSelectedUserType(sessionStorage.getItem("LVV_USER_TYPE") === "master" ? "master" : "vendor");
   }, [selectedVendor]);
+
+  useEffect(() => {
+    sessionStorage.setItem("LVV_USER_TYPE", selectedUserType);
+    props.onUserTypeChanged(selectedUserType);
+  }, [selectedUserType, props.onUserTypeChanged]);
+
+  const isDeploymentGroupSelectionRoute = props.page === "deployment-group-validation";
+  const isDeploymentGroupValidationRoute = props.page === "deployment-group-validation-page";
+  const isDeploymentGroupRoute = isDeploymentGroupSelectionRoute || isDeploymentGroupValidationRoute;
+
+  useEffect(() => {
+    if (!isDeploymentGroupRoute) {
+      setDeploymentGroupAccessLoading(false);
+      return;
+    }
+    if (selectedUserType === "master") {
+      setDeploymentGroupAccessLoading(false);
+      return;
+    }
+
+    const ac = new AbortController();
+    setDeploymentGroupAccessLoading(true);
+    void resolveCurrentUserType(props.region, ac.signal)
+      .then((userType) => {
+        if (ac.signal.aborted) return;
+        setSelectedUserType(userType);
+        setDeploymentGroupAccessLoading(false);
+      })
+      .catch((error) => {
+        if ((error as any)?.name === "AbortError") return;
+        setSelectedUserType("vendor");
+        setDeploymentGroupAccessLoading(false);
+      });
+
+    return () => ac.abort();
+  }, [isDeploymentGroupRoute, selectedUserType, props.region]);
 
   // Hydrate rack context from URL when user refreshes or opens /rack/{id} directly.
   useEffect(() => {
@@ -201,11 +249,36 @@ const Content = (props: Props) => {
 
   const isRack = Boolean(props.page?.includes("rack"));
   const isCabling = Boolean(props.page?.includes("cabling"));
-  const isHome = !isRack && !isCabling;
+  const isDeploymentGroupSelection = Boolean(
+    isDeploymentGroupSelectionRoute && selectedUserType === "master"
+  );
+  const isDeploymentGroupValidationPage = Boolean(
+    isDeploymentGroupValidationRoute && selectedUserType === "master"
+  );
+  const isHome = !isRack && !isCabling && !isDeploymentGroupRoute;
   return (
     <div class="oj-web-applayout-max-width oj-web-applayout-content">
       {isCabling ? (
         <Cabling />
+      ) : isDeploymentGroupRoute && deploymentGroupAccessLoading ? (
+        <div class="deployment-group-loading" role="status" aria-live="polite">
+          <oj-progress-circle size="md" value={-1}></oj-progress-circle>
+          <div>Checking access...</div>
+        </div>
+      ) : isDeploymentGroupRoute && selectedUserType !== "master" ? (
+        <div class="deployment-group-access-denied" role="alert">
+          Deployment Group Validation is available only to master users.
+        </div>
+      ) : isDeploymentGroupSelection ? (
+        <DeploymentGroupSelectionPage
+          region={props.region}
+          onPageChanged={props.onPageChanged}
+        />
+      ) : isDeploymentGroupValidationPage ? (
+        <DeploymentGroupValidationPage
+          region={props.region}
+          onPageChanged={props.onPageChanged}
+        />
       ) : (
         <>
       {/* Keep Home mounted to preserve project/filter state; isActive pauses Home-only requests while hidden. */}
@@ -214,6 +287,7 @@ const Content = (props: Props) => {
           <HomeContainer
             isActive={isHome}
             onRackChanged={rackChangedHandler}
+            onUserTypeChanged={setSelectedUserType}
             vendor={selectedVendor}
             region={props.region}
           />
