@@ -28,7 +28,6 @@ import {
   DeploymentGroupValidationPage,
 } from "../deployment-group-validation";
 import { getInitialLvvUserType } from "../home/userType";
-import Qc from "../qc";
 
 
 type Props = {
@@ -38,7 +37,6 @@ type Props = {
   onPageChanged: (value: any) => void;
   onVendorChanged: (vendor: string) => void;
   onUserTypeChanged: (userType: "master" | "vendor") => void;
-  vendorName?: string;
   region: string;
 };
 
@@ -67,7 +65,6 @@ const Content = (props: Props) => {
   const [selectedRackRegion, setSelectedRackRegion] = useState(INIT_DEFAULT);
   const [selectedResolveEnabled, setSelectedResolveEnabled] = useState<boolean>(false);
   const [selectedResolveDisabledReason, setSelectedResolveDisabledReason] = useState<string>("");
-  const [selectedCablingSiteName, setSelectedCablingSiteName] = useState<string>("");
   const [rackReady, setRackReady] = useState<boolean>(false);
   const [rackLoadError, setRackLoadError] = useState<string>("");
   const [rackSNVersion, setRackSNVersion] = useState(0);
@@ -159,7 +156,7 @@ const Content = (props: Props) => {
         }
         setSelectedResolveEnabled(Boolean(ctx.resolveEnabled));
         setSelectedResolveDisabledReason(String(ctx.resolveDisabledReason || ""));
-    setRackSNVersion((v) => v + 1);
+        setRackSNVersion((v) => v + 1);
 
         if (!ctx.userType) {
           const currentUserTypeAc = new AbortController();
@@ -259,11 +256,10 @@ const Content = (props: Props) => {
     isDeploymentGroupValidationRoute && selectedUserType === "master"
   );
   const isHome = !isRack && !isCabling && !isDeploymentGroupRoute;
-  const isQc = Boolean(props.page?.includes("qc"));
   return (
-    <div class="oj-web-applayout-max-width oj-web-applayout-content lvv-route-content">
+    <div class="oj-web-applayout-max-width oj-web-applayout-content">
       {isCabling ? (
-        <Cabling onSelectedSiteNameChanged={setSelectedCablingSiteName} />
+        <Cabling />
       ) : isDeploymentGroupRoute && deploymentGroupAccessLoading ? (
         <div class="deployment-group-loading" role="status" aria-live="polite">
           <oj-progress-circle size="md" value={-1}></oj-progress-circle>
@@ -282,13 +278,6 @@ const Content = (props: Props) => {
         <DeploymentGroupValidationPage
           region={props.region}
           onPageChanged={props.onPageChanged}
-        />
-      ) : isQc ? (
-        <Qc
-          page={props.page}
-          onPageChanged={props.onPageChanged}
-          selectedSiteName={selectedCablingSiteName}
-          vendorName={props.vendorName}
         />
       ) : (
         <>

@@ -35,6 +35,29 @@ function omitIgnoredDeploymentGroupDevices(
   );
 }
 
+function hasDeploymentGroupRackResult(
+  results: DeploymentGroupValidationResults,
+  rackSerialNumber: string
+): boolean {
+  return Boolean(
+    rackSerialNumber &&
+    Object.prototype.hasOwnProperty.call(results, rackSerialNumber)
+  );
+}
+
+export function getDeploymentGroupRackValidationFailures(params: {
+  rackSerialNumber: string;
+  results: DeploymentGroupValidationResults;
+}): ValidationFailuresByDevice {
+  if (!hasDeploymentGroupRackResult(params.results, params.rackSerialNumber)) {
+    return {};
+  }
+
+  return omitIgnoredDeploymentGroupDevices(
+    normalizeValidationFailuresPayload(params.results, params.rackSerialNumber)
+  );
+}
+
 export function getRackFailureTotal(summary: RackValidationSummary): number {
   return (
     summary.lldpFailures +
@@ -90,15 +113,11 @@ export function buildDeploymentGroupRackRows(params: {
   return params.rackNumbers.map((rackNumber) => {
     const metadata = params.metadataByRackNumber[rackNumber];
     const rackSerialNumber = metadata?.rackSerialNumber || "";
-    const hasResult = Boolean(
-      rackSerialNumber &&
-      Object.prototype.hasOwnProperty.call(params.results, rackSerialNumber)
-    );
-    const failuresByDevice = hasResult
-      ? omitIgnoredDeploymentGroupDevices(
-          normalizeValidationFailuresPayload(params.results, rackSerialNumber)
-        )
-      : {};
+    const hasResult = hasDeploymentGroupRackResult(params.results, rackSerialNumber);
+    const failuresByDevice = getDeploymentGroupRackValidationFailures({
+      results: params.results,
+      rackSerialNumber,
+    });
     const summary = hasResult
       ? toValidatedSummary(summarizeValidationFailuresByDevice(failuresByDevice))
       : NOT_VALIDATED_SUMMARY;

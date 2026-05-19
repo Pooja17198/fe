@@ -1,5 +1,6 @@
 import {
   DeviceStatus,
+  ValidationMode,
   DeviceValidationFailures,
   ValidationFailure,
   ValidationFailuresByDevice,
@@ -120,6 +121,7 @@ export function normalizeDeviceStatusesPayload(payload: unknown): DeviceStatus[]
     const statusValue = pick(record, ["jobStatus", "status", "validationStatus"], "NOT_TRIGGERED");
     const elevation = toInteger(record["elevation"] ?? record["slot"]);
     const eligibility = inferValidationEligibility(record);
+    const validationMode = inferValidationMode(record) ?? prior?.validationMode;
 
     devicesByName.set(deviceName, {
       deviceName,
@@ -134,6 +136,8 @@ export function normalizeDeviceStatusesPayload(payload: unknown): DeviceStatus[]
         typeof eligibility.eligible === "boolean"
           ? eligibility.eligible
           : prior?.validationEligible,
+      validationMode:
+        validationMode || prior?.validationMode,
       validationEligibilityReason:
         eligibility.reason || prior?.validationEligibilityReason,
       _key: deviceName,
@@ -156,6 +160,13 @@ export function getPeriodicRefreshDeviceNames(
 
   return deviceStatuses
     .filter((device) => {
+      if (device.validationMode === "STREAMING") {
+        return device.validationEligible !== false;
+      }
+      if (device.validationMode === "ON_DEMAND") {
+        return false;
+      }
+
       if (isPeriodicValidationRefreshEnabledForAllDevices()) {
         return true;
       }
@@ -332,6 +343,11 @@ export function mergeRackValidationSummaries(
 function inferValidationEligibility(
   record: RowRecord
 ): { eligible: boolean; reason?: string } {
+  const explicitReason = firstString([
+    record["validationEligibilityReason"],
+    record["eligibilityReason"],
+    record["reason"],
+  ]);
   const explicitEligibility = firstBoolean([
     record["validationEligible"],
     record["isValidationEligible"],
@@ -347,7 +363,7 @@ function inferValidationEligibility(
       ? { eligible: true }
       : {
           eligible: false,
-          reason: "Device is not in monitored and deployed state.",
+          reason: explicitReason || "Device is not in monitored and deployed state.",
         };
   }
 
@@ -380,6 +396,24 @@ function inferValidationEligibility(
   }
 
   return { eligible: true };
+}
+
+function inferValidationMode(record: RowRecord): ValidationMode | undefined {
+  const explicitMode = firstString([
+    record["validationMode"],
+    record["validation_mode"],
+  ]);
+
+  if (!explicitMode) {
+    return undefined;
+  }
+
+  const normalizedMode = explicitMode.trim().toUpperCase();
+  if (normalizedMode === "ON_DEMAND" || normalizedMode === "STREAMING") {
+    return normalizedMode as ValidationMode;
+  }
+
+  return undefined;
 }
 
 function inferMonitored(record: RowRecord): boolean | null {

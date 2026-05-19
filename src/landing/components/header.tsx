@@ -24,43 +24,12 @@ type Props = Readonly<{
   userType?: "master" | "vendor",
   regionValue?: string,
   page: string,
-  onRegionChanged?: (region: string) => void,
-  onPageChanged: (value: any) => void,
-  onMenuClick?: () => void,
-  isMenuOpen?: boolean;
+  onRegionChanged?: (region: string) => void
+  onPageChanged: (value: any) => void;
 }>;
 
-type HeaderNavItem = {
-  path: "home" | "cabling";
-  label: string;
-};
-
-const headerNavItems: HeaderNavItem[] = [
-  { path: "cabling", label: "Cabling and Materials" },
-  { path: "home", label: "Rack Validation" }
-];
-
-const headerNavDP = new MutableArrayDataProvider<HeaderNavItem["path"], HeaderNavItem>(
-    headerNavItems,
-    { keyAttributes: "path" }
-);
-
-export function Header(
-    {
-      appName,
-      userLogin,
-      vendorName,
-      regionValue,
-      page,
-      userType,
-      onRegionChanged,
-      onPageChanged,
-      onMenuClick,
-      isMenuOpen
-    }: Props) {
-  const mediaQueryRef = useRef<MediaQueryList>(
-      window.matchMedia(ResponsiveUtils.getFrameworkQuery("sm-only")!)
-  );
+export function Header({ appName, userLogin, vendorName, userType, regionValue, page, onRegionChanged, onPageChanged }: Props) {
+  const mediaQueryRef = useRef<MediaQueryList>(window.matchMedia(ResponsiveUtils.getFrameworkQuery("sm-only")!));
 
   const [isSmallWidth, setIsSmallWidth] = useState(mediaQueryRef.current.matches);
 
@@ -231,33 +200,6 @@ export function Header(
     tabs.slice(0),
     { keyAttributes: "path" }
   );
-  const headerNavSelection =
-      page === "cabling"
-          ? "cabling"
-          : page === "home" || !page
-              ? "home"
-              : undefined;
-
-  const headerNavItemTemplate = (
-      item: ojTabBar.ItemContext<HeaderNavItem["path"], HeaderNavItem>
-  ) => (
-      <li>
-        <a href="#">
-          {item.data.label}
-        </a>
-      </li>
-  );
-
-  const handleHeaderNavChanged = (
-      event: ojTabBar.selectionChanged<HeaderNavItem["path"], HeaderNavItem>
-  ) => {
-    const nextPath = event.detail.value;
-    if (!nextPath || nextPath === page) {
-      return;
-    }
-
-    onPageChanged({ path: nextPath });
-  };
 
   // TODO: Add a Home Button
   // Log regions data for debugging just before rendering
@@ -265,26 +207,13 @@ export function Header(
   return (
       <header role="banner" class="oj-web-applayout-header">
         <div class="oj-web-applayout-max-width oj-flex-bar oj-sm-align-items-center">
-          <oj-button
-              id="menuOpener"
-              display="icons"
-              class="oj-sm-margin-2x-end"
-              onojAction={() => onMenuClick?.()}
-          >
-            {isMenuOpen ? (
-                <span slot="startIcon" className="oj-ux-ico-close"></span>
-            ) : (
-                <span slot="startIcon" className="oj-ux-ico-menu"></span>
-            )}
-          </oj-button>
-
           <div class="oj-flex-bar-middle oj-sm-align-items-baseline">
           <span
               role="img"
               class="oj-icon demo-oracle-icon"
               title="Oracle Logo"
               // alt="Oracle Logo"
-          >
+              >
           </span>
             <h1
                 class="oj-sm-only-hide oj-web-applayout-header-title"
@@ -292,17 +221,17 @@ export function Header(
               {appName} Vendor Name: {vendorName}
             </h1>
           </div>
-          <oj-tab-bar
-              class="lvv-tabbar oj-sm-margin-8x-end"
-              edge="top"
-              data={headerNavDP}
-              selection={headerNavSelection}
-              onselectionChanged={handleHeaderNavChanged}
-          >
-            <template slot="itemTemplate" render={headerNavItemTemplate}></template>
-          </oj-tab-bar>
+        <oj-tab-bar
+          class="lvv-tabbar oj-sm-margin-8x-end"
+          edge="top"
+          data={tabbarDP}
+          selection={activeTab}
+          onselectionChanged={loadTabContent}
+        >
+          <template slot="itemTemplate" render={tabItemTemplate}></template>
+        </oj-tab-bar>
           <div class="oj-flex-bar-end">
-            {regions.length > 0 && !isCabling && (
+            {regions.length > 0 && !isCabling &&(
                 <oj-combobox-one
                     ref={regionRef}
                     value={regionValue}

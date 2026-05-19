@@ -1,13 +1,9 @@
 import { GraphView } from "./components/GraphView";
 
-type CablingProps = {
-  onSelectedSiteNameChanged?: (siteName: string) => void;
-};
+const Cabling = () => {
 
-const Cabling = ({ onSelectedSiteNameChanged }: CablingProps) => {
-  return (
-    <GraphView onSelectedSiteNameChanged={onSelectedSiteNameChanged} />
-  );
+  return         <GraphView />
+;
 };
 
 export default Cabling;

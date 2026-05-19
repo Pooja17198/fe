@@ -1,7 +1,10 @@
+export type ValidationMode = "ON_DEMAND" | "STREAMING";
+
 export type DeviceStatus = {
   deviceName: string;
   jobStatus: string;
   elevation?: number;
+  validationMode?: ValidationMode;
   validationEligible?: boolean;
   validationEligibilityReason?: string;
   hostReadinessLoading?: boolean;

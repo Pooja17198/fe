@@ -5,6 +5,7 @@ declare global {
   }
 }
 
+// Set LOCAL_API_BASE to https://downstream.service.lvv.us-phoenix-1.oci.oc-test.com/lvv if you want to point it to beta backend
 const LOCAL_API_BASE = "http://localhost:21000/lvv";
 const LOCAL_IDE_API_BASE = "http://localhost:21000/idelvv";
 

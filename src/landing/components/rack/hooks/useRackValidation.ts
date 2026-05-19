@@ -79,6 +79,8 @@ type UseRackValidationResult = {
     periodicValidationDeviceNames: Set<string>;
     periodicValidationDeviceCount: number;
     periodicRefreshIntervalMs: number;
+    onDemandValidationDeviceNames: Set<string>;
+    onDemandValidationDeviceCount: number;
     resolveFeatureEnabled: boolean;
     resolveAllowed: boolean;
     resolveTooltip: string;
@@ -168,18 +170,37 @@ export function useRackValidation(props: RackProps, options?: UseRackValidationO
         () => deviceStatuses.filter(isDeviceValidationEligible).map((device) => device.deviceName),
         [deviceStatuses]
     );
-    const periodicValidationRefreshEnabled = useMemo(
-        () =>
-            validationServiceView &&
-            isPeriodicValidationRefreshEnabledForRack({
-                region: props.region,
-                building: props.building,
-                block: props.block,
-                rackSerial: props.rack_serial,
-                isGpuRack: props.isGpuRack,
-            }),
-        [validationServiceView, props.region, props.building, props.block, props.rack_serial, props.isGpuRack]
-    );
+    const periodicValidationRefreshEnabled = useMemo(() => {
+        if (!validationServiceView) {
+            return false;
+        }
+
+        const hasBackendValidationModes = deviceStatuses.some(
+            (device) => device.validationMode === "ON_DEMAND" || device.validationMode === "STREAMING"
+        );
+
+        if (hasBackendValidationModes) {
+            return deviceStatuses.some(
+                (device) => device.validationMode === "STREAMING" && device.validationEligible !== false
+            );
+        }
+
+        return isPeriodicValidationRefreshEnabledForRack({
+            region: props.region,
+            building: props.building,
+            block: props.block,
+            rackSerial: props.rack_serial,
+            isGpuRack: props.isGpuRack,
+        });
+    }, [
+        validationServiceView,
+        deviceStatuses,
+        props.region,
+        props.building,
+        props.block,
+        props.rack_serial,
+        props.isGpuRack,
+    ]);
     const periodicRefreshDeviceNames = useMemo(
         () =>
             getPeriodicRefreshDeviceNames(deviceStatuses, {
@@ -197,6 +218,21 @@ export function useRackValidation(props: RackProps, options?: UseRackValidationO
         [validationEligibleDeviceNames]
     );
     const eligibleDeviceNameSet = useMemo(() => new Set(eligibleDeviceNames), [eligibleDeviceNames]);
+    const onDemandValidationDeviceNames = useMemo(
+        () =>
+            deviceStatuses
+                .filter(
+                    (device) =>
+                        isDeviceValidationEligible(device) &&
+                        device.validationMode === "ON_DEMAND"
+                )
+                .map((device) => device.deviceName),
+        [deviceStatuses]
+    );
+    const onDemandValidationDeviceNameSet = useMemo(
+        () => new Set(onDemandValidationDeviceNames),
+        [onDemandValidationDeviceNames]
+    );
 
     // Only run effects when rack context is complete (prevents running on Home page)
     const rackContextReady = Boolean(props.region && props.rack_serial && props.rack && props.building);
@@ -408,11 +444,14 @@ export function useRackValidation(props: RackProps, options?: UseRackValidationO
         props.rack_serial,
     ]);
 
-    const fetchDeviceValidationStatuses = useCallback(async (): Promise<boolean> => {
+    const fetchDeviceValidationStatuses = useCallback(async (): Promise<{
+        inProgress: boolean;
+        devices: DeviceStatus[];
+    }> => {
         setDevicesLoading(true);
         try {
             if (!props.rack_serial || !props.region || !props.rack || !props.building) {
-                return false;
+                return { inProgress: false, devices: [] };
             }
 
             const localStubStatuses = getLocalRackStubDeviceStatuses({
@@ -424,7 +463,7 @@ export function useRackValidation(props: RackProps, options?: UseRackValidationO
             if (localStubStatuses) {
                 setDeviceStatuses(localStubStatuses);
                 setIsValidating(false);
-                return false;
+                return { inProgress: false, devices: localStubStatuses };
             }
 
             const url = new URL(`${LVV_API}/allDevicesInRack`);
@@ -449,16 +488,16 @@ export function useRackValidation(props: RackProps, options?: UseRackValidationO
                     normalizedDevices.filter((device) => isDeviceValidationEligible(device))
                 );
                 setIsValidating(inProgress);
-                return inProgress;
+                return { inProgress, devices: normalizedDevices };
             } else {
                 setDeviceStatuses([]);
                 setIsValidating(false);
-                return false;
+                return { inProgress: false, devices: [] };
             }
         } finally {
             setDevicesLoading(false);
         }
-        return false;
+        return { inProgress: false, devices: [] };
     }, [props.region, props.rack, props.building, props.rack_serial, props.isGpuRack, props.rackState]);
 
     const prefetchPatchPanelRowsForCurrentRack = useCallback(async (
@@ -534,7 +573,9 @@ export function useRackValidation(props: RackProps, options?: UseRackValidationO
         }
     }, [prefetchPatchPanelRowsForCurrentRack]);
 
-    const fetchValidationFailures = useCallback(async (): Promise<boolean> => {
+    const fetchValidationFailures = useCallback(async (
+      options?: { excludedDeviceNames?: Set<string> }
+    ): Promise<boolean> => {
       try {
         if (!props.rack_serial || !props.region) return false;
 
@@ -544,9 +585,14 @@ export function useRackValidation(props: RackProps, options?: UseRackValidationO
           rackNumber: props.rack,
           rackSerialNumber: props.rack_serial,
         });
+        const excludedDeviceNames = options?.excludedDeviceNames;
         if (localStubPayload) {
           const normalized = normalizeValidationFailuresPayload(localStubPayload, props.rack_serial);
-          const manualFailures = filterOutPeriodicValidationDevices(normalized);
+          const manualFailures = excludedDeviceNames
+            ? Object.fromEntries(
+                Object.entries(normalized).filter(([deviceName]) => !excludedDeviceNames.has(deviceName))
+              ) as ValidationFailuresByDevice
+            : filterOutPeriodicValidationDevices(normalized);
           validationFailuresByDeviceRef.current = manualFailures;
           setValidationFailuresByDevice(manualFailures);
           setPatchPanelByDevicePort({});
@@ -568,7 +614,11 @@ export function useRackValidation(props: RackProps, options?: UseRackValidationO
 
         const data: unknown = await resp.json();
         const normalized = normalizeValidationFailuresPayload(data, props.rack_serial);
-        const manualFailures = filterOutPeriodicValidationDevices(normalized);
+        const manualFailures = excludedDeviceNames
+          ? Object.fromEntries(
+              Object.entries(normalized).filter(([deviceName]) => !excludedDeviceNames.has(deviceName))
+            ) as ValidationFailuresByDevice
+          : filterOutPeriodicValidationDevices(normalized);
         const mergedFailures = mergeValidationFailuresByDevice(
           validationFailuresByDeviceRef.current,
           manualFailures
@@ -790,13 +840,32 @@ export function useRackValidation(props: RackProps, options?: UseRackValidationO
         const startSignal = pageAbortRef.current?.signal as AbortSignal | undefined;
 
         void (async () => {
-            const inProgress = await fetchDeviceValidationStatuses();
+            const { inProgress, devices } = await fetchDeviceValidationStatuses();
 
             const sameContext = currentRackKeyRef.current === expectedKey;
             const notAborted = !(startSignal && startSignal.aborted);
             if (sameContext && notAborted) {
                 console.log("isValidating (fresh) ", inProgress);
                 if (validationServiceView) {
+                    const streamingDeviceNames = new Set(
+                        devices
+                            .filter(
+                                (device) =>
+                                    isDeviceValidationEligible(device) &&
+                                    device.validationMode === "STREAMING"
+                            )
+                            .map((device) => device.deviceName)
+                    );
+                    const hasOnDemandDevices = devices.some(
+                        (device) =>
+                            isDeviceValidationEligible(device) &&
+                            device.validationMode === "ON_DEMAND"
+                    );
+                    if (hasOnDemandDevices) {
+                        await fetchValidationFailures({
+                            excludedDeviceNames: streamingDeviceNames,
+                        });
+                    }
                     return;
                 }
                 if (inProgress){
@@ -842,17 +911,23 @@ export function useRackValidation(props: RackProps, options?: UseRackValidationO
         }
 
         const isSelectedValidation = selectedLinkKeys.size > 0;
+        const validateTargetDeviceNames = validationServiceView
+            ? onDemandValidationDeviceNames
+            : eligibleDeviceNames;
+        const validateTargetDeviceNameSet = validationServiceView
+            ? onDemandValidationDeviceNameSet
+            : eligibleDeviceNameSet;
         const requestedDeviceNames = new Set<string>();
         if (selectedLinkKeys.size > 0) {
             Array.from(selectedLinkKeys).forEach((key) => {
                 const deviceName = selectedKeyToDeviceName(key);
-                if (eligibleDeviceNameSet.has(deviceName)) {
+                if (validateTargetDeviceNameSet.has(deviceName)) {
                     requestedDeviceNames.add(deviceName);
                 }
             });
         }
         if (requestedDeviceNames.size === 0) {
-            eligibleDeviceNames.forEach((name) => requestedDeviceNames.add(name));
+            validateTargetDeviceNames.forEach((name) => requestedDeviceNames.add(name));
         }
 
         const buildValidationUrl = (
@@ -1027,6 +1102,8 @@ export function useRackValidation(props: RackProps, options?: UseRackValidationO
                                             : device.validationEligible,
                                     validationEligibilityReason:
                                         prior?.validationEligibilityReason ?? device.validationEligibilityReason,
+                                    validationMode:
+                                        device.validationMode ?? prior?.validationMode,
                                     _key: device.deviceName,
                                 });
                             });
@@ -1114,10 +1191,22 @@ export function useRackValidation(props: RackProps, options?: UseRackValidationO
             return;
         }
 
+        if (validationServiceView && onDemandValidationDeviceNames.length === 0) {
+            setJobErrorDetails({
+                code: 400,
+                message: "No devices on this tab are enabled for on-demand validation.",
+            });
+            setIsValidating(false);
+            return;
+        }
+
         setPatchPanelByDevicePort({});
         const selectedDeviceCount = selectedLinkKeys.size > 0
-            ? Array.from(selectedLinkKeys).filter((key) => eligibleDeviceNameSet.has(selectedKeyToDeviceName(key))).length
-            : eligibleDeviceNames.length;
+            ? Array.from(selectedLinkKeys).filter((key) =>
+                (validationServiceView ? onDemandValidationDeviceNameSet : eligibleDeviceNameSet)
+                    .has(selectedKeyToDeviceName(key))
+            ).length
+            : (validationServiceView ? onDemandValidationDeviceNames.length : eligibleDeviceNames.length);
         const measurement = {
             measurementId: Date.now() + Math.floor(Math.random() * 1000),
             startedAt: Date.now(),
@@ -1206,11 +1295,14 @@ export function useRackValidation(props: RackProps, options?: UseRackValidationO
         pollValidationJob,
         fetchValidationFailures,
         selectedLinkKeys,
+        onDemandValidationDeviceNames,
+        onDemandValidationDeviceNameSet,
         eligibleDeviceNameSet,
         eligibleDeviceNames,
         rackValidationAllowed,
         filterOutPeriodicValidationDevices,
         props.rack_serial,
+        validationServiceView,
     ]);
 
     const resolve = useCallback(async (): Promise<{ ok: true } | { ok: false; message: string }> => {
@@ -1324,6 +1416,8 @@ export function useRackValidation(props: RackProps, options?: UseRackValidationO
         periodicValidationDeviceNames: periodicValidationDeviceNameSet,
         periodicValidationDeviceCount: periodicRefreshDeviceNames.length,
         periodicRefreshIntervalMs,
+        onDemandValidationDeviceNames: onDemandValidationDeviceNameSet,
+        onDemandValidationDeviceCount: onDemandValidationDeviceNames.length,
         resolveFeatureEnabled,
         resolveAllowed,
         resolveTooltip,

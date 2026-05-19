@@ -63,11 +63,7 @@ const getMoreFiltersButtonLabel = (rackFilters: RackFilters): string => {
     : "More filters";
 };
 
-type GraphViewProps = {
-  onSelectedSiteNameChanged?: (siteName: string) => void;
-};
-
-export const GraphView = ({ onSelectedSiteNameChanged }: GraphViewProps) => {
+export const GraphView = () => {
   const [selectedRoom, setSelectedRoom] = useState<DataCenterRoom | null>(null);
   const [materialPanelOpen, setMaterialPanelOpen] = useState<boolean>(false);
   // const [highlights, setHighlights] = useState<HighlightsInfo>({
@@ -148,10 +144,6 @@ export const GraphView = ({ onSelectedSiteNameChanged }: GraphViewProps) => {
   } = usePlatformListByRoom(UseMockData);
 
   const [errors, setErrors] = useState<any[]>([]);
-
-  useEffect(() => {
-    onSelectedSiteNameChanged?.(selectedRoom?.roomName || "");
-  }, [onSelectedSiteNameChanged, selectedRoom?.roomName]);
 
   useEffect(() => {
     const errors = [];
@@ -409,7 +401,7 @@ export const GraphView = ({ onSelectedSiteNameChanged }: GraphViewProps) => {
   };
 
   return (
-    <div class="oj-web-applayout-max-width oj-web-applayout-content lvv-route-content lvv-cabling-content">
+    <div class="oj-web-applayout-max-width oj-web-applayout-content">
       <div className="cabling-selectors-row">
         <div className="cabling-selectors-column cabling-selectors-column--left">
           <RegionADSiteSelectors

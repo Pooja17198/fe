@@ -17,14 +17,6 @@ export interface AdrBuilding {
   roomCanonicalName: string;
 }
 
-export const isAdrBuilding = (
-  value: Partial<AdrBuilding> | null | undefined
-): value is AdrBuilding =>
-  typeof value?.regionDisplayName === "string" &&
-  typeof value?.availabilityDomainCanonicalShortCode === "string" &&
-  typeof value?.buildingCanonicalName === "string" &&
-  typeof value?.roomCanonicalName === "string";
-
 export interface DataCenterRackRow {
   /**
    * Row number of the rack row.

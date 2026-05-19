@@ -82,6 +82,7 @@ export function useDeploymentGroupValidation(params: {
   const [jobMetadata, setJobMetadata] =
     useState<DeploymentGroupJobMetadata>(NOT_TRIGGERED_METADATA);
   const [rows, setRows] = useState<DeploymentGroupRackRow[]>([]);
+  const [resultsLoaded, setResultsLoaded] = useState(false);
 
   const requestSeqRef = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
@@ -124,6 +125,7 @@ export function useDeploymentGroupValidation(params: {
         })
       : {};
 
+    setResultsLoaded(true);
     applyRows(
       makeRows({
         rackNumbers,
@@ -217,6 +219,7 @@ export function useDeploymentGroupValidation(params: {
     setErrorMessage(null);
     setWarningMessage(null);
     setIsValidating(false);
+    setResultsLoaded(false);
 
     if (!params.region || !params.building || !params.deploymentGroup) {
       applyRows([]);
@@ -382,6 +385,7 @@ export function useDeploymentGroupValidation(params: {
     isValidating,
     jobMetadata,
     rows,
+    resultsLoaded,
     summary,
     refresh: loadInitialData,
     validateDeploymentGroup,

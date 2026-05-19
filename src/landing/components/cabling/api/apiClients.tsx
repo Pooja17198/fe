@@ -7,7 +7,6 @@ import {
   BuildArtifactsApi,
   PhysicalCutsheetApi,
   RackViewApi,
-  QcApi,
 } from "../../../../../gen/clients/ide-lvv-client";
 
 
@@ -32,20 +31,6 @@ if (window.location.host.includes("oraclecloud")) {
     dxfPath: dxfPaths["dev"],
   };
 }
-
-export const QcApiBasePath = paths.dxfPath;
-
-const withSplatCsrfHeader = (request: Request) => {
-  const method = request.method.toUpperCase();
-  if (!["POST", "PUT", "PATCH", "DELETE"].includes(method)) {
-    return Promise.resolve(request);
-  }
-
-  const headers = new Headers(request.headers);
-  headers.set("X-OCI-Splat-CSRF", "1");
-
-  return Promise.resolve(new Request(request, { headers }));
-};
 
 export const MaterialApiClient = new MaterialApi(
   window.fetch.bind(window),
@@ -86,10 +71,3 @@ export const RackViewApiClient = new RackViewApi(
   window.fetch.bind(window),
   paths.dxfPath,  
 );
-export const QcApiClient = new QcApi(
-  window.fetch.bind(window),
-  paths.dxfPath,
-  {
-    requestInterceptors: [withSplatCsrfHeader],
-  },
-)

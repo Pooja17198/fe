@@ -10,20 +10,25 @@ import "ojs/ojpagingcontrol";
 import { ProjectLoadMeasurement } from "./types";
 import { emitMetric, TELEMETRY_METRICS } from "../telemetry/api";
 import { getLvvApiBase } from "../../config/api";
-import { fetchWithRetry } from "../rack/api";
+import { createCsrfHeaders, fetchWithRetry } from "../rack/api";
 import type { RackValidationSummary } from "../rack/validationShared";
 import {
     asArray,
     asRecord,
+    mergeRackValidationSummaries,
+    normalizeDeviceStatusesPayload,
     normalizeValidationFailuresPayload,
     NOT_VALIDATED_SUMMARY,
     summarizeValidationFailuresByDevice,
 } from "../rack/validationShared";
 import {
+    getLocalRackStubDeviceStatuses,
     getLocalRackStubRows,
     getLocalRackStubValidationPayload,
     mergeLocalRackStubRows,
 } from "../../localRackStub";
+import type { DeviceStatus, ValidationMode } from "../rack/types";
+import { isGpuComputeDevice } from "../rack/utils";
 
 const BASE_RACK_COLUMNS = [
     { headerText: "Rack Location", field: "rackLocation", id: "rackLocation", resizable: "enabled" as const, sortable: 'enabled' as const },
@@ -160,6 +165,95 @@ async function fetchRackValidationPayload(
     } catch {
         return null;
     }
+}
+
+async function fetchRackDeviceStatuses(
+    row: ProjectRackRow,
+    region: string,
+    signal: AbortSignal
+): Promise<DeviceStatus[] | null> {
+    const localStubStatuses = getLocalRackStubDeviceStatuses({
+        region,
+        building: row.building,
+        rackNumber: row.rackLocation,
+        rackSerialNumber: row.rackSerialNumber,
+    });
+    if (localStubStatuses) {
+        return localStubStatuses.map((device) => ({
+            ...device,
+            validationMode: device.validationMode ?? "ON_DEMAND",
+        }));
+    }
+
+    const url = new URL(`${API_URL}/allDevicesInRack`);
+    url.searchParams.set("rackSerialNumber", row.rackSerialNumber);
+    url.searchParams.set("regionName", region);
+    url.searchParams.set("rackNumber", row.rackLocation);
+    url.searchParams.set("buildingName", row.building);
+    url.searchParams.set("isGPURack", String(Boolean(row.isGpuRack)));
+    url.searchParams.set("rackState", String(row.rackState || ""));
+
+    const response = await fetchWithRetry(url.href, { method: "GET", signal });
+    if (!response.ok) {
+        return null;
+    }
+
+    const payload: unknown = await response.json();
+    return normalizeDeviceStatusesPayload(payload);
+}
+
+async function fetchRackStreamingValidationPayload(
+    row: ProjectRackRow,
+    region: string,
+    deviceNames: string[],
+    signal: AbortSignal
+): Promise<unknown | null> {
+    if (!row.rackSerialNumber || !region || deviceNames.length === 0) {
+        return null;
+    }
+
+    const headers = createCsrfHeaders();
+    headers.append("Content-Type", "application/json");
+    const url = new URL(`${API_URL}/getResultsFromValidationService`);
+    const payload = {
+        regionName: region,
+        buildingName: row.building,
+        rackSerialNumber: row.rackSerialNumber,
+        rackNumber: row.rackLocation,
+        devices: deviceNames.map((deviceName) => ({
+            deviceName,
+            isGpuDevice: isGpuComputeDevice(deviceName, row.isGpuRack),
+        })),
+    };
+
+    const response = await fetchWithRetry(url.href, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(payload),
+        signal,
+    });
+    if (!response.ok) {
+        return null;
+    }
+
+    const body = await response.text();
+    if (!body.trim()) {
+        return null;
+    }
+
+    try {
+        return JSON.parse(body) as unknown;
+    } catch {
+        return null;
+    }
+}
+
+function normalizeValidationMode(value: ValidationMode | string | undefined): ValidationMode | undefined {
+    const normalized = String(value || "").trim().toUpperCase();
+    if (normalized === "ON_DEMAND" || normalized === "STREAMING") {
+        return normalized as ValidationMode;
+    }
+    return undefined;
 }
 
 async function fetchRackHostReadinessPayload(
@@ -354,12 +448,65 @@ async function fetchRackValidationSummary(
         return NOT_VALIDATED_SUMMARY;
     }
 
-    const cablingPayload = await fetchRackValidationPayload(row, region, signal);
+    const [deviceStatuses, cablingPayload] = await Promise.all([
+        fetchRackDeviceStatuses(row, region, signal),
+        fetchRackValidationPayload(row, region, signal),
+    ]);
     const cablingFailuresByDevice = cablingPayload
         ? normalizeValidationFailuresPayload(cablingPayload, row.rackSerialNumber)
         : {};
 
-    return summarizeValidationFailuresByDevice(cablingFailuresByDevice);
+    if (!deviceStatuses || deviceStatuses.length === 0) {
+        return summarizeValidationFailuresByDevice(cablingFailuresByDevice);
+    }
+
+    const hasBackendValidationModes = deviceStatuses.some((device) => {
+        const validationMode = normalizeValidationMode(device.validationMode);
+        return validationMode === "ON_DEMAND" || validationMode === "STREAMING";
+    });
+
+    const onDemandDeviceNames = deviceStatuses
+        .filter((device) => {
+            if (device.validationEligible !== true) {
+                return false;
+            }
+
+            const validationMode = normalizeValidationMode(device.validationMode);
+            if (hasBackendValidationModes) {
+                return validationMode === "ON_DEMAND";
+            }
+            return true;
+        })
+        .map((device) => device.deviceName);
+
+    const streamingDeviceNames = deviceStatuses
+        .filter((device) => {
+            if (device.validationEligible !== true) {
+                return false;
+            }
+
+            return normalizeValidationMode(device.validationMode) === "STREAMING";
+        })
+        .map((device) => device.deviceName);
+
+    const streamingPayload = await fetchRackStreamingValidationPayload(
+        row,
+        region,
+        streamingDeviceNames,
+        signal
+    );
+    const streamingFailuresByDevice = streamingPayload
+        ? normalizeValidationFailuresPayload(streamingPayload, row.rackSerialNumber)
+        : {};
+
+    const onDemandSummary = summarizeValidationFailuresByDevice(cablingFailuresByDevice, {
+        includeDeviceNames: onDemandDeviceNames,
+    });
+    const streamingSummary = summarizeValidationFailuresByDevice(streamingFailuresByDevice, {
+        includeDeviceNames: streamingDeviceNames,
+    });
+
+    return mergeRackValidationSummaries(onDemandSummary, streamingSummary);
 }
 
 function getHostReadinessItems(payload: unknown): Record<string, unknown>[] {

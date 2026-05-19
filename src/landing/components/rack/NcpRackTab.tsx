@@ -5,7 +5,6 @@ import { useRackValidation } from "./hooks/useRackValidation";
 import { RackProps } from "./types";
 
 const NcpRackTab = (props: RackProps) => {
-  const summaryTitle = props.userType === "master" ? "On-demand" : "Validation Summary";
   const [hideUnsupported, setHideUnsupported] = useState(true);
   const [externalExpandedKeys, setExternalExpandedKeys] = useState<Set<string>>(new Set());
   const [externalExpandedKeysNonce, setExternalExpandedKeysNonce] = useState(0);
@@ -130,7 +129,7 @@ const NcpRackTab = (props: RackProps) => {
       <div className="device-accordion-toolbar">
         <h3 className="device-accordion-summary-title">
           <span role="img" className="oj-icon validation-summary-icon" title="Validation Summary Image"></span>
-          {summaryTitle}
+          On-demand
         </h3>
 
         <div className="flex-spacer" />

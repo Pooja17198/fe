@@ -185,6 +185,7 @@ type ValidationSectionTableProps = {
   deviceIndex: number;
   deviceName: string;
   isGpuRack?: boolean;
+  hideLastExecuted?: boolean;
   section: ValidationSection;
   expanded?: boolean;
   onExpandedChange?: (expanded: boolean) => void;
@@ -259,9 +260,9 @@ function areValidationTableRowsEqual(
 }
 
 function ValidationSectionRowsTable(
-  props: Pick<ValidationSectionTableProps, "deviceIndex" | "section" | "isGpuRack">
+  props: Pick<ValidationSectionTableProps, "deviceIndex" | "section" | "isGpuRack" | "hideLastExecuted">
 ) {
-  const { deviceIndex, section, isGpuRack } = props;
+  const { deviceIndex, section, isGpuRack, hideLastExecuted } = props;
   const stableRowsRef = useRef<ValidationTableRow[]>(section.rows);
 
   if (!areValidationTableRowsEqual(stableRowsRef.current, section.rows)) {
@@ -270,8 +271,8 @@ function ValidationSectionRowsTable(
 
   const stableRows = stableRowsRef.current;
   const sectionColumns = useMemo(
-    () => getSectionColumns(section.title, stableRows, isGpuRack),
-    [section.title, stableRows, isGpuRack]
+    () => getSectionColumns(section.title, stableRows, isGpuRack, hideLastExecuted),
+    [section.title, stableRows, isGpuRack, hideLastExecuted]
   );
   const sectionDataProvider = useMemo(
     () => new ArrayDataProvider(stableRows, { keyAttributes: "_key" }),
@@ -325,13 +326,14 @@ const MemoizedValidationSectionRowsTable = memo(
   (previousProps, nextProps) =>
     previousProps.deviceIndex === nextProps.deviceIndex &&
     previousProps.isGpuRack === nextProps.isGpuRack &&
+    previousProps.hideLastExecuted === nextProps.hideLastExecuted &&
     previousProps.section.title === nextProps.section.title &&
     previousProps.section.key === nextProps.section.key &&
     areValidationTableRowsEqual(previousProps.section.rows, nextProps.section.rows)
 );
 
 function ValidationSectionTable(props: ValidationSectionTableProps) {
-  const { deviceIndex, deviceName, isGpuRack, section, expanded = false, onExpandedChange } = props;
+  const { deviceIndex, deviceName, isGpuRack, hideLastExecuted, section, expanded = false, onExpandedChange } = props;
   const shouldRenderContent = expanded || !onExpandedChange;
 
   return (
@@ -359,6 +361,7 @@ function ValidationSectionTable(props: ValidationSectionTableProps) {
             <MemoizedValidationSectionRowsTable
               deviceIndex={deviceIndex}
               isGpuRack={isGpuRack}
+              hideLastExecuted={hideLastExecuted}
               section={section}
             />
           </div>
@@ -374,6 +377,7 @@ const MemoizedValidationSectionTable = memo(
     previousProps.deviceIndex === nextProps.deviceIndex &&
     previousProps.deviceName === nextProps.deviceName &&
     previousProps.isGpuRack === nextProps.isGpuRack &&
+    previousProps.hideLastExecuted === nextProps.hideLastExecuted &&
     previousProps.section.title === nextProps.section.title &&
     previousProps.section.key === nextProps.section.key &&
     previousProps.expanded === nextProps.expanded &&
@@ -1077,10 +1081,10 @@ function hasRenderableValue(value: unknown): boolean {
   return value !== null && value !== undefined;
 }
 
-function buildGpuLldpColumns(sectionRows: ValidationTableRow[]): any[] {
+function buildGpuLldpColumns(sectionRows: ValidationTableRow[], hideLastExecuted: boolean = false): any[] {
   const shouldShowLastExecuted = sectionRows.some((row) =>
     hasRenderableValue(row["Last Executed"] ?? row.lastExecuted)
-  );
+  ) && !hideLastExecuted;
   const shouldShowErrorMessage = sectionRows.some((row) =>
     hasRenderableValue(row.errorMessage ?? row["Error Message"])
   );
@@ -1372,14 +1376,15 @@ function getColumnTemplate(sectionTitle: string, field: string): string | undefi
 function getSectionColumns(
   sectionTitle: string,
   sectionRows: ValidationTableRow[],
-  isGpuRack?: boolean
+  isGpuRack?: boolean,
+  hideLastExecuted: boolean = false
 ): any[] {
   if (isHostTransceiverOpticsSection(sectionTitle) || isHostTransceiverFecBerSection(sectionTitle)) {
     return buildHostTransceiverColumns(sectionTitle);
   }
 
   if (Boolean(isGpuRack) && isGpuLldpSection(sectionTitle, sectionRows)) {
-    return buildGpuLldpColumns(sectionRows);
+    return buildGpuLldpColumns(sectionRows, hideLastExecuted);
   }
 
   if (Boolean(isGpuRack) && isGpuFecBerSection(sectionTitle, sectionRows)) {
@@ -1428,6 +1433,7 @@ function getSectionColumns(
 
   return orderedFields
       .filter((field) => !(shouldHideErrorMessage && field === "errorMessage"))
+      .filter((field) => !(hideLastExecuted && (field === "Last Executed" || field === "lastExecuted")))
       .map((field) => {
         const template = getColumnTemplate(sectionTitle, field);
         const widthOverrides =
@@ -1954,6 +1960,7 @@ const DeviceAccordion = (props: Props) => {
                     deviceIndex={deviceIndex}
                     deviceName={device.deviceName}
                     isGpuRack={props.isGpuRack}
+                    hideLastExecuted={hideLastExecutedColumn}
                     section={section}
                     expanded={expandedChildSectionKeys.has(childKey)}
                     onExpandedChange={(expanded) =>
@@ -2045,7 +2052,9 @@ const DeviceAccordion = (props: Props) => {
 
   const showReachabilityColumn = props.periodicValidationEnabled;
   const showPsuColumn = !validationServiceView;
+  const showLastValidatedColumn = !validationServiceView;
   const showValidationStateColumn = props.isGpuRack;
+  const hideLastExecutedColumn = validationServiceView;
   const deviceAccordionColumns = [
     ...(showSelection ? ["minmax(24px, 28px)"] : []),
     "minmax(260px, 1.45fr)",
@@ -2053,7 +2062,7 @@ const DeviceAccordion = (props: Props) => {
     "minmax(260px, 1.9fr)",
     ...(showReachabilityColumn ? ["minmax(92px, 118px)"] : []),
     ...(showPsuColumn ? ["minmax(92px, 126px)"] : []),
-    "minmax(128px, 168px)",
+    ...(showLastValidatedColumn ? ["minmax(128px, 168px)"] : []),
     ...(showValidationStateColumn ? ["minmax(148px, 188px)"] : []),
     "minmax(136px, 176px)",
   ].join(" ");
@@ -2300,21 +2309,41 @@ const DeviceAccordion = (props: Props) => {
                     const periodicDevices = props.devices.filter((d) =>
                         isPeriodicValidationDevice(d.deviceName)
                     );
+                    const onDemandDevices = validationServiceView
+                      ? eligibleDevices.filter((d) => !isPeriodicValidationDevice(d.deviceName))
+                      : eligibleDevices;
                     const hasEligibleDevices = eligibleDevices.length > 0;
+                    const hasOnDemandDevices = onDemandDevices.length > 0;
                     const numUnreachable = eligibleDevices.filter((d) => d.jobStatus === "DEVICE_UNREACHABLE").length;
                     const hasAnyValidated = eligibleDevices.some(
                         (d) => d.jobStatus !== "NOT_TRIGGERED" && d.jobStatus !== "IN_PROGRESS"
                     );
-                    if (!hasEligibleDevices && periodicDevices.length > 0) {
+                    if (validationServiceView && !hasOnDemandDevices && periodicDevices.length > 0) {
                       return (
                           <div class="device-accordion-summary-card info">
                             <div>
                               <span class="device-accordion-message-title">
-                                Devices use Periodic Check in this rack.
+                                {periodicDevices.length} device(s) use Periodic Check in this rack.
                               </span>
                               <span class="device-accordion-message-title">
-                                Those devices show a Periodic Check chip in the Status column.
+                                No devices on this tab currently support on-demand validation.
                               </span>
+                            </div>
+                          </div>
+                      );
+                    }
+                    if (validationServiceView && hasOnDemandDevices && !hasAnyValidated) {
+                      return (
+                          <div class="device-accordion-summary-card info">
+                            <div>
+                              <span class="device-accordion-message-title">
+                                Click Validate to run on-demand validation for {onDemandDevices.length} device(s).
+                              </span>
+                              {periodicDevices.length > 0 && (
+                                <span class="device-accordion-message-title">
+                                  {periodicDevices.length} device(s) use Periodic Check.
+                                </span>
+                              )}
                             </div>
                           </div>
                       );
@@ -2424,7 +2453,9 @@ const DeviceAccordion = (props: Props) => {
                 {showPsuColumn ? (
                   <span class="device-col psu-status">PSU Status</span>
                 ) : null}
-                <span class="device-col last-validated">Last Validated</span>
+                {showLastValidatedColumn ? (
+                  <span class="device-col last-validated">Last Validated</span>
+                ) : null}
                 {showValidationStateColumn ? (
                   <span class="device-col validation-state">
                     <span className="device-last-validated-header">
@@ -2482,7 +2513,9 @@ const DeviceAccordion = (props: Props) => {
                   const isExpanded = expandedKeys.has(device._key);
                   const isValidationEligible = props.eligibleDeviceNames.has(device.deviceName);
                   const statusToRender = validationServiceView
-                      ? (isPeriodicValidation ? "PERIODIC_CHECK" : "NOT_ENABLED")
+                      ? (isPeriodicValidation
+                          ? (isValidationEligible ? "PERIODIC_CHECK" : "NOT_ELIGIBLE")
+                          : (isValidationEligible ? device.jobStatus : "NOT_ELIGIBLE"))
                       : (isValidationEligible ? device.jobStatus : "NOT_ELIGIBLE");
                   const rowSelectionDisabled = gpuRackSelectionDisabled || !props.rackValidationAllowed || !isValidationEligible;
                   const disabledReason =
@@ -2582,7 +2615,11 @@ const DeviceAccordion = (props: Props) => {
                               </span>
                             ) : null}
 
-                            <span className="device-col last-validated">{renderLastValidated(device, deviceFailures)}</span>
+                            {showLastValidatedColumn ? (
+                              <span className="device-col last-validated">
+                                {renderLastValidated(device, deviceFailures)}
+                              </span>
+                            ) : null}
 
                             {validationStateContent && (
                               <span className="device-col validation-state">
@@ -2623,6 +2660,7 @@ const DeviceAccordion = (props: Props) => {
                                             deviceIndex={idx}
                                             deviceName={device.deviceName}
                                             isGpuRack={props.isGpuRack}
+                                            hideLastExecuted={hideLastExecutedColumn}
                                             section={section}
                                         />
                                     );

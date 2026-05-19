@@ -1,12 +1,16 @@
 import { h } from "preact";
-import { useMemo, useState } from "preact/hooks";
+import { useCallback, useMemo, useState } from "preact/hooks";
 import "ojs/ojbutton";
 import "ojs/ojprogress-circle";
 import "ojs/ojselectsingle";
 import "ojs/ojtable";
 import ArrayDataProvider = require("ojs/ojarraydataprovider");
 import type { TableIntrinsicProps } from "ojs/ojtable";
-import type { RackValidationSummary } from "../rack/validationShared";
+import { downloadDeploymentGroupExcel } from "./deploymentGroupExcelDownloader";
+import {
+  buildDeploymentGroupErrorTokens,
+  type DeploymentGroupErrorToken,
+} from "./deploymentGroupErrorTypes";
 import type {
   DeploymentGroupRackFilter,
   DeploymentGroupRackRow,
@@ -21,12 +25,6 @@ type Props = {
 type FilterOption = {
   value: DeploymentGroupRackFilter;
   label: string;
-};
-
-type ErrorToken = {
-  label: string;
-  className: string;
-  title: string;
 };
 
 const FILTER_OPTIONS: FilterOption[] = [
@@ -65,51 +63,11 @@ function formatLastUpdatedTime(value: string | null): string {
   return parsed.toLocaleString();
 }
 
-function buildErrorTokens(summary: RackValidationSummary): ErrorToken[] {
-  return [
-    summary.lldpFailures > 0 ? {
-      label: `LLDP:${summary.lldpFailures}`,
-      className: "rack-status-chip lldp-failure",
-      title: `${summary.lldpFailures} LLDP validation failure(s)`,
-    } : null,
-    summary.interfaceFailures > 0 ? {
-      label: `INTERFACE:${summary.interfaceFailures}`,
-      className: "rack-status-chip interface-failure",
-      title: `${summary.interfaceFailures} interface validation failure(s)`,
-    } : null,
-    summary.opticModuleFailures > 0 ? {
-      label: `OPTICS:${summary.opticModuleFailures}`,
-      className: "rack-status-chip phoenix-optics-failure",
-      title: `${summary.opticModuleFailures} optic validation failure(s)`,
-    } : null,
-    summary.fecBerFailures > 0 ? {
-      label: `FEC BER:${summary.fecBerFailures}`,
-      className: "rack-status-chip fec-ber-failure",
-      title: `${summary.fecBerFailures} FEC BER validation failure(s)`,
-    } : null,
-    summary.hostOptFailures > 0 ? {
-      label: `HOST_OPT:${summary.hostOptFailures}`,
-      className: "rack-status-chip host-opt-failure",
-      title: `${summary.hostOptFailures} host transceiver optic validation failure(s)`,
-    } : null,
-    summary.hostFecBerFailures > 0 ? {
-      label: `HOST_FEC_BER:${summary.hostFecBerFailures}`,
-      className: "rack-status-chip host-fec-ber-failure",
-      title: `${summary.hostFecBerFailures} host transceiver FEC BER validation failure(s)`,
-    } : null,
-    summary.deviceFailures > 0 ? {
-      label: `DEVICE:${summary.deviceFailures}`,
-      className: "rack-status-chip device-failure",
-      title: `${summary.deviceFailures} power or fan validation failure(s)`,
-    } : null,
-  ].filter((token): token is ErrorToken => Boolean(token));
-}
-
 function renderZeroErrors() {
   return <span class="device-accordion-failure-count success">0</span>;
 }
 
-function renderErrorTokens(tokens: ErrorToken[]) {
+function renderErrorTokens(tokens: DeploymentGroupErrorToken[]) {
   if (tokens.length === 0) {
     return renderZeroErrors();
   }
@@ -136,6 +94,7 @@ const DeploymentGroupValidationPage = ({ region, onPageChanged }: Props) => {
   const [searchText, setSearchText] = useState("");
   const [filter, setFilter] = useState<DeploymentGroupRackFilter>("all");
   const [failedFirst, setFailedFirst] = useState(true);
+  const [isExcelDownloadInProgress, setIsExcelDownloadInProgress] = useState(false);
 
   const hasRequiredSelection =
     selection.region !== "" && selection.building !== "" && selection.deploymentGroup !== "";
@@ -148,6 +107,7 @@ const DeploymentGroupValidationPage = ({ region, onPageChanged }: Props) => {
     isValidating,
     jobMetadata,
     rows,
+    resultsLoaded,
     summary,
     validateDeploymentGroup,
   } = useDeploymentGroupValidation(selection);
@@ -205,7 +165,7 @@ const DeploymentGroupValidationPage = ({ region, onPageChanged }: Props) => {
       return <span class="rack-status-text muted">NOT_VALIDATE</span>;
     }
 
-    return renderErrorTokens(buildErrorTokens(row.summary));
+    return renderErrorTokens(buildDeploymentGroupErrorTokens(row.summary));
   };
 
   const renderDetails = (context: any) => {
@@ -219,6 +179,22 @@ const DeploymentGroupValidationPage = ({ region, onPageChanged }: Props) => {
       </a>
     );
   };
+
+  const handleDownloadExcel = useCallback(async () => {
+    setIsExcelDownloadInProgress(true);
+    try {
+      await downloadDeploymentGroupExcel({
+        building: selection.building,
+        deploymentGroup: selection.deploymentGroup,
+        rows,
+      });
+    } catch (error) {
+      const message = (error as any)?.message ? String((error as any).message) : "Unknown error";
+      window.alert(`Download Excel failed: ${message}`);
+    } finally {
+      setIsExcelDownloadInProgress(false);
+    }
+  }, [rows, selection.building, selection.deploymentGroup]);
 
   if (!hasRequiredSelection) {
     return (
@@ -277,6 +253,15 @@ const DeploymentGroupValidationPage = ({ region, onPageChanged }: Props) => {
           >
             {isValidating ? "Validating..." : "Validate Deployment Group"}
           </oj-button>
+          {rows.length > 0 && resultsLoaded && (
+            <oj-button
+              chroming="outlined"
+              disabled={loading || isValidating || isExcelDownloadInProgress}
+              onojAction={handleDownloadExcel}
+            >
+              {isExcelDownloadInProgress ? "Preparing Excel..." : "Download Excel"}
+            </oj-button>
+          )}
           <oj-button
             chroming="outlined"
             disabled={isValidating}
@@ -310,7 +295,7 @@ const DeploymentGroupValidationPage = ({ region, onPageChanged }: Props) => {
           <div class="deployment-group-summary-cell">
             <div class="deployment-group-summary-label">Aggregated Errors</div>
             <div class="deployment-group-summary-value deployment-group-aggregated-errors">
-              {renderErrorTokens(buildErrorTokens(summary.aggregate))}
+              {renderErrorTokens(buildDeploymentGroupErrorTokens(summary.aggregate))}
             </div>
           </div>
         </div>

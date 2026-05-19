@@ -159,11 +159,11 @@ export const usePlatformListByRoom = (mockData?: boolean) => {
     queryFn: mockData
       ? (roomName: string) =>
           MockRoomPlatformApi.getPlatformListByRoom({ roomName }).then(
-            (response) => response.data ?? [],
+            (response) => response.data,
           )
       : (roomName: string) =>
           RoomMetadataByRoomApiClient.getPlatformListByRoom({ roomName }).then(
-            (response) => response.data ?? [],
+            (response) => response.data,
           ),
     enabled: false,
   });

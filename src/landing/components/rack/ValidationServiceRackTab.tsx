@@ -1,29 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from "preact/hooks";
+import { useCallback, useState } from "preact/hooks";
 import "oj-c/button";
 import DeviceAccordion from "./DeviceAccordion";
 import { useRackValidation } from "./hooks/useRackValidation";
 import { RackProps } from "./types";
-
-type RefreshIntervalOption = {
-  value: number;
-  label: string;
-};
-
-const PERIODIC_REFRESH_INTERVAL_OPTIONS: RefreshIntervalOption[] = [
-  { value: 10_000, label: "10s" },
-  { value: 30_000, label: "30s" },
-  { value: 60_000, label: "1m" },
-  { value: 120_000, label: "2m" },
-];
+import { downloadStreamingTabExcel } from "./streamingTabExcelDownloader";
 
 const ValidationServiceRackTab = (props: RackProps) => {
-  const summaryTitle = props.userType === "master" ? "Streaming" : "Validation Service";
   const [hideUnsupported, setHideUnsupported] = useState(true);
   const [externalExpandedKeys, setExternalExpandedKeys] = useState<Set<string>>(new Set());
   const [externalExpandedKeysNonce, setExternalExpandedKeysNonce] = useState(0);
-  const [toastMsg, setToastMsg] = useState<string>("");
-  const [toastVisible, setToastVisible] = useState<boolean>(false);
-  const toastTimerRef = useRef<number | null>(null);
+  const [isMergedDownloadInProgress, setIsMergedDownloadInProgress] = useState(false);
 
   const {
     deviceStatuses,
@@ -40,45 +26,14 @@ const ValidationServiceRackTab = (props: RackProps) => {
     jobErrorDetails,
     isPeriodicValidationRefreshing,
     eligibleDeviceNames,
+    onDemandValidationDeviceCount,
     rackValidationAllowed,
     rackValidationTooltip,
     periodicValidationEnabled,
     periodicValidationDeviceNames,
-    periodicRefreshIntervalMs,
-    setPeriodicRefreshIntervalMs,
+    validate,
     refreshPeriodicValidationResults,
   } = useRackValidation(props, { viewMode: "validationService" });
-
-  const showToast = useCallback((msg: string) => {
-    setToastMsg(msg);
-    setToastVisible(true);
-    if (toastTimerRef.current) {
-      window.clearTimeout(toastTimerRef.current);
-      toastTimerRef.current = null;
-    }
-    toastTimerRef.current = window.setTimeout(() => {
-      setToastVisible(false);
-      toastTimerRef.current = null;
-    }, 4000);
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      if (toastTimerRef.current) {
-        window.clearTimeout(toastTimerRef.current);
-      }
-    };
-  }, []);
-
-  const handleRefreshPeriodicValidation = useCallback(async () => {
-    const result = await refreshPeriodicValidationResults();
-    if (!(result as any)?.ok) {
-      const msg = (result as any)?.message;
-      if (msg) {
-        showToast(String(msg));
-      }
-    }
-  }, [refreshPeriodicValidationResults, showToast]);
 
   const handleExpandAll = useCallback(() => {
     const deviceNamesWithFailures = new Set(
@@ -110,12 +65,24 @@ const ValidationServiceRackTab = (props: RackProps) => {
     setExternalExpandedKeysNonce((n) => n + 1);
   }, []);
 
+  const handleStreamingTabDownload = useCallback(async () => {
+    setIsMergedDownloadInProgress(true);
+    try {
+      await downloadStreamingTabExcel(props);
+    } catch (error: any) {
+      const message = error?.message ? String(error.message) : "Unknown error";
+      window.alert(`Streaming tab Excel download failed: ${message}`);
+    } finally {
+      setIsMergedDownloadInProgress(false);
+    }
+  }, [props]);
+
   return (
     <div style={{ margin: "18px 0 32px 0" }}>
       {jobErrorDetails && (
         <div className="alert alert-danger" role="alert">
           <span className="alert-icon" aria-hidden="true">⚠️</span>
-          <div>Validation Service refresh failed!</div>
+          <div>Validation action failed!</div>
           {jobErrorDetails.code && (
             <div>
               <b>Code:</b> {jobErrorDetails.code}
@@ -132,7 +99,7 @@ const ValidationServiceRackTab = (props: RackProps) => {
       <div className="device-accordion-toolbar">
         <h3 className="device-accordion-summary-title">
           <span role="img" className="oj-icon validation-summary-icon" title="Validation Summary Image"></span>
-          {summaryTitle}
+          Streaming
         </h3>
 
         <div className="flex-spacer" />
@@ -140,34 +107,26 @@ const ValidationServiceRackTab = (props: RackProps) => {
         <oj-c-button
           chroming="callToAction"
           size="sm"
-          label={isPeriodicValidationRefreshing ? "Refreshing..." : "Refresh"}
-          onojAction={handleRefreshPeriodicValidation}
-          style="margin-left: 8px;"
-          disabled={isPeriodicValidationRefreshing || periodicValidationDeviceNames.size === 0}
-          title={periodicValidationDeviceNames.size === 0 ? "No devices are enabled for Validation Service." : ""}
+          label="Validate"
+          onojAction={validate}
+          style="margin-left: 8px; margin-right: 8px;"
+          disabled={isValidating || onDemandValidationDeviceCount === 0 || !rackValidationAllowed}
+          title={
+            !rackValidationAllowed
+              ? rackValidationTooltip
+              : onDemandValidationDeviceCount === 0
+                ? "No devices on this tab are enabled for on-demand validation."
+                : ""
+          }
         ></oj-c-button>
-
-        <div className="device-periodic-refresh-interval">
-          <select
-            id="validationServiceRefreshInterval"
-            className="device-periodic-refresh-native"
-            value={String(periodicRefreshIntervalMs)}
-            title="Validation Service refresh interval"
-            aria-label="Validation Service refresh interval"
-            onChange={(event) => {
-              const nextValue = Number((event.target as HTMLSelectElement).value);
-              if (Number.isFinite(nextValue) && nextValue > 0) {
-                setPeriodicRefreshIntervalMs(nextValue);
-              }
-            }}
-          >
-            {PERIODIC_REFRESH_INTERVAL_OPTIONS.map((option) => (
-              <option key={option.value} value={String(option.value)}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </div>
+        <oj-c-button
+          chroming="callToAction"
+          size="sm"
+          label={isMergedDownloadInProgress ? "Preparing Excel..." : "Download Excel"}
+          onojAction={handleStreamingTabDownload}
+          style="margin-left: 8px;"
+          disabled={isMergedDownloadInProgress}
+        ></oj-c-button>
 
         <label>
           <input
@@ -213,30 +172,6 @@ const ValidationServiceRackTab = (props: RackProps) => {
         externalExpandedKeys={externalExpandedKeys}
         externalExpandedKeysNonce={externalExpandedKeysNonce}
       />
-
-      {toastVisible && (
-        <div
-          role="status"
-          aria-live="polite"
-          onClick={() => setToastVisible(false)}
-          style={{
-            position: "fixed",
-            right: "16px",
-            bottom: "16px",
-            background: "#1f2937",
-            color: "#fff",
-            padding: "10px 12px",
-            borderRadius: "6px",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
-            cursor: "pointer",
-            maxWidth: "360px",
-            zIndex: 9999,
-          }}
-          title="Click to dismiss"
-        >
-          {toastMsg}
-        </div>
-      )}
     </div>
   );
 };
