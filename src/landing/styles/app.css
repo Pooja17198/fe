@@ -112,6 +112,10 @@
 }
 
 .home-container {
+    display: flex;
+    flex: 1 1 auto;
+    align-items: stretch;
+    min-height: 100%;
     text-align: center;
 }
 
@@ -1568,4 +1572,66 @@
         padding: 6px 8px;           /* Slightly tighter spacing for small screens */
         font-size: 13px;
     }
+}
+
+.lvv-app-shell {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    min-height: 100vh;
+    min-height: 100dvh;
+}
+
+.lvv-app-body {
+    display: flex;
+    min-height: 0;
+    overflow: hidden;
+}
+
+.lvv-content-drawer-layout {
+    display: block;
+    flex: 1 1 auto;
+    height: 100%;
+    min-height: 0;
+    min-width: 0;
+}
+
+
+.lvv-drawer-start {
+    height: 100%;
+    min-height: 100%;
+    overflow-y: auto;
+    box-sizing: border-box;
+}
+
+.lvv-main-content {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    height: 100%;
+    min-height: 100%;
+    min-width: 0;
+    overflow-y: auto;
+    box-sizing: border-box;
+}
+
+.lvv-route-content {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    min-height: 100%;
+    min-width: 0;
+}
+
+.lvv-content-main {
+    height: 100%;
+    box-sizing: border-box;
+    padding: 16px;
+    overflow: auto;
+}
+
+.lvv-drawer-start {
+    width: 260px;
+    box-sizing: border-box;
+    border-right: 1px solid #d6dfe6;
+    background-color: #f8f9fb;
 }

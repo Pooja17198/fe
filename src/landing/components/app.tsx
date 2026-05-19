@@ -15,6 +15,11 @@ import { Header } from "./header";
 import Content from "./content/index";
 import UrlPathParamAdapter = require("ojs/ojurlpathparamadapter");
 import { getInitialLvvUserType } from "./home/userType";
+import "oj-c/drawer-layout";
+import "ojs/ojnavigationlist";
+import MutableArrayDataProvider = require("ojs/ojmutablearraydataprovider");
+import {h} from "preact";
+
 
 type Props = {
   appName?: string;
@@ -52,8 +57,30 @@ const routeArray: Array<any> = [
     detail: {
       label: "Cabling"
     },
+  },
+  {
+    path: "qc",
+    detail: {
+      label: "Quality Control"
+    }
   }
 ]
+
+type DrawerItem = {
+  id: string;
+  label: string;
+};
+
+const drawerItems: DrawerItem[] = [
+  { id: "home",       label: "Rack Validation" },
+  { id: "cabling",    label: "Cabling and Materials" },
+  { id: "qc",         label: "Quality Control" }
+];
+
+const drawerDP = new MutableArrayDataProvider<DrawerItem["id"], DrawerItem>(
+    drawerItems,
+    { keyAttributes: "id" }
+);
 
 const router = new CoreRouter<CoreRouter.DetailedRouteConfig>(routeArray, {
   urlAdapter: new UrlPathParamAdapter("/"),
@@ -90,7 +117,10 @@ type Route = {
 const pageChangeHandler = async (route: Route) => {
   // Navigate via CoreRouter using path/params; master accepts passing params for all routes
   try {
-    await router.go({ path: route.path, params: { id: route.id } as any });
+    await router.go({
+      path: route.path,
+      params: route.id ? ({ id: route.id } as any) : undefined
+    });
   } catch (error) {
     if (!isSyncOverriddenError(error)) {
       throw error;
@@ -129,6 +159,7 @@ export const App = registerCustomElement("app-root", (props: Props) => {
     const [selectedUserType, setSelectedUserType] = useState<"master" | "vendor">(() =>
       getInitialLvvUserType(isLocalhost())
     );
+    const [menuDrawerOpen, setMenuDrawerOpen] = useState(false);
 
     props.appName = "LVV Portal";
     props.userLogin = sessionStorage.getItem("X-Oracle-Vendor-Email") || "";
@@ -144,6 +175,12 @@ export const App = registerCustomElement("app-root", (props: Props) => {
       const newPath = actionable.state?.path;
       setRoutePath(newPath);
     };
+
+    const navigationSelection = routePath?.startsWith("qc")
+        ? "qc"
+        : routePath?.startsWith("rack")
+            ? "home"
+            : routePath;
 
     const vendorChangedHandler = (vendor: string) => {
       setSelectedVendor(vendor)
@@ -234,28 +271,72 @@ export const App = registerCustomElement("app-root", (props: Props) => {
       };
     }, []);
 
-    return (
-      <div id="appContainer" class="oj-web-applayout-page">
-        <Header
-          appName={props.appName}
-          userLogin={props.userLogin}
-          vendorName={selectedVendor}
-          userType={selectedUserType}
-          regionValue={selectedRegion}
-          page={routePath}
-          onRegionChanged={regionChangedHandler}
-          onPageChanged={pageChangeHandler}
-        />
-        <Content
-          page={routePath}
-          pagerouter={router}
-          onPageChanged={pageChangeHandler}
-          onVendorChanged={vendorChangedHandler}
-          onUserTypeChanged={userTypeChangedHandler}
-          region={selectedRegion}
-          routes={routeArray}/>
-        <Footer />
-      </div>
+    const menuItemTemplate = (item: any) => (
+        <li>
+          <a href="#" className="layout-menu-item-label">
+            <div className={"oj-sm-padding-1x"}>{item.data.label}</div>
+          </a>
+        </li>
     );
-  }
+    
+    return (
+        <div id="appContainer" class="oj-web-applayout-page lvv-app-shell">
+          <Header
+              appName={props.appName}
+              userLogin={props.userLogin}
+              vendorName={selectedVendor}
+              regionValue={selectedRegion}
+              page={routePath}
+              onRegionChanged={regionChangedHandler}
+              onPageChanged={pageChangeHandler}
+              onMenuClick={() => setMenuDrawerOpen(o => !o)}
+              isMenuOpen={menuDrawerOpen}
+          />
+          <main className="lvv-app-body">
+            <oj-c-drawer-layout
+                start-display="reflow"
+                start-opened={menuDrawerOpen}
+                onstart-opened-changed={(e: any) => setMenuDrawerOpen(e.detail.value)}
+                class="lvv-content-drawer-layout"
+            >
+              <div slot="start" className="lvv-drawer-start oj-sm-padding-4x">
+                <div className="demo-drawer-header">
+                  <div>
+                    <h6>Menu</h6>
+                  </div>
+                </div>
+                <oj-navigation-list
+                    edge="start"
+                    data={drawerDP}
+                    selection={navigationSelection}
+                    onselectionChanged={(e: any) => {
+                      const nextPath = e.detail.value as string;
+                      if (!nextPath || nextPath === navigationSelection) {
+                        return;
+                      }
+                      void pageChangeHandler({path: nextPath});
+                      setMenuDrawerOpen(false);
+                    }}
+                >
+                  <template slot="itemTemplate" render={menuItemTemplate}></template>
+                </oj-navigation-list>
+              </div>
+              <div class="lvv-main-content">
+                <Content
+                    page={routePath}
+                    pagerouter={router}
+                    onPageChanged={pageChangeHandler}
+                    onVendorChanged={vendorChangedHandler}
+                    onUserTypeChanged={userTypeChangedHandler}
+                    vendorName={selectedVendor}
+                    region={selectedRegion}
+                    routes={routeArray}
+                />
+              </div>
+            </oj-c-drawer-layout>
+          </main>
+          <Footer/>
+        </div>
+    );
+    }
 );

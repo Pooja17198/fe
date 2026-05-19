@@ -2,7 +2,7 @@ swagger: '2.0'
 x-oracle-package: com.oracle.ide.lvvservice
 info:
   title: Low Voltage Vendor API
-
+  
   description: Low Voltage Vendor API.
   version: "20251211"
 # the domain of the service
@@ -509,6 +509,393 @@ paths:
               schema:
                 $ref: '#/definitions/Error'
 
+  /qc/workorders:
+    get:
+      tags: ['Qc']
+      operationId: listQcWorkOrders
+      summary: List QC work orders
+      description: |
+        Returns a list of QC work orders.
+        
+        All filters are exact-match filters unless otherwise stated.
+        When multiple filters are provided, we apply them together using AND logic.
+        The lifecycleState filter is UI-facing and is mapped internally to the Taskflow
+        work order lifecycle state before the downstream call is made.
+      parameters:
+        - $ref: '#/parameters/QcLifecycleStatusQueryParam'
+        - $ref: '#/parameters/QcCreatedByQueryParam'
+        - $ref: '#/parameters/QcRegionIdQueryParam'
+        - $ref: '#/parameters/QcBuildingIdQueryParam'
+        - $ref: '#/parameters/QcRoomIdQueryParam'
+        - $ref: '#/parameters/QcRackLocationIdQueryParam'
+        - $ref: '#/parameters/PaginationLimitQueryParam'
+        - $ref: '#/parameters/PaginationTokenQueryParam'
+        - $ref: '#/parameters/SortOrderQueryParam'
+        - $ref: '#/parameters/QcSortByQueryParam'
+        - $ref: '#/parameters/RequestIdHeader'
+      produces:
+        - application/json
+      responses:
+        200:
+          description: List of QC work orders.
+          schema:
+            $ref: '#/definitions/QcWorkOrderCollection'
+          headers:
+            opc-request-id:
+              type: string
+              description: The unique Oracle-assigned identifier for the request.
+            opc-next-page:
+              type: string
+              description: For pagination of a list of items.
+        400:
+          $ref: '#/responses/400'
+        401:
+          $ref: '#/responses/401'
+        404:
+          $ref: '#/responses/404'
+        429:
+          $ref: '#/responses/429'
+        500:
+          $ref: '#/responses/500'
+        default:
+          $ref: '#/responses/DefaultError'
+    post:
+      tags: ['Qc']
+      operationId: createQcWorkOrder
+      summary: Create QC work order
+      description: Initiates a QC run by creating a new QC work order.
+      parameters:
+        - in: body
+          name: createQcWorkOrderDetails
+          description: Details for creating a QC work order.
+          required: true
+          schema:
+            $ref: '#/definitions/CreateQcWorkOrderDetails'
+        - $ref: '#/parameters/RequestIdHeader'
+      consumes:
+        - application/json
+      produces:
+        - application/json
+      responses:
+        201:
+          description: QC work order created.
+          schema:
+            $ref: '#/definitions/QcWorkOrder'
+          headers:
+            opc-request-id:
+              type: string
+              description: The unique Oracle-assigned identifier for the request.
+        400:
+          $ref: '#/responses/400'
+        401:
+          $ref: '#/responses/401'
+        404:
+          $ref: '#/responses/404'
+        409:
+          $ref: '#/responses/409'
+        429:
+          $ref: '#/responses/429'
+        500:
+          $ref: '#/responses/500'
+        default:
+          $ref: '#/responses/DefaultError'
+
+  /qc/workorders/{workOrderId}:
+    get:
+      tags: ['Qc']
+      operationId: getQcWorkOrder
+      summary: Get QC work order
+      description: Returns detailed header information for a specific QC work order.
+      parameters:
+        - $ref: '#/parameters/QcWorkOrderIdPathParam'
+        - $ref: '#/parameters/RequestIdHeader'
+      produces:
+        - application/json
+      responses:
+        200:
+          description: Detailed QC work order.
+          schema:
+            $ref: '#/definitions/QcWorkOrder'
+        400:
+          $ref: '#/responses/400'
+        401:
+          $ref: '#/responses/401'
+        404:
+          $ref: '#/responses/404'
+        429:
+          $ref: '#/responses/429'
+        500:
+          $ref: '#/responses/500'
+        default:
+          $ref: '#/responses/DefaultError'
+
+  /qc/workorders/{workOrderId}/tasks:
+    get:
+      tags: ['Qc']
+      operationId: listQcWorkOrderTasks
+      summary: List QC work order tasks
+      description: Returns checklist tasks for a specific QC work order.
+      parameters:
+        - $ref: '#/parameters/QcWorkOrderIdPathParam'
+        - $ref: '#/parameters/PaginationLimitQueryParam'
+        - $ref: '#/parameters/PaginationTokenQueryParam'
+        - $ref: '#/parameters/SortOrderQueryParam'
+        - $ref: '#/parameters/QcTaskSortByQueryParam'
+        - $ref: '#/parameters/RequestIdHeader'
+      produces:
+        - application/json
+      responses:
+        200:
+          description: List of QC tasks for the work order.
+          schema:
+            $ref: '#/definitions/QcTaskCollection'
+          headers:
+            opc-request-id:
+              type: string
+              description: The unique Oracle-assigned identifier for the request.
+            opc-next-page:
+              type: string
+              description: For pagination of a list of items.
+        400:
+          $ref: '#/responses/400'
+        401:
+          $ref: '#/responses/401'
+        404:
+          $ref: '#/responses/404'
+        429:
+          $ref: '#/responses/429'
+        500:
+          $ref: '#/responses/500'
+        default:
+          $ref: '#/responses/DefaultError'
+
+  /qc/tasks/{taskId}/comments:
+    get:
+      tags: ['Qc']
+      operationId: listQcTaskComments
+      summary: List QC task comments
+      description: Returns comments for a specific QC checklist task.
+      parameters:
+        - $ref: '#/parameters/QcTaskIdPathParam'
+        - $ref: '#/parameters/PaginationLimitQueryParam'
+        - $ref: '#/parameters/PaginationTokenQueryParam'
+        - $ref: '#/parameters/SortOrderQueryParam'
+        - $ref: '#/parameters/QcTaskCommentSortByQueryParam'
+        - $ref: '#/parameters/RequestIdHeader'
+      produces:
+        - application/json
+      responses:
+        200:
+          description: List of comments for the QC task.
+          schema:
+            $ref: '#/definitions/QcTaskCommentCollection'
+          headers:
+            opc-request-id:
+              type: string
+              description: The unique Oracle-assigned identifier for the request.
+            opc-next-page:
+              type: string
+              description: For pagination of a list of items.
+        400:
+          $ref: '#/responses/400'
+        401:
+          $ref: '#/responses/401'
+        404:
+          $ref: '#/responses/404'
+        429:
+          $ref: '#/responses/429'
+        500:
+          $ref: '#/responses/500'
+        default:
+          $ref: '#/responses/DefaultError'
+    post:
+      tags: ['Qc']
+      operationId: createQcTaskComment
+      summary: Add QC task comment
+      description: Adds a comment to a specific QC checklist task.
+      parameters:
+        - $ref: '#/parameters/QcTaskIdPathParam'
+        - in: body
+          name: createQcTaskCommentDetails
+          description: Details used to add a comment to a QC checklist task.
+          required: true
+          schema:
+            $ref: '#/definitions/CreateQcTaskCommentDetails'
+        - $ref: '#/parameters/RequestIdHeader'
+      consumes:
+        - application/json
+      produces:
+        - application/json
+      responses:
+        201:
+          description: Comment added successfully.
+          schema:
+            $ref: '#/definitions/QcTaskCommentSummary'
+          headers:
+            opc-request-id:
+              type: string
+              description: The unique Oracle-assigned identifier for the request.
+        400:
+          $ref: '#/responses/400'
+        401:
+          $ref: '#/responses/401'
+        404:
+          $ref: '#/responses/404'
+        409:
+          $ref: '#/responses/409'
+        429:
+          $ref: '#/responses/429'
+        500:
+          $ref: '#/responses/500'
+        default:
+          $ref: '#/responses/DefaultError'
+
+  /qc/tasks/{taskId}/attachments:
+    get:
+      tags: ['Qc']
+      operationId: listQcTaskAttachments
+      summary: List QC task attachments
+      description: Returns attachments for a specific QC checklist task.
+      parameters:
+        - $ref: '#/parameters/QcTaskIdPathParam'
+        - $ref: '#/parameters/PaginationLimitQueryParam'
+        - $ref: '#/parameters/PaginationTokenQueryParam'
+        - $ref: '#/parameters/SortOrderQueryParam'
+        - $ref: '#/parameters/QcTaskAttachmentSortByQueryParam'
+        - $ref: '#/parameters/RequestIdHeader'
+      produces:
+        - application/json
+      responses:
+        200:
+          description: List of attachments for the QC task.
+          schema:
+            $ref: '#/definitions/QcTaskAttachmentCollection'
+          headers:
+            opc-request-id:
+              type: string
+              description: The unique Oracle-assigned identifier for the request.
+            opc-next-page:
+              type: string
+              description: For pagination of a list of items.
+        400:
+          $ref: '#/responses/400'
+        401:
+          $ref: '#/responses/401'
+        404:
+          $ref: '#/responses/404'
+        429:
+          $ref: '#/responses/429'
+        500:
+          $ref: '#/responses/500'
+        default:
+          $ref: '#/responses/DefaultError'
+    post:
+      tags: ['Qc']
+      operationId: createQcTaskAttachment
+      summary: Add QC task attachment
+      description: Adds an attachment reference to a specific QC checklist task.
+      parameters:
+        - $ref: '#/parameters/QcTaskIdPathParam'
+        - in: body
+          name: createQcTaskAttachmentDetails
+          description: Details used to add an attachment reference to a QC checklist task.
+          required: true
+          schema:
+            $ref: '#/definitions/CreateQcTaskAttachmentDetails'
+        - $ref: '#/parameters/RequestIdHeader'
+      consumes:
+        - application/json
+      produces:
+        - application/json
+      responses:
+        201:
+          description: Attachment added successfully.
+          schema:
+            $ref: '#/definitions/QcTaskAttachmentSummary'
+          headers:
+            opc-request-id:
+              type: string
+              description: The unique Oracle-assigned identifier for the request.
+        400:
+          $ref: '#/responses/400'
+        401:
+          $ref: '#/responses/401'
+        404:
+          $ref: '#/responses/404'
+        409:
+          $ref: '#/responses/409'
+        429:
+          $ref: '#/responses/429'
+        500:
+          $ref: '#/responses/500'
+        default:
+          $ref: '#/responses/DefaultError'
+
+  /qc/tasks/{taskId}/actions/evaluate:
+    patch:
+      tags: ['Qc']
+      operationId: evaluateQcTask
+      summary: Evaluate QC task
+      description: Updates QC checklist task evaluation as pass or fail.
+      parameters:
+        - $ref: '#/parameters/QcTaskIdPathParam'
+        - in: body
+          name: evaluateQcTaskDetails
+          description: Details used to evaluate a QC checklist task.
+          required: true
+          schema:
+            $ref: '#/definitions/EvaluateQcTaskDetails'
+        - $ref: '#/parameters/RequestIdHeader'
+      consumes:
+        - application/json
+      produces:
+        - application/json
+      responses:
+        200:
+          description: QC task evaluated successfully.
+          schema:
+            $ref: '#/definitions/QcTaskSummary'
+          headers:
+            opc-request-id:
+              type: string
+              description: The unique Oracle-assigned identifier for the request.
+        400:
+          $ref: '#/responses/400'
+        401:
+          $ref: '#/responses/401'
+        404:
+          $ref: '#/responses/404'
+        409:
+          $ref: '#/responses/409'
+        429:
+          $ref: '#/responses/429'
+        500:
+          $ref: '#/responses/500'
+        default:
+          $ref: '#/responses/DefaultError'
+
+  /roommetadata/{room_name}:
+    get:
+      tags: [ 'RoomMetadataByRoom' ]
+      summary: Gets the platform list in a room
+      description: Gets the platform list in a room
+      operationId: getPlatformListByRoom
+      produces:
+        - application/json
+      parameters:
+        - name: room_name
+          in: path
+          required: true
+          description: Room name identifier
+          schema:
+            type: string
+      responses:
+        200:
+          description: All platforms and corresponding details in a room
+          schema:
+            type: array
+            items:
+              $ref: '#/definitions/RoomPlatform'
   /physicalcutsheets:
     get:
       tags: ['physicalCutsheet']
@@ -1072,6 +1459,9 @@ definitions:
         nullable: true
       materials:
         type: array
+        description: Materials associated with the physical connection
+        items:
+          $ref: "#/definitions/MaterialSummary"
 
   FileMetadata:
     type: object
@@ -1147,7 +1537,6 @@ definitions:
         type: array
         items:
           $ref: "#/definitions/PhysicalCutsheetSummary"
-
   PhysicalCutsheetSummary:
     type: object
     description: Physical cutsheet summary
@@ -1312,6 +1701,401 @@ definitions:
         type: array
         items:
           type: string
+
+  QcWorkOrderLifecycleState:
+    type: string
+    description: Combined execution/resource lifecycle state of the QC work order.
+    enum:
+      - IN_PROGRESS
+      - FAILED
+      - SUCCEEDED
+
+  CreateQcWorkOrderDetails:
+    type: object
+    description: Details required to create a QC work order.
+    required:
+      - workOrderDefinitionId
+      - displayName
+      - regionId
+      - buildingId
+      - roomId
+      - rackLocationId
+      - createdBy
+    properties:
+      workOrderDefinitionId:
+        type: string
+        description: Identifier of the QC work order definition to run.
+      displayName:
+        type: string
+        description: Display name for the new QC work order.
+      regionId:
+        type: string
+        description: Identifier of the region scope for the work order.
+      buildingId:
+        type: string
+        description: Identifier of the building scope for the work order.
+      roomId:
+        type: string
+        description: Identifier of the room scope for the work order.
+      rackLocationId:
+        type: string
+        description: Identifier of the rack location to run QC against.
+      vendorName:
+        type: string
+        description: Name of the vendor associated with the QC work order.
+      createdBy:
+        description: Identifier of the requesting user.
+        type: string
+
+  QcWorkOrderSummary:
+    type: object
+    description: Summary view of a QC work order returned by list operations.
+    required:
+      - id
+      - lifecycleState
+      - timeCreated
+    properties:
+      id:
+        type: string
+        description: QC work order identifier.
+      workOrderDefinitionId:
+        type: string
+        description: Identifier of the QC work order definition used to create this work order.
+      displayName:
+        type: string
+        description: Display name of the QC work order.
+      timeCreated:
+        type: string
+        format: date-time
+        description: Time when the work order was created, in [RFC3339](https://tools.ietf.org/html/rfc3339) format.
+      timeUpdated:
+        description: Time the WorkOrder was last updated, in [RFC3339](https://tools.ietf.org/html/rfc3339) format.
+        type: string
+        format: date-time
+      regionId:
+        description: Identifier of the region for the WorkOrder scope.
+        type: string
+      buildingId:
+        description: Identifier of the building for the WorkOrder scope.
+        type: string
+      roomId:
+        description: Identifier of the room for the WorkOrder scope.
+        type: string
+      rackLocationId:
+        description: Identifier of the rack location for the WorkOrder scope.
+        type: string
+      vendorName:
+        description: Name of the vendor associated with the QC work order.
+        type: string
+      createdBy:
+        description: Identifier of the requesting user.
+        type: string
+      lifecycleState:
+        $ref: '#/definitions/QcWorkOrderLifecycleState'
+
+  QcWorkOrderCollection:
+    type: object
+    description: Results of listing QC work orders.
+    required:
+      - items
+    properties:
+      items:
+        type: array
+        description: List of QC work order summaries.
+        items:
+          $ref: '#/definitions/QcWorkOrderSummary'
+
+  QcWorkOrder:
+    type: object
+    description: Detailed QC work order view returned by get-by-id operations.
+    required:
+      - id
+      - lifecycleState
+      - timeCreated
+    properties:
+      id:
+        type: string
+        description: QC work order identifier.
+      workOrderDefinitionId:
+        type: string
+        description: Identifier of the QC work order definition used to create this work order.
+      displayName:
+        type: string
+        description: Display name of the QC work order.
+      timeCreated:
+        type: string
+        format: date-time
+        description: Time when the work order was created, in RFC3339 format.
+      timeUpdated:
+        type: string
+        format: date-time
+        description: Time when the work order was last updated, in RFC3339 format.
+      regionId:
+        type: string
+        description: Identifier of the region for the work order scope.
+      buildingId:
+        type: string
+        description: Identifier of the building for the work order scope.
+      roomId:
+        type: string
+        description: Identifier of the room for the work order scope.
+      rackLocationId:
+        type: string
+        description: Identifier of the rack location for the work order scope.
+      vendorName:
+        type: string
+        description: Name of the vendor associated with the QC work order.
+      createdBy:
+        type: string
+        description: Identifier of the user who created this work order.
+      lifecycleState:
+        $ref: '#/definitions/QcWorkOrderLifecycleState'
+
+  QcTaskLifecycleState:
+    type: string
+    description: Lifecycle state for a QC checklist task.
+    enum:
+      - IN_PROGRESS
+      - COMPLETED
+      - FAILED
+
+  QcTaskEvaluationResult:
+    type: string
+    description: Evaluation result for a QC checklist task.
+    enum:
+      - PASS
+
+  EvaluateQcTaskDetails:
+    type: object
+    description: Details used to evaluate a QC checklist task.
+    required:
+      - result
+      - evaluatedBy
+      - timeEvaluated
+    properties:
+      result:
+        $ref: '#/definitions/QcTaskEvaluationResult'
+      evaluatedBy:
+        type: string
+        description: Identifier of the user evaluating the task.
+      timeEvaluated:
+        type: string
+        format: date-time
+        description: Evaluation timestamp in RFC3339 format.
+
+  QcTaskSummary:
+    type: object
+    description: Summary view of a QC checklist task.
+    required:
+      - id
+      - workOrderId
+      - state
+    properties:
+      id:
+        type: string
+        description: Identifier of the task.
+      workOrderId:
+        type: string
+        description: Identifier of the parent QC work order.
+      taskKey:
+        type: string
+        description: Task key/name from the checklist template.
+      assignedTo:
+        type: string
+        description: Identifier of the user currently assigned to this task.
+      lifecycleState:
+        $ref: '#/definitions/QcTaskLifecycleState'
+      timeCreated:
+        type: string
+        format: date-time
+        description: Time when the task was created, in RFC3339 format.
+      timeUpdated:
+        type: string
+        format: date-time
+        description: Time when the task was last updated, in RFC3339 format.
+      timeStarted:
+        type: string
+        format: date-time
+        description: Time when the task was started, in RFC3339 format.
+      timeCompleted:
+        type: string
+        format: date-time
+        description: Time when the task was completed, in RFC3339 format.
+
+  QcTaskCollection:
+    type: object
+    description: Results of listing QC checklist tasks for a work order.
+    required:
+      - items
+    properties:
+      items:
+        type: array
+        description: List of QC task summaries.
+        items:
+          $ref: '#/definitions/QcTaskSummary'
+
+  QcTaskCommentSummary:
+    type: object
+    description: Summary view of a QC task comment.
+    required:
+      - commentId
+      - taskId
+      - comment
+      - timeCreated
+    properties:
+      commentId:
+        type: string
+        description: Identifier of the comment.
+      taskId:
+        type: string
+        description: Identifier of the parent task.
+      createdBy:
+        type: string
+        description: Name of the user who created the comment.
+      comment:
+        type: string
+        description: Comment text.
+      timeCreated:
+        type: string
+        format: date-time
+        description: Time when the comment was created, in RFC3339 format.
+
+  CreateQcTaskCommentDetails:
+    type: object
+    description: Details used to add a comment to a QC checklist task.
+    required:
+      - comment
+      - createdBy
+      - timeCreated
+    properties:
+      comment:
+        type: string
+        description: Comment text.
+      createdBy:
+        type: string
+        description: Identifier of the user creating the comment.
+      emailAddress:
+        type: string
+        description: Email address of the user creating the comment.
+      timeCreated:
+        type: string
+        format: date-time
+        description: Creation timestamp in RFC3339 format.
+
+  CreateQcTaskAttachmentDetails:
+    type: object
+    description: Details used to add an attachment reference to a QC checklist task.
+    required:
+      - fileName
+      - contentType
+      - content
+      - contentSize
+      - createdBy
+      - timeCreated
+    properties:
+      fileName:
+        type: string
+        description: Name of the attachment file.
+      contentType:
+        type: string
+        description: MIME type of the attachment file.
+      contentSize:
+        type: integer
+        format: int64
+        description: Size of the attachment in bytes.
+      createdBy:
+        type: string
+        description: Identifier of the user creating the attachment.
+      emailAddress:
+        type: string
+        description: Email address of the user creating the attachment.
+      timeCreated:
+        type: string
+        format: date-time
+        description: Creation timestamp in RFC3339 format.
+      content:
+        type: string
+        format: byte
+        description: Base64-encoded binary content of the attached file.
+      notes:
+        type: string
+        description: Optional notes about the attachment.
+
+  QcTaskCommentCollection:
+    type: object
+    description: Results of listing QC task comments.
+    required:
+      - items
+    properties:
+      items:
+        type: array
+        description: List of QC task comments.
+        items:
+          $ref: '#/definitions/QcTaskCommentSummary'
+
+  QcTaskAttachmentSummary:
+    type: object
+    description: Summary view of a QC task attachment.
+    required:
+      - attachmentId
+      - taskId
+      - fileName
+      - contentType
+      - timeCreated
+    properties:
+      attachmentId:
+        type: string
+        description: Identifier of the attachment.
+      taskId:
+        type: string
+        description: Identifier of the parent task.
+      createdBy:
+        type: string
+        description: Name of the user who created the attachment.
+      fileName:
+        type: string
+        description: Name of the attached file.
+      contentType:
+        type: string
+        description: MIME type of the attached file.
+      contentSize:
+        type: integer
+        format: int64
+        description: Size of the attached file in bytes.
+      content:
+        type: string
+        description: Base64-encoded binary content of the attached file.
+      timeCreated:
+        type: string
+        format: date-time
+        description: Time when the attachment was created, in RFC3339 format.
+
+  QcTaskAttachmentCollection:
+    type: object
+    description: Results of listing QC task attachments.
+    required:
+      - items
+    properties:
+      items:
+        type: array
+        description: List of QC task attachments.
+        items:
+          $ref: '#/definitions/QcTaskAttachmentSummary'
+
+  RoomPlatform:
+    type: object
+    description: Platform details for a rack in a room
+    properties:
+      rackNumber:
+        type: string
+        description: Rack number
+      platformName:
+        type: string
+        description: Platform name
+      blockName:
+        type: string
+        description: block name
+
 #==========[ Parameters ]================================================================================================
 parameters:
   RoomNameQueryParam:
@@ -1380,12 +2164,8 @@ parameters:
     description: Request ID for idempotency
     required: false
     type: string
-  RoomNameQueryParam:
-    in: query
-    name: roomName
-    required: true
-    type: string
-    description: Room name for filtering
+
+
 
   SourceRackNumberQueryParam:
     in: query
@@ -1487,6 +2267,141 @@ parameters:
     description: Rack number for filtering
     required: false
     type: string
+  QcLifecycleStatusQueryParam:
+    in: query
+    name: lifecycleState
+    description: |
+      Optional exact-match filter for the QC work order lifecycle state.
+
+      Use this when the UI needs to show only one work order state:
+      IN_PROGRESS, FAILED, or SUCCEEDED.
+      ide-lvv translates this value internally to the downstream Taskflow lifecycle state.
+    required: false
+    type: string
+    enum:
+      - IN_PROGRESS
+      - FAILED
+      - SUCCEEDED
+
+  QcCreatedByQueryParam:
+    in: query
+    name: createdBy
+    description: |
+      Optional exact-match filter for the user who created the QC work order.
+      Use this to narrow the list to work orders created by a specific operator or service account.
+    required: false
+    type: string
+
+  QcRegionIdQueryParam:
+    in: query
+    name: regionId
+    description: |
+      Optional exact-match filter for the region scope of the QC work order.
+      This is applied together with the other filters using AND logic.
+    required: false
+    type: string
+
+  QcBuildingIdQueryParam:
+    in: query
+    name: buildingId
+    description: |
+      Optional exact-match filter for the building scope of the QC work order.
+      This is applied together with the other filters using AND logic.
+    required: false
+    type: string
+
+  QcRoomIdQueryParam:
+    in: query
+    name: roomId
+    description: |
+      Optional exact-match filter for the room scope of the QC work order.
+      This is applied together with the other filters using AND logic.
+    required: false
+    type: string
+
+  QcRackLocationIdQueryParam:
+    in: query
+    name: rackLocationId
+    description: |
+      Optional exact-match filter for the rack location scope of the QC work order.
+      This is applied together with the other filters using AND logic.
+    required: false
+    type: string
+
+  QcSortByQueryParam:
+    in: query
+    name: sortBy
+    description: |
+      Sort key for QC work order list results.
+
+      - timeCreated sorts by creation time.
+
+      Pair this with sortOrder=DESC to get newest-first ordering, which is the default UI behavior.
+    required: false
+    type: string
+    enum:
+      - timeCreated
+
+  QcWorkOrderIdPathParam:
+    in: path
+    name: workOrderId
+    description: Identifier of the QC work order.
+    required: true
+    type: string
+
+  QcTaskSortByQueryParam:
+    in: query
+    name: sortBy
+    description: |
+      Sort key for QC task list results for a work order.
+
+      - timeStarted sorts by task start time.
+    required: false
+    type: string
+    enum:
+      - timeStarted
+
+  QcTaskIdPathParam:
+    in: path
+    name: taskId
+    description: Identifier of the QC checklist task.
+    required: true
+    type: string
+
+  QcTaskCommentSortByQueryParam:
+    in: query
+    name: sortBy
+    description: |
+      Sort key for QC task comments.
+
+      - timeCreated sorts by creation time.
+      - userName sorts by the comment author's user name.
+      - emailAddress sorts by the comment author's email address.
+    required: false
+    type: string
+    enum:
+      - timeCreated
+      - userName
+      - emailAddress
+
+  QcTaskAttachmentSortByQueryParam:
+    in: query
+    name: sortBy
+    description: |
+      Sort key for QC task attachments.
+
+      - attachmentId sorts by attachment identifier.
+      - fileName sorts by file name.
+      - contentType sorts by content type.
+      - contentSize sorts by content size.
+    required: false
+    type: string
+    enum:
+      - attachmentId
+      - fileName
+      - contentType
+      - contentSize
+
 #==========[ Responses ]================================================================================================
 responses:
 # This is being included in the 'responses:' section.
