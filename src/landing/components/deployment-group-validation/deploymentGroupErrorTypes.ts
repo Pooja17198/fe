@@ -39,6 +39,12 @@ export const DEPLOYMENT_GROUP_ERROR_TYPE_DEFINITIONS: DeploymentGroupErrorTypeDe
     getTitle: (count) => `${count} FEC BER validation failure(s)`,
   },
   {
+    label: "RAW BER",
+    className: "rack-status-chip raw-ber-failure",
+    getCount: (summary) => summary.rawBerFailures,
+    getTitle: (count) => `${count} Raw BER validation failure(s)`,
+  },
+  {
     label: "HOST_OPT",
     className: "rack-status-chip host-opt-failure",
     getCount: (summary) => summary.hostOptFailures,

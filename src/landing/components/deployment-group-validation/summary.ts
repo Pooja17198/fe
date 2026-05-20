@@ -64,6 +64,7 @@ export function getRackFailureTotal(summary: RackValidationSummary): number {
     summary.interfaceFailures +
     summary.opticModuleFailures +
     summary.fecBerFailures +
+    summary.rawBerFailures +
     summary.hostOptFailures +
     summary.hostFecBerFailures +
     summary.deviceFailures

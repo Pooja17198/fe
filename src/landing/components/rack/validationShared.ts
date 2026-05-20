@@ -22,6 +22,7 @@ export type RackValidationSummary = {
   interfaceFailures: number;
   opticModuleFailures: number;
   fecBerFailures: number;
+  rawBerFailures: number;
   hostOpticsFailures: number;
   hostOptFailures: number;
   hostFecBerFailures: number;
@@ -36,6 +37,7 @@ export const NOT_VALIDATED_SUMMARY: RackValidationSummary = {
   interfaceFailures: 0,
   opticModuleFailures: 0,
   fecBerFailures: 0,
+  rawBerFailures: 0,
   hostOpticsFailures: 0,
   hostOptFailures: 0,
   hostFecBerFailures: 0,
@@ -264,6 +266,7 @@ export function summarizeValidationFailuresByDevice(
   let interfaceFailures = 0;
   let opticModuleFailures = 0;
   let fecBerFailures = 0;
+  let rawBerFailures = 0;
   let hostOpticsFailures = 0;
   let hostOptFailures = 0;
   let hostFecBerFailures = 0;
@@ -283,11 +286,13 @@ export function summarizeValidationFailuresByDevice(
     const interfaceCount = getSectionCount(failures, "Interface Errors");
     const opticCount = getSectionCount(failures, "Optic Errors");
     const fecBerCount = getSectionCount(failures, "FEC_BER Errors");
+    const rawBerCount = getSectionCount(failures, "Raw BER Errors");
 
     lldpFailures += lldpCount;
     interfaceFailures += interfaceCount;
     opticModuleFailures += opticCount;
     fecBerFailures += fecBerCount;
+    rawBerFailures += rawBerCount;
     cableFailures += lldpCount + interfaceCount;
     opticsFailures += opticCount + fecBerCount;
     const hostTransceiverCounts = getHostTransceiverActionableCounts(failures);
@@ -310,6 +315,7 @@ export function summarizeValidationFailuresByDevice(
     interfaceFailures,
     opticModuleFailures,
     fecBerFailures,
+    rawBerFailures,
     hostOpticsFailures,
     hostOptFailures,
     hostFecBerFailures,
@@ -329,6 +335,7 @@ export function mergeRackValidationSummaries(
       interfaceFailures: acc.interfaceFailures + summary.interfaceFailures,
       opticModuleFailures: acc.opticModuleFailures + summary.opticModuleFailures,
       fecBerFailures: acc.fecBerFailures + summary.fecBerFailures,
+      rawBerFailures: acc.rawBerFailures + summary.rawBerFailures,
       hostOpticsFailures: acc.hostOpticsFailures + summary.hostOpticsFailures,
       hostOptFailures: acc.hostOptFailures + summary.hostOptFailures,
       hostFecBerFailures: acc.hostFecBerFailures + summary.hostFecBerFailures,

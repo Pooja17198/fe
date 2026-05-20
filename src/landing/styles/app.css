@@ -668,6 +668,12 @@
     color: #ea580c;
 }
 
+.rack-status-chip.raw-ber-failure {
+    background: #ecfeff;
+    border-color: #a5f3fc;
+    color: #0f766e;
+}
+
 .rack-status-chip.host-optics-failure {
     background: #ecfdf5;
     border-color: #a7f3d0;

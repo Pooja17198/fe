@@ -322,6 +322,7 @@ function buildRackStatusTokens(summary: RackValidationSummary, region?: string):
     if (
         summary.cableFailures === 0 &&
         summary.opticsFailures === 0 &&
+        summary.rawBerFailures === 0 &&
         summary.hostOpticsFailures === 0 &&
         summary.deviceFailures === 0
     ) {
@@ -368,6 +369,14 @@ function buildRackStatusTokens(summary: RackValidationSummary, region?: string):
                 title: `${summary.fecBerFailures} FEC BER validation failure${summary.fecBerFailures === 1 ? "" : "s"}`,
             });
         }
+
+        if (summary.rawBerFailures > 0) {
+            tokens.push({
+                className: "rack-status-chip raw-ber-failure",
+                label: `RAW BER:${summary.rawBerFailures}`,
+                title: `${summary.rawBerFailures} Raw BER validation failure${summary.rawBerFailures === 1 ? "" : "s"}`,
+            });
+        }
     } else {
         if (summary.cableFailures > 0) {
             tokens.push({
@@ -382,6 +391,14 @@ function buildRackStatusTokens(summary: RackValidationSummary, region?: string):
                 className: "rack-status-chip optics-failure",
                 label: `OPTICS:${summary.opticsFailures}`,
                 title: `${summary.opticsFailures} optics validation failure${summary.opticsFailures === 1 ? "" : "s"}`,
+            });
+        }
+
+        if (summary.rawBerFailures > 0) {
+            tokens.push({
+                className: "rack-status-chip raw-ber-failure",
+                label: `RAW BER:${summary.rawBerFailures}`,
+                title: `${summary.rawBerFailures} Raw BER validation failure${summary.rawBerFailures === 1 ? "" : "s"}`,
             });
         }
     }
