@@ -1,7 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "preact/hooks";
-import MutableArrayDataProvider = require("ojs/ojmutablearraydataprovider");
-import "ojs/ojnavigationlist";
-import { ojTabBar } from "ojs/ojnavigationlist";
+import { useEffect, useRef } from "preact/hooks";
 import { RackProps } from "./types";
 import NcpRackTab from "./NcpRackTab";
 import ValidationServiceRackTab from "./ValidationServiceRackTab";
@@ -9,26 +6,8 @@ import { useBuildingBadLinks } from "../network-monitoring/useBuildingBadLinks";
 import { BadLinksBanner } from "../network-monitoring/BadLinksBanner";
 import { ENABLE_NETWORK_MONITORING } from "../../config/featureFlags";
 
-type Tab = {
-  path: "ncp" | "validationService";
-  label: string;
-};
-
-const RACK_TABS: Tab[] = [
-  { path: "ncp", label: "On-demand" },
-  { path: "validationService", label: "Streaming" },
-];
-
 const Rack = (props: RackProps) => {
   const isFirstRender = useRef(true);
-  const defaultActiveTab: Tab["path"] = props.isGpuRack ? "ncp" : "validationService";
-  const [activeTab, setActiveTab] = useState<Tab["path"]>(defaultActiveTab);
-  const visibleTabs = useMemo(
-    () => RACK_TABS.filter((tab) =>
-      props.isGpuRack ? tab.path === "ncp" : tab.path === "validationService"
-    ),
-    [props.isGpuRack]
-  );
 
   const networkMonitoringEnabled = ENABLE_NETWORK_MONITORING;
   const badLinks = useBuildingBadLinks(props.building, props.region, networkMonitoringEnabled);
@@ -40,27 +19,6 @@ const Rack = (props: RackProps) => {
     }
     props.onPageChanged({ path: "home" });
   }, [props.region]);
-
-  useEffect(() => {
-    if (!visibleTabs.some((tab) => tab.path === activeTab)) {
-      setActiveTab(defaultActiveTab);
-    }
-  }, [activeTab, defaultActiveTab, visibleTabs]);
-
-  const tabbarDP = useMemo(
-    () => new MutableArrayDataProvider<Tab["path"], Tab>(visibleTabs.slice(0), { keyAttributes: "path" }),
-    [visibleTabs]
-  );
-
-  const tabItemTemplate = (item: ojTabBar.ItemContext<Tab["path"], Tab>) => (
-    <li>
-      <a href="#">{item.data.label}</a>
-    </li>
-  );
-
-  const loadTabContent = (event: ojTabBar.selectionChanged<Tab["path"], Tab>) => {
-    setActiveTab(event.detail.value);
-  };
 
   return (
     <div class="rack-page">
@@ -82,22 +40,10 @@ const Rack = (props: RackProps) => {
         <BadLinksBanner building={props.building} badLinks={badLinks} />
       )}
 
-      <div className="rack-tabbar-wrap">
-        <oj-tab-bar
-          class="rack-tabbar"
-          edge="top"
-          data={tabbarDP}
-          selection={activeTab}
-          onselectionChanged={loadTabContent}
-        >
-          <template slot="itemTemplate" render={tabItemTemplate}></template>
-        </oj-tab-bar>
-      </div>
-
-      {activeTab === "validationService" ? (
-        <ValidationServiceRackTab {...props} />
-      ) : (
+      {props.isGpuRack ? (
         <NcpRackTab {...props} />
+      ) : (
+        <ValidationServiceRackTab {...props} />
       )}
     </div>
   );

@@ -99,7 +99,7 @@ const ValidationServiceRackTab = (props: RackProps) => {
       <div className="device-accordion-toolbar">
         <h3 className="device-accordion-summary-title">
           <span role="img" className="oj-icon validation-summary-icon" title="Validation Summary Image"></span>
-          Streaming
+          Validation Summary
         </h3>
 
         <div className="flex-spacer" />
