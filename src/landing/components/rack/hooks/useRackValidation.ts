@@ -1350,6 +1350,7 @@ export function useRackValidation(props: RackProps, options?: UseRackValidationO
             url.searchParams.set("rackSerialNumber", props.rack_serial);
             url.searchParams.set("regionName", props.region);
             url.searchParams.set("format", "xlsx");
+            url.searchParams.set("isGPURack", String(Boolean(props.isGpuRack)));
             const headers = new Headers();
             headers.append("Accept", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
 
@@ -1383,7 +1384,7 @@ export function useRackValidation(props: RackProps, options?: UseRackValidationO
         } finally {
             setIsDownloading(false);
         }
-    }, [props.rack_serial, props.region]);
+    }, [props.rack_serial, props.region, props.isGpuRack]);
 
     const summaryStats = useMemo(() => {
         const values = Object.values(validationFailuresByDevice);
