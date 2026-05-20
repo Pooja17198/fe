@@ -7,12 +7,14 @@ interface MaterialPanelProps {
   materials: MaterialSummary[] | undefined;
   loading: boolean;
   headerText: string;
+  metricDimensions?: Record<string, unknown>;
 }
 
 export const MaterialPanel = ({
   materials,
   loading,
   headerText,
+  metricDimensions,
 }: MaterialPanelProps) => {
   const [fieldDialogOpen, setFieldDialogOpen] = useState(false);
 
@@ -79,6 +81,7 @@ export const MaterialPanel = ({
         opened={fieldDialogOpen}
         onClose={() => setFieldDialogOpen(false)}
         headerText={headerText}
+        metricDimensions={metricDimensions}
         materials={materials}
       />
     </div>

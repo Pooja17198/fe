@@ -400,6 +400,70 @@ export const GraphView = () => {
     }
   };
 
+  const materialPanelContext = (() => {
+    const roomName = selectedRoom?.roomName;
+    const baseDimensions = roomName ? { roomName } : {};
+    const getRackBlockName = (rackNumber: string | null | undefined) =>
+      roomPlatforms?.find(
+        (roomPlatform) => roomPlatform.rackNumber?.trim() === rackNumber,
+      )?.blockName;
+
+    if (isSourceOnlySelection && selectedRackToRack?.sourceRack) {
+      const blockName = getRackBlockName(selectedRackToRack.sourceRack);
+      return {
+        headerText: `Rack ${selectedRackToRack.sourceRack}`,
+        metricDimensions: {
+          ...baseDimensions,
+          sourceRackNumber: selectedRackToRack.sourceRack,
+          ...(blockName ? { blockName } : {}),
+        },
+      };
+    }
+
+    if (rackFilters.blockName) {
+      return {
+        headerText: `Block ${rackFilters.blockName}`,
+        metricDimensions: {
+          ...baseDimensions,
+          blockName: rackFilters.blockName,
+        },
+      };
+    }
+
+    if (
+      rackToRackConnections?.materials &&
+      selectedRackToRack?.destinationRack
+    ) {
+      const blockName = getRackBlockName(selectedRackToRack.sourceRack);
+      return {
+        headerText: `Rack ${selectedRackToRack.sourceRack} to Rack ${selectedRackToRack.destinationRack}`,
+        metricDimensions: {
+          ...baseDimensions,
+          sourceRackNumber: selectedRackToRack.sourceRack,
+          destinationRackNumber: selectedRackToRack.destinationRack,
+          ...(blockName ? { blockName } : {}),
+        },
+      };
+    }
+
+    if (selectedCutsheetRack) {
+      const blockName = getRackBlockName(selectedCutsheetRack);
+      return {
+        headerText: `Rack ${selectedCutsheetRack}`,
+        metricDimensions: {
+          ...baseDimensions,
+          rackNumber: selectedCutsheetRack,
+          ...(blockName ? { blockName } : {}),
+        },
+      };
+    }
+
+    return {
+      headerText: `Room ${roomName}`,
+      metricDimensions: baseDimensions,
+    };
+  })();
+
   return (
     <div class="oj-web-applayout-max-width oj-web-applayout-content">
       <div className="cabling-selectors-row">
@@ -594,17 +658,8 @@ export const GraphView = () => {
             <MaterialPanel
               materials={materialShown}
               loading={materialsLoading || !selectedRoom?.roomName}
-              headerText={
-                rackToRackConnections?.materials &&
-                selectedRackToRack &&
-                selectedRackToRack.destinationRack
-                  ? `Rack ${selectedRackToRack?.sourceRack} to Rack ${selectedRackToRack?.destinationRack}`
-                  : selectedCutsheetRack
-                    ? `Rack ${selectedCutsheetRack}`
-                    : rackFilters.blockName ? 
-                    `Block ${rackFilters.blockName}` :
-                    `Room ${selectedRoom?.roomName}`
-              }
+              headerText={materialPanelContext.headerText}
+              metricDimensions={materialPanelContext.metricDimensions}
             />
           </div>
         ) : (
@@ -621,17 +676,8 @@ export const GraphView = () => {
             <MaterialPanel
               materials={materialShown}
               loading={materialsLoading || !selectedRoom?.roomName}
-              headerText={
-                rackToRackConnections?.materials &&
-                selectedRackToRack &&
-                selectedRackToRack.destinationRack
-                  ? `Rack ${selectedRackToRack?.sourceRack} to Rack ${selectedRackToRack?.destinationRack}`
-                  : selectedCutsheetRack
-                    ? `Rack ${selectedCutsheetRack}`
-                    : rackFilters.blockName ? 
-                    `Block ${rackFilters.blockName}` :
-                    `Room ${selectedRoom?.roomName}`
-              }
+              headerText={materialPanelContext.headerText}
+              metricDimensions={materialPanelContext.metricDimensions}
             />
           ) : (
             <PhysicalCutsheetPanel

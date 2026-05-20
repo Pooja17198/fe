@@ -623,6 +623,40 @@ paths:
         default:
           $ref: '#/responses/DefaultError'
 
+  /uiMetrics:
+    post:
+      tags: ['UiMetrics']
+      operationId: emitUiMetric
+      summary: Emits a cabling UI metric.
+      description: Emits a cabling UI action metric with string dimensions.
+      consumes:
+        - application/json
+      produces:
+        - application/json
+      parameters:
+        - in: body
+          name: EmitUiMetricRequest
+          required: true
+          description: Cabling UI metric payload.
+          schema:
+            $ref: '#/definitions/EmitUiMetricRequest'
+        - $ref: '#/parameters/RequestIdHeader'
+      responses:
+        204:
+          description: Cabling UI metric accepted.
+          headers:
+            opc-request-id: *ref-opc-request-id
+        400:
+          $ref: '#/responses/400'
+        401:
+          $ref: '#/responses/401'
+        429:
+          $ref: '#/responses/429'
+        500:
+          $ref: '#/responses/500'
+        default:
+          $ref: '#/responses/DefaultError'
+
 #==========[ Definitions ]================================================================================================
 definitions:
   Version:
@@ -711,6 +745,22 @@ definitions:
       message:
         description: A human-readable error message.
         type: string
+
+  EmitUiMetricRequest:
+    type: object
+    description: Request body for cabling UI action metric emission.
+    required:
+      - actionName
+      - dimensions
+    properties:
+      actionName:
+        type: string
+        description: Name of the UI action being emitted.
+      dimensions:
+        type: object
+        description: String-valued dimensions to attach to the metric.
+        additionalProperties:
+          type: string
 
   NamespaceMapping:
     type: object
@@ -814,6 +864,11 @@ definitions:
 
   RoomMetadata:
     type: object
+    required:
+      - regionDisplayName
+      - availabilityDomainCanonicalShortCode
+      - buildingCanonicalName
+      - roomCanonicalName
     properties:
       regionDisplayName:
         type: string

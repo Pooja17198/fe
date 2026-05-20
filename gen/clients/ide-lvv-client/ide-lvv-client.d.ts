@@ -3,6 +3,12 @@ export interface BuildArtifactCollection {
     "room_name": string;
     "items": Array<FileMetadata>;
 }
+export interface EmitUiMetricRequest {
+    "actionName": string;
+    "dimensions": {
+        [key: string]: string;
+    };
+}
 export interface FileMetadata {
     "name": string;
     "sizeBytes": number;
@@ -99,7 +105,7 @@ export interface PhysicalConnectionCollection {
     "roomName"?: string;
     "type"?: string;
     "items": Array<PhysicalConnectionSummary>;
-    "materials"?: MaterialSummary[];
+    "materials"?: Array<MaterialSummary>;
 }
 export interface PhysicalConnectionImageResponse {
     "image": string;
@@ -492,6 +498,18 @@ export declare class RoomMetadataLayoutApi extends base.BaseAPI {
         response: Response;
         data: RoomLayout;
     }>;
+}
+export interface UiMetricsApiEmitUiMetricArgs {
+    "emitUiMetricRequest": EmitUiMetricRequest;
+    "opcRequestId"?: string;
+}
+export type UiMetricsApiEmitUiMetricReturnType = Response;
+export declare class UiMetricsApi extends base.BaseAPI {
+    static createFromEndpointTemplate(fetch: base.Fetch, region: string, secondLevelDomain: string, config?: base.BaseApiConfig): UiMetricsApi;
+    emitUiMetric(params: {
+        "emitUiMetricRequest": EmitUiMetricRequest;
+        "opcRequestId"?: string;
+    }, options?: any): Promise<Response>;
 }
 export declare class VersionApi extends base.BaseAPI {
     static createFromEndpointTemplate(fetch: base.Fetch, region: string, secondLevelDomain: string, config?: base.BaseApiConfig): VersionApi;

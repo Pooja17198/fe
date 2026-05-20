@@ -9,6 +9,10 @@ import {
   RackDeviceSummary,
   PatchPanelPortSummary,
 } from "gen/clients/ide-lvv-client";
+import {
+  CABLING_UI_ACTIONS,
+  emitCablingUiMetric,
+} from "../api/uiMetrics";
 
 interface PhysicalCutsheetProps {
   gpuRacks: string[];
@@ -209,10 +213,16 @@ export const PhysicalCutsheetPanel = ({
     setExportLoading(true);
 
     try {
-      downloadEasyMarkCsv(
-        buildRackViewEasyMarkRows(devices),
-        roomName,
-        selectedRack,
+      const easyMarkRows = buildRackViewEasyMarkRows(devices);
+      downloadEasyMarkCsv(easyMarkRows, roomName, selectedRack);
+      void emitCablingUiMetric(
+        CABLING_UI_ACTIONS.DOWNLOAD_EASY_MARKS,
+        {
+          roomName,
+          rackNumber: selectedRack,
+          deviceCount: devices.length,
+          easyMarkRowCount: easyMarkRows.length,
+        },
       );
     } finally {
       setExportLoading(false);

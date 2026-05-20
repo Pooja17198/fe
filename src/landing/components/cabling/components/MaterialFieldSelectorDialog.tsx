@@ -9,6 +9,10 @@ import "oj-c/selector-all";
 import * as XLSX from "xlsx";
 import { MaterialSummary } from "gen/clients/ide-lvv-client";
 import ToastMessage from "./ToastMessage";
+import {
+  CABLING_UI_ACTIONS,
+  emitCablingUiMetric,
+} from "../api/uiMetrics";
 
 type MaterialField = {
   id: string;
@@ -18,6 +22,7 @@ type MaterialField = {
 interface MaterialFieldSelectorDialogProps {
   opened: boolean;
   headerText: string;
+  metricDimensions?: Record<string, unknown>;
   onClose: () => void;
   materials: MaterialSummary[] | undefined;
 }
@@ -145,6 +150,7 @@ export const MaterialFieldSelectorDialog = ({
   opened,
   onClose,
   headerText,
+  metricDimensions = {},
   materials,
 }: MaterialFieldSelectorDialogProps) => {
   const [selectedFields, setSelectedFields] = useState<string[]>([]);
@@ -271,6 +277,10 @@ export const MaterialFieldSelectorDialog = ({
     link.click();
     link.remove();
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    void emitCablingUiMetric(CABLING_UI_ACTIONS.DOWNLOAD_MATERIALS, {
+      ...metricDimensions,
+      exportRowCount: exportRows.length,
+    });
     onClose();
   };
 
