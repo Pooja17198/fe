@@ -138,15 +138,22 @@ export function Header({ appName, userLogin, vendorName, userType, regionValue, 
   const isMasterUser = userType === "master";
   const tabs: Tab[] = [
     { path: "cabling", label: "Cabling and Materials" },
+    { path: "qc", label: "Quality Control" },
     { path: "home", label: "Rack Validation" },
     ...(isMasterUser ? [{ path: "deployment-group-validation", label: "Deployment Group Validation" }] : []),
   ];
-  const isCabling = Boolean(page?.includes("cabling"));
-  const [activeTab, setActiveTab] = useState<string>(() => page === "cabling" ? tabs[0].path : tabs[1].path);
-
+  const isCabling = Boolean(page?.includes("cabling") || page?.includes("qc") );
+  const [activeTab, setActiveTab] = useState<string>(() => {
+    if (page?.includes("cabling")) return "cabling";
+    if (page?.includes("qc")) return "qc";
+    if (page?.includes("deployment-group-validation") && isMasterUser) {
+      return "deployment-group-validation";
+    }
+    return "home";
+  });
   const tabItemTemplate = (item: ojTabBar.ItemContext<Tab["path"], Tab>) => (
     <li>
-      <a href="#">
+      <a href="#" class="lvv-tabbar-item-label">
         {item.data.label}
       </a>
     </li>
@@ -176,13 +183,25 @@ export function Header({ appName, userLogin, vendorName, userType, regionValue, 
       setActiveTab("deployment-group-validation");
       return;
     }
-    onPageChanged({ path: "cabling" });
-    setActiveTab("cabling");
+    if (selectedPath === 'cabling') {
+      onPageChanged({ path: "cabling" });
+      setActiveTab("cabling");
+      return;
+    } 
+    if (selectedPath === 'qc') {
+      onPageChanged({ path: "qc" });
+      setActiveTab("qc");
+      return;
+    }
   };
 
   useEffect(() => {
     if (page?.includes("cabling")) {
       setActiveTab("cabling");
+      return;
+    }
+    if (page?.includes("qc")) {
+      setActiveTab("qc");
       return;
     }
     if (page?.includes("deployment-group-validation")) {
@@ -206,7 +225,7 @@ export function Header({ appName, userLogin, vendorName, userType, regionValue, 
   console.log('regions', regions);
   return (
       <header role="banner" class="oj-web-applayout-header">
-        <div class="oj-web-applayout-max-width oj-flex-bar oj-sm-align-items-center">
+        <div class="oj-flex-bar oj-sm-align-items-center">
           <div class="oj-flex-bar-middle oj-sm-align-items-baseline">
           <span
               role="img"
@@ -215,11 +234,11 @@ export function Header({ appName, userLogin, vendorName, userType, regionValue, 
               // alt="Oracle Logo"
               >
           </span>
-            <h1
-                class="oj-sm-only-hide oj-web-applayout-header-title"
+            <div
+                class="oj-md-only-hide oj-sm-only-hide oj-web-applayout-header-title"
                 title="Application Name">
-              {appName} Vendor Name: {vendorName}
-            </h1>
+              {`${appName} Vendor Name: ${vendorName}`}
+            </div>
           </div>
         <oj-tab-bar
           class="lvv-tabbar oj-sm-margin-8x-end"

@@ -1,9 +1,11 @@
+// Import from modules
 import { Dispatch, StateUpdater, useMemo } from "preact/hooks";
-import { AdrBuilding, DataCenterRoom } from "../types";
+import { DataCenterRoom } from "../types";
 import { useRoomMetadata } from "../api/hooks/materialApi";
 import "oj-c/select-single";
 import ArrayDataProvider from "ojs/ojarraydataprovider";
 import { UseMockData } from "./GraphView";
+import { RoomMetadata } from "gen/clients/ide-lvv-client";
 
 interface RegionADSiteSelectorsProps {
   rooms?: DataCenterRoom[];
@@ -40,7 +42,7 @@ const RegionADSiteSelectors = ({
     });
 
     if (roomMap.size === 0) {
-      (adrBuildingData || []).forEach((item: AdrBuilding) => {
+      (adrBuildingData || []).forEach((item: RoomMetadata) => {
         const roomName = item.roomCanonicalName;
         if (!roomName || roomMap.has(roomName)) {
           return;

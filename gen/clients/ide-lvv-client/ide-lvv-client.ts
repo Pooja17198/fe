@@ -34,6 +34,119 @@ export interface EmitUiMetricRequest {
     "dimensions": { [key: string]: string; };
 }
 
+/**
+ * Details used to add an attachment reference to a QC checklist task.
+ */
+export interface CreateQcTaskAttachmentDetails {
+    /**
+     * Name of the attachment file.
+     */
+    "fileName": string;
+    /**
+     * MIME type of the attachment file.
+     */
+    "contentType": string;
+    /**
+     * Size of the attachment in bytes.
+     */
+    "contentSize": number;
+    /**
+     * Identifier of the user creating the attachment.
+     */
+    "createdBy": string;
+    /**
+     * Email address of the user creating the attachment.
+     */
+    "emailAddress"?: string;
+    /**
+     * Creation timestamp in RFC3339 format.
+     */
+    "timeCreated": string;
+    /**
+     * Base64-encoded binary content of the attached file.
+     */
+    "content": string;
+    /**
+     * Optional notes about the attachment.
+     */
+    "notes"?: string;
+}
+
+/**
+ * Details used to add a comment to a QC checklist task.
+ */
+export interface CreateQcTaskCommentDetails {
+    /**
+     * Comment text.
+     */
+    "comment": string;
+    /**
+     * Identifier of the user creating the comment.
+     */
+    "createdBy": string;
+    /**
+     * Email address of the user creating the comment.
+     */
+    "emailAddress"?: string;
+    /**
+     * Creation timestamp in RFC3339 format.
+     */
+    "timeCreated": string;
+}
+
+/**
+ * Details required to create a QC work order.
+ */
+export interface CreateQcWorkOrderDetails {
+    /**
+     * Identifier of the QC work order definition to run.
+     */
+    "workOrderDefinitionId": string;
+    /**
+     * Display name for the new QC work order.
+     */
+    "displayName": string;
+    /**
+     * Identifier of the region scope for the work order.
+     */
+    "regionId": string;
+    /**
+     * Identifier of the building scope for the work order.
+     */
+    "buildingId": string;
+    /**
+     * Identifier of the room scope for the work order.
+     */
+    "roomId": string;
+    /**
+     * Identifier of the rack location to run QC against.
+     */
+    "rackLocationId": string;
+    /**
+     * Name of the vendor associated with the QC work order.
+     */
+    "vendorName"?: string;
+    /**
+     * Identifier of the requesting user.
+     */
+    "createdBy": string;
+}
+
+/**
+ * Details used to evaluate a QC checklist task.
+ */
+export interface EvaluateQcTaskDetails {
+    "result": QcTaskEvaluationResult;
+    /**
+     * Identifier of the user evaluating the task.
+     */
+    "evaluatedBy": string;
+    /**
+     * Evaluation timestamp in RFC3339 format.
+     */
+    "timeEvaluated": string;
+}
+
 export interface FileMetadata {
     "name": string;
     "sizeBytes": number;
@@ -369,7 +482,10 @@ export interface PhysicalConnectionImageResponse {
      * Base64 encoded image for the physical connection
      */
     "image": string;
-    "materials"?: MaterialSummary[];
+    /**
+     * Materials associated with the physical connection
+     */
+    "materials"?: Array<MaterialSummary>;
 }
 
 /**
@@ -546,6 +662,279 @@ export interface PortErrorSummary {
 }
 
 /**
+ * Results of listing QC task attachments.
+ */
+export interface QcTaskAttachmentCollection {
+    /**
+     * List of QC task attachments.
+     */
+    "items": Array<QcTaskAttachmentSummary>;
+}
+
+/**
+ * Summary view of a QC task attachment.
+ */
+export interface QcTaskAttachmentSummary {
+    /**
+     * Identifier of the attachment.
+     */
+    "attachmentId": string;
+    /**
+     * Identifier of the parent task.
+     */
+    "taskId": string;
+    /**
+     * Name of the user who created the attachment.
+     */
+    "createdBy"?: string;
+    /**
+     * Name of the attached file.
+     */
+    "fileName": string;
+    /**
+     * MIME type of the attached file.
+     */
+    "contentType": string;
+    /**
+     * Size of the attached file in bytes.
+     */
+    "contentSize"?: number;
+    /**
+     * Base64-encoded binary content of the attached file.
+     */
+    "content"?: string;
+    /**
+     * Time when the attachment was created, in RFC3339 format.
+     */
+    "timeCreated": string;
+}
+
+/**
+ * Results of listing QC checklist tasks for a work order.
+ */
+export interface QcTaskCollection {
+    /**
+     * List of QC task summaries.
+     */
+    "items": Array<QcTaskSummary>;
+}
+
+/**
+ * Results of listing QC task comments.
+ */
+export interface QcTaskCommentCollection {
+    /**
+     * List of QC task comments.
+     */
+    "items": Array<QcTaskCommentSummary>;
+}
+
+/**
+ * Summary view of a QC task comment.
+ */
+export interface QcTaskCommentSummary {
+    /**
+     * Identifier of the comment.
+     */
+    "commentId": string;
+    /**
+     * Identifier of the parent task.
+     */
+    "taskId": string;
+    /**
+     * Name of the user who created the comment.
+     */
+    "createdBy"?: string;
+    /**
+     * Comment text.
+     */
+    "comment": string;
+    /**
+     * Time when the comment was created, in RFC3339 format.
+     */
+    "timeCreated": string;
+}
+
+/**
+ * Evaluation result for a QC checklist task.
+ */
+export type QcTaskEvaluationResult = "PASS";
+export enum QcTaskEvaluationResultValues {
+    PASS = "PASS"
+}
+
+/**
+ * Lifecycle state for a QC checklist task.
+ */
+export type QcTaskLifecycleState = "IN_PROGRESS" | "COMPLETED" | "FAILED";
+export enum QcTaskLifecycleStateValues {
+    IN_PROGRESS = "IN_PROGRESS",
+    COMPLETED = "COMPLETED",
+    FAILED = "FAILED"
+}
+
+/**
+ * Summary view of a QC checklist task.
+ */
+export interface QcTaskSummary {
+    /**
+     * Identifier of the task.
+     */
+    "id": string;
+    /**
+     * Identifier of the parent QC work order.
+     */
+    "workOrderId": string;
+    /**
+     * Task key/name from the checklist template.
+     */
+    "taskKey"?: string;
+    /**
+     * Identifier of the user currently assigned to this task.
+     */
+    "vendorName"?: string;
+    "lifecycleState"?: QcTaskLifecycleState;
+    /**
+     * Time when the task was created, in RFC3339 format.
+     */
+    "timeCreated"?: string;
+    /**
+     * Time when the task was last updated, in RFC3339 format.
+     */
+    "timeUpdated"?: string;
+    /**
+     * Time when the task was started, in RFC3339 format.
+     */
+    "timeStarted"?: string;
+    /**
+     * Time when the task was completed, in RFC3339 format.
+     */
+    "timeCompleted"?: string;
+}
+
+/**
+ * Detailed QC work order view returned by get-by-id operations.
+ */
+export interface QcWorkOrder {
+    /**
+     * QC work order identifier.
+     */
+    "id": string;
+    /**
+     * Identifier of the QC work order definition used to create this work order.
+     */
+    "workOrderDefinitionId"?: string;
+    /**
+     * Display name of the QC work order.
+     */
+    "displayName"?: string;
+    /**
+     * Time when the work order was created, in RFC3339 format.
+     */
+    "timeCreated": string;
+    /**
+     * Time when the work order was last updated, in RFC3339 format.
+     */
+    "timeUpdated"?: string;
+    /**
+     * Identifier of the region for the work order scope.
+     */
+    "regionId"?: string;
+    /**
+     * Identifier of the building for the work order scope.
+     */
+    "buildingId"?: string;
+    /**
+     * Identifier of the room for the work order scope.
+     */
+    "roomId"?: string;
+    /**
+     * Identifier of the rack location for the work order scope.
+     */
+    "rackLocationId"?: string;
+    /**
+     * Name of the vendor associated with the QC work order.
+     */
+    "vendorName"?: string;
+    /**
+     * Identifier of the user who created this work order.
+     */
+    "createdBy"?: string;
+    "lifecycleState": QcWorkOrderLifecycleState;
+}
+
+/**
+ * Results of listing QC work orders.
+ */
+export interface QcWorkOrderCollection {
+    /**
+     * List of QC work order summaries.
+     */
+    "items": Array<QcWorkOrderSummary>;
+}
+
+/**
+ * Combined execution/resource lifecycle state of the QC work order.
+ */
+export type QcWorkOrderLifecycleState = "IN_PROGRESS" | "FAILED" | "SUCCEEDED";
+export enum QcWorkOrderLifecycleStateValues {
+    IN_PROGRESS = "IN_PROGRESS",
+    FAILED = "FAILED",
+    SUCCEEDED = "SUCCEEDED"
+}
+
+/**
+ * Summary view of a QC work order returned by list operations.
+ */
+export interface QcWorkOrderSummary {
+    /**
+     * QC work order identifier.
+     */
+    "id": string;
+    /**
+     * Identifier of the QC work order definition used to create this work order.
+     */
+    "workOrderDefinitionId"?: string;
+    /**
+     * Display name of the QC work order.
+     */
+    "displayName"?: string;
+    /**
+     * Time when the work order was created, in [RFC3339](https://tools.ietf.org/html/rfc3339) format.
+     */
+    "timeCreated": string;
+    /**
+     * Time the WorkOrder was last updated, in [RFC3339](https://tools.ietf.org/html/rfc3339) format.
+     */
+    "timeUpdated"?: string;
+    /**
+     * Identifier of the region for the WorkOrder scope.
+     */
+    "regionId"?: string;
+    /**
+     * Identifier of the building for the WorkOrder scope.
+     */
+    "buildingId"?: string;
+    /**
+     * Identifier of the room for the WorkOrder scope.
+     */
+    "roomId"?: string;
+    /**
+     * Identifier of the rack location for the WorkOrder scope.
+     */
+    "rackLocationId"?: string;
+    /**
+     * Name of the vendor associated with the QC work order.
+     */
+    "vendorName"?: string;
+    /**
+     * Identifier of the requesting user.
+     */
+    "createdBy"?: string;
+    "lifecycleState": QcWorkOrderLifecycleState;
+}
+
+/**
  * Rack device summary
  */
 export interface RackDeviceSummary {
@@ -588,19 +977,19 @@ export interface RoomMetadata {
     /**
      * Region display Name
      */
-    "regionDisplayName": string;
+    "regionDisplayName"?: string;
     /**
      * AD short code
      */
-    "availabilityDomainCanonicalShortCode": string;
+    "availabilityDomainCanonicalShortCode"?: string;
     /**
      * Building name
      */
-    "buildingCanonicalName": string;
+    "buildingCanonicalName"?: string;
     /**
      * Room name
      */
-    "roomCanonicalName": string;
+    "roomCanonicalName"?: string;
 }
 
 export interface RoomMetadataCollection {
@@ -723,7 +1112,7 @@ export class BuildArtifactsApi extends base.BaseAPI {
 };
 
 export interface MaterialApiListMaterialsArgs {
-     "roomName": string;
+     "roomName"?: string;
      "bomId"?: number;
      "limit"?: number;
      "page"?: string;
@@ -760,9 +1149,8 @@ export class MaterialApi extends base.BaseAPI {
      * @param sortBy Sort field
      * @param opcRequestId Request ID for idempotency
      */
-    public listMaterials(params: {  "roomName": string; "bomId"?: number; "limit"?: number; "page"?: string; "sortOrder"?: string; "sortBy"?: string; "opcRequestId"?: string; }, options?: any): Promise<{ response: Response, data: MaterialCollection }> {
+    public listMaterials(params: {  "roomName"?: string; "bomId"?: number; "limit"?: number; "page"?: string; "sortOrder"?: string; "sortBy"?: string; "opcRequestId"?: string; }, options?: any): Promise<{ response: Response, data: MaterialCollection }> {
         base.validateRequiredParameters([
-            "roomName",
         ], "listMaterials", params);
 
         const path = `${this.basePath}/materials`;
@@ -1088,15 +1476,15 @@ export class NamespaceMappingApi extends base.BaseAPI {
 };
 
 export interface PhysicalConnectionApiGetPhysicalConnectionImageArgs {
-     "roomName": string;
      "sourceRackNumber": string;
      "destinationRackNumber": string;
+     "roomName"?: string;
      "opcRequestId"?: string
 }
 export type PhysicalConnectionApiGetPhysicalConnectionImageReturnType = { response: Response, data: PhysicalConnectionImageResponse };
 
 export interface PhysicalConnectionApiListPhysicalConnectionsArgs {
-     "roomName": string;
+     "roomName"?: string;
      "blockName"?: string;
      "bomId"?: number;
      "limit"?: number;
@@ -1125,14 +1513,13 @@ export class PhysicalConnectionApi extends base.BaseAPI {
 
     /**
      * Get physical connection image by room and rack pair.
-     * @param roomName Room name for filtering
      * @param sourceRackNumber Source rack number
      * @param destinationRackNumber Destination rack number
+     * @param roomName Room name for filtering
      * @param opcRequestId Request ID for idempotency
      */
-    public getPhysicalConnectionImage(params: {  "roomName": string; "sourceRackNumber": string; "destinationRackNumber": string; "opcRequestId"?: string; }, options?: any): Promise<{ response: Response, data: PhysicalConnectionImageResponse }> {
+    public getPhysicalConnectionImage(params: {  "sourceRackNumber": string; "destinationRackNumber": string; "roomName"?: string; "opcRequestId"?: string; }, options?: any): Promise<{ response: Response, data: PhysicalConnectionImageResponse }> {
         base.validateRequiredParameters([
-            "roomName",
             "sourceRackNumber",
             "destinationRackNumber",
         ], "getPhysicalConnectionImage", params);
@@ -1172,9 +1559,8 @@ export class PhysicalConnectionApi extends base.BaseAPI {
      * @param sortBy Sort field
      * @param opcRequestId Request ID for idempotency
      */
-    public listPhysicalConnections(params: {  "roomName": string; "blockName"?: string; "bomId"?: number; "limit"?: number; "page"?: string; "sortOrder"?: string; "sortBy"?: string; "opcRequestId"?: string; }, options?: any): Promise<{ response: Response, data: PhysicalConnectionCollection }> {
+    public listPhysicalConnections(params: {  "roomName"?: string; "blockName"?: string; "bomId"?: number; "limit"?: number; "page"?: string; "sortOrder"?: string; "sortBy"?: string; "opcRequestId"?: string; }, options?: any): Promise<{ response: Response, data: PhysicalConnectionCollection }> {
         base.validateRequiredParameters([
-            "roomName",
         ], "listPhysicalConnections", params);
 
         const path = `${this.basePath}/physicalconnections`;
@@ -1317,6 +1703,450 @@ export class PhysicalCutsheetApi extends base.BaseAPI {
             parseResponseBody: true,
 
             operationName: "listPhysicalCutsheets",
+            httpMethod: "GET"
+        });
+    }
+};
+
+export interface QcApiCreateQcTaskAttachmentArgs {
+     "taskId": string;
+     "createQcTaskAttachmentDetails": CreateQcTaskAttachmentDetails;
+     "opcRequestId"?: string
+}
+export type QcApiCreateQcTaskAttachmentReturnType = { response: Response, data: QcTaskAttachmentSummary };
+
+export interface QcApiCreateQcTaskCommentArgs {
+     "taskId": string;
+     "createQcTaskCommentDetails": CreateQcTaskCommentDetails;
+     "opcRequestId"?: string
+}
+export type QcApiCreateQcTaskCommentReturnType = { response: Response, data: QcTaskCommentSummary };
+
+export interface QcApiCreateQcWorkOrderArgs {
+     "createQcWorkOrderDetails": CreateQcWorkOrderDetails;
+     "opcRequestId"?: string
+}
+export type QcApiCreateQcWorkOrderReturnType = { response: Response, data: QcWorkOrder };
+
+export interface QcApiEvaluateQcTaskArgs {
+     "taskId": string;
+     "evaluateQcTaskDetails": EvaluateQcTaskDetails;
+     "opcRequestId"?: string
+}
+export type QcApiEvaluateQcTaskReturnType = { response: Response, data: QcTaskSummary };
+
+export interface QcApiGetQcWorkOrderArgs {
+     "workOrderId": string;
+     "opcRequestId"?: string
+}
+export type QcApiGetQcWorkOrderReturnType = { response: Response, data: QcWorkOrder };
+
+export interface QcApiListQcTaskAttachmentsArgs {
+     "taskId": string;
+     "limit"?: number;
+     "page"?: string;
+     "sortOrder"?: string;
+     "sortBy"?: string;
+     "opcRequestId"?: string
+}
+export type QcApiListQcTaskAttachmentsReturnType = { response: Response, data: QcTaskAttachmentCollection };
+
+export interface QcApiListQcTaskCommentsArgs {
+     "taskId": string;
+     "limit"?: number;
+     "page"?: string;
+     "sortOrder"?: string;
+     "sortBy"?: string;
+     "opcRequestId"?: string
+}
+export type QcApiListQcTaskCommentsReturnType = { response: Response, data: QcTaskCommentCollection };
+
+export interface QcApiListQcWorkOrderTasksArgs {
+     "workOrderId": string;
+     "limit"?: number;
+     "page"?: string;
+     "sortOrder"?: string;
+     "sortBy"?: string;
+     "opcRequestId"?: string
+}
+export type QcApiListQcWorkOrderTasksReturnType = { response: Response, data: QcTaskCollection };
+
+export interface QcApiListQcWorkOrdersArgs {
+     "lifecycleState"?: string;
+     "createdBy"?: string;
+     "regionId"?: string;
+     "buildingId"?: string;
+     "roomId"?: string;
+     "rackLocationId"?: string;
+     "limit"?: number;
+     "page"?: string;
+     "sortOrder"?: string;
+     "sortBy"?: string;
+     "opcRequestId"?: string
+}
+export type QcApiListQcWorkOrdersReturnType = { response: Response, data: QcWorkOrderCollection };
+
+
+/**
+ * QcApi - object-oriented interface
+ */
+export class QcApi extends base.BaseAPI {
+    public static createFromEndpointTemplate(fetch: base.Fetch, region: string, secondLevelDomain: string, config?: base.BaseApiConfig): QcApi {
+        const endpoint = base.buildEndpointFromTemplate(
+            "https://infradeliveryengineering.{region}.oci.{secondLevelDomain}",
+            "/idelvv",
+            region,
+            secondLevelDomain
+        );
+
+        return new QcApi(fetch, endpoint, config);
+    }
+
+    /** 
+     * Add QC task attachment
+     * Adds an attachment reference to a specific QC checklist task.
+     * @param taskId Identifier of the QC checklist task.
+     * @param createQcTaskAttachmentDetails Details used to add an attachment reference to a QC checklist task.
+     * @param opcRequestId Request ID for idempotency
+     */
+    public createQcTaskAttachment(params: {  "taskId": string; "createQcTaskAttachmentDetails": CreateQcTaskAttachmentDetails; "opcRequestId"?: string; }, options?: any): Promise<{ response: Response, data: QcTaskAttachmentSummary }> {
+        base.validateRequiredParameters([
+            "taskId",
+            "createQcTaskAttachmentDetails",
+        ], "createQcTaskAttachment", params);
+
+        const path = `${this.basePath}/qc/tasks/{taskId}/attachments`
+            .replace(`{${"taskId"}}`, `${ params["taskId"] }`);
+
+        return this.request<QcTaskAttachmentSummary>({
+            options,
+            path,
+
+
+            headerParameters: {
+                "opc-request-id":  params["opcRequestId"]
+            },
+
+                    body: 
+                    {
+                        type: "content",
+                        contentType: (params as any)["contentType"] ? (params as any)["contentType"] as string : "application/json",
+                        content: params["createQcTaskAttachmentDetails"]
+                    },
+
+            parseResponseBody: true,
+
+            operationName: "createQcTaskAttachment",
+            httpMethod: "POST"
+        });
+    }
+    /** 
+     * Add QC task comment
+     * Adds a comment to a specific QC checklist task.
+     * @param taskId Identifier of the QC checklist task.
+     * @param createQcTaskCommentDetails Details used to add a comment to a QC checklist task.
+     * @param opcRequestId Request ID for idempotency
+     */
+    public createQcTaskComment(params: {  "taskId": string; "createQcTaskCommentDetails": CreateQcTaskCommentDetails; "opcRequestId"?: string; }, options?: any): Promise<{ response: Response, data: QcTaskCommentSummary }> {
+        base.validateRequiredParameters([
+            "taskId",
+            "createQcTaskCommentDetails",
+        ], "createQcTaskComment", params);
+
+        const path = `${this.basePath}/qc/tasks/{taskId}/comments`
+            .replace(`{${"taskId"}}`, `${ params["taskId"] }`);
+
+        return this.request<QcTaskCommentSummary>({
+            options,
+            path,
+
+
+            headerParameters: {
+                "opc-request-id":  params["opcRequestId"]
+            },
+
+                    body: 
+                    {
+                        type: "content",
+                        contentType: (params as any)["contentType"] ? (params as any)["contentType"] as string : "application/json",
+                        content: params["createQcTaskCommentDetails"]
+                    },
+
+            parseResponseBody: true,
+
+            operationName: "createQcTaskComment",
+            httpMethod: "POST"
+        });
+    }
+    /** 
+     * Create QC work order
+     * Initiates a QC run by creating a new QC work order.
+     * @param createQcWorkOrderDetails Details for creating a QC work order.
+     * @param opcRequestId Request ID for idempotency
+     */
+    public createQcWorkOrder(params: {  "createQcWorkOrderDetails": CreateQcWorkOrderDetails; "opcRequestId"?: string; }, options?: any): Promise<{ response: Response, data: QcWorkOrder }> {
+        base.validateRequiredParameters([
+            "createQcWorkOrderDetails",
+        ], "createQcWorkOrder", params);
+
+        const path = `${this.basePath}/qc/workorders`;
+
+        return this.request<QcWorkOrder>({
+            options,
+            path,
+
+
+            headerParameters: {
+                "opc-request-id":  params["opcRequestId"]
+            },
+
+                    body: 
+                    {
+                        type: "content",
+                        contentType: (params as any)["contentType"] ? (params as any)["contentType"] as string : "application/json",
+                        content: params["createQcWorkOrderDetails"]
+                    },
+
+            parseResponseBody: true,
+
+            operationName: "createQcWorkOrder",
+            httpMethod: "POST"
+        });
+    }
+    /** 
+     * Evaluate QC task
+     * Updates QC checklist task evaluation as pass or fail.
+     * @param taskId Identifier of the QC checklist task.
+     * @param evaluateQcTaskDetails Details used to evaluate a QC checklist task.
+     * @param opcRequestId Request ID for idempotency
+     */
+    public evaluateQcTask(params: {  "taskId": string; "evaluateQcTaskDetails": EvaluateQcTaskDetails; "opcRequestId"?: string; }, options?: any): Promise<{ response: Response, data: QcTaskSummary }> {
+        base.validateRequiredParameters([
+            "taskId",
+            "evaluateQcTaskDetails",
+        ], "evaluateQcTask", params);
+
+        const path = `${this.basePath}/qc/tasks/{taskId}/actions/evaluate`
+            .replace(`{${"taskId"}}`, `${ params["taskId"] }`);
+
+        return this.request<QcTaskSummary>({
+            options,
+            path,
+
+
+            headerParameters: {
+                "opc-request-id":  params["opcRequestId"]
+            },
+
+                    body: 
+                    {
+                        type: "content",
+                        contentType: (params as any)["contentType"] ? (params as any)["contentType"] as string : "application/json",
+                        content: params["evaluateQcTaskDetails"]
+                    },
+
+            parseResponseBody: true,
+
+            operationName: "evaluateQcTask",
+            httpMethod: "PATCH"
+        });
+    }
+    /** 
+     * Get QC work order
+     * Returns detailed header information for a specific QC work order.
+     * @param workOrderId Identifier of the QC work order.
+     * @param opcRequestId Request ID for idempotency
+     */
+    public getQcWorkOrder(params: {  "workOrderId": string; "opcRequestId"?: string; }, options?: any): Promise<{ response: Response, data: QcWorkOrder }> {
+        base.validateRequiredParameters([
+            "workOrderId",
+        ], "getQcWorkOrder", params);
+
+        const path = `${this.basePath}/qc/workorders/{workOrderId}`
+            .replace(`{${"workOrderId"}}`, `${ params["workOrderId"] }`);
+
+        return this.request<QcWorkOrder>({
+            options,
+            path,
+
+
+            headerParameters: {
+                "opc-request-id":  params["opcRequestId"]
+            },
+
+
+            parseResponseBody: true,
+
+            operationName: "getQcWorkOrder",
+            httpMethod: "GET"
+        });
+    }
+    /** 
+     * List QC task attachments
+     * Returns attachments for a specific QC checklist task.
+     * @param taskId Identifier of the QC checklist task.
+     * @param limit Max items per page
+     * @param page Pagination token
+     * @param sortOrder Sort order
+     * @param sortBy Sort key for QC task attachments.  - attachmentId sorts by attachment identifier. - fileName sorts by file name. - contentType sorts by content type. - contentSize sorts by content size. 
+     * @param opcRequestId Request ID for idempotency
+     */
+    public listQcTaskAttachments(params: {  "taskId": string; "limit"?: number; "page"?: string; "sortOrder"?: string; "sortBy"?: string; "opcRequestId"?: string; }, options?: any): Promise<{ response: Response, data: QcTaskAttachmentCollection }> {
+        base.validateRequiredParameters([
+            "taskId",
+        ], "listQcTaskAttachments", params);
+
+        const path = `${this.basePath}/qc/tasks/{taskId}/attachments`
+            .replace(`{${"taskId"}}`, `${ params["taskId"] }`);
+
+        return this.request<QcTaskAttachmentCollection>({
+            options,
+            path,
+
+            queryParameters: {
+                    "limit": { values: params["limit"] },
+                    "page": { values: params["page"] },
+                    "sortOrder": { values: params["sortOrder"] },
+                    "sortBy": { values: params["sortBy"] }
+            },
+
+            headerParameters: {
+                "opc-request-id":  params["opcRequestId"]
+            },
+
+
+            parseResponseBody: true,
+
+            operationName: "listQcTaskAttachments",
+            httpMethod: "GET"
+        });
+    }
+    /** 
+     * List QC task comments
+     * Returns comments for a specific QC checklist task.
+     * @param taskId Identifier of the QC checklist task.
+     * @param limit Max items per page
+     * @param page Pagination token
+     * @param sortOrder Sort order
+     * @param sortBy Sort key for QC task comments.  - timeCreated sorts by creation time. - userName sorts by the comment author&#39;s user name. - emailAddress sorts by the comment author&#39;s email address. 
+     * @param opcRequestId Request ID for idempotency
+     */
+    public listQcTaskComments(params: {  "taskId": string; "limit"?: number; "page"?: string; "sortOrder"?: string; "sortBy"?: string; "opcRequestId"?: string; }, options?: any): Promise<{ response: Response, data: QcTaskCommentCollection }> {
+        base.validateRequiredParameters([
+            "taskId",
+        ], "listQcTaskComments", params);
+
+        const path = `${this.basePath}/qc/tasks/{taskId}/comments`
+            .replace(`{${"taskId"}}`, `${ params["taskId"] }`);
+
+        return this.request<QcTaskCommentCollection>({
+            options,
+            path,
+
+            queryParameters: {
+                    "limit": { values: params["limit"] },
+                    "page": { values: params["page"] },
+                    "sortOrder": { values: params["sortOrder"] },
+                    "sortBy": { values: params["sortBy"] }
+            },
+
+            headerParameters: {
+                "opc-request-id":  params["opcRequestId"]
+            },
+
+
+            parseResponseBody: true,
+
+            operationName: "listQcTaskComments",
+            httpMethod: "GET"
+        });
+    }
+    /** 
+     * List QC work order tasks
+     * Returns checklist tasks for a specific QC work order.
+     * @param workOrderId Identifier of the QC work order.
+     * @param limit Max items per page
+     * @param page Pagination token
+     * @param sortOrder Sort order
+     * @param sortBy Sort key for QC task list results for a work order.  - timeStarted sorts by task start time. 
+     * @param opcRequestId Request ID for idempotency
+     */
+    public listQcWorkOrderTasks(params: {  "workOrderId": string; "limit"?: number; "page"?: string; "sortOrder"?: string; "sortBy"?: string; "opcRequestId"?: string; }, options?: any): Promise<{ response: Response, data: QcTaskCollection }> {
+        base.validateRequiredParameters([
+            "workOrderId",
+        ], "listQcWorkOrderTasks", params);
+
+        const path = `${this.basePath}/qc/workorders/{workOrderId}/tasks`
+            .replace(`{${"workOrderId"}}`, `${ params["workOrderId"] }`);
+
+        return this.request<QcTaskCollection>({
+            options,
+            path,
+
+            queryParameters: {
+                    "limit": { values: params["limit"] },
+                    "page": { values: params["page"] },
+                    "sortOrder": { values: params["sortOrder"] },
+                    "sortBy": { values: params["sortBy"] }
+            },
+
+            headerParameters: {
+                "opc-request-id":  params["opcRequestId"]
+            },
+
+
+            parseResponseBody: true,
+
+            operationName: "listQcWorkOrderTasks",
+            httpMethod: "GET"
+        });
+    }
+    /** 
+     * List QC work orders
+     * Returns a list of QC work orders.  All filters are exact-match filters unless otherwise stated. When multiple filters are provided, we apply them together using AND logic. The lifecycleState filter is UI-facing and is mapped internally to the Taskflow work order lifecycle state before the downstream call is made. 
+     * @param lifecycleState Optional exact-match filter for the QC work order lifecycle state.  Use this when the UI needs to show only one work order state: IN_PROGRESS, FAILED, or SUCCEEDED. ide-lvv translates this value internally to the downstream Taskflow lifecycle state. 
+     * @param createdBy Optional exact-match filter for the user who created the QC work order. Use this to narrow the list to work orders created by a specific operator or service account. 
+     * @param regionId Optional exact-match filter for the region scope of the QC work order. This is applied together with the other filters using AND logic. 
+     * @param buildingId Optional exact-match filter for the building scope of the QC work order. This is applied together with the other filters using AND logic. 
+     * @param roomId Optional exact-match filter for the room scope of the QC work order. This is applied together with the other filters using AND logic. 
+     * @param rackLocationId Optional exact-match filter for the rack location scope of the QC work order. This is applied together with the other filters using AND logic. 
+     * @param limit Max items per page
+     * @param page Pagination token
+     * @param sortOrder Sort order
+     * @param sortBy Sort key for QC work order list results.  - timeCreated sorts by creation time.  Pair this with sortOrder&#x3D;DESC to get newest-first ordering, which is the default UI behavior. 
+     * @param opcRequestId Request ID for idempotency
+     */
+    public listQcWorkOrders(params: {  "lifecycleState"?: string; "createdBy"?: string; "regionId"?: string; "buildingId"?: string; "roomId"?: string; "rackLocationId"?: string; "limit"?: number; "page"?: string; "sortOrder"?: string; "sortBy"?: string; "opcRequestId"?: string; }, options?: any): Promise<{ response: Response, data: QcWorkOrderCollection }> {
+        base.validateRequiredParameters([
+        ], "listQcWorkOrders", params);
+
+        const path = `${this.basePath}/qc/workorders`;
+
+        return this.request<QcWorkOrderCollection>({
+            options,
+            path,
+
+            queryParameters: {
+                    "lifecycleState": { values: params["lifecycleState"] },
+                    "createdBy": { values: params["createdBy"] },
+                    "regionId": { values: params["regionId"] },
+                    "buildingId": { values: params["buildingId"] },
+                    "roomId": { values: params["roomId"] },
+                    "rackLocationId": { values: params["rackLocationId"] },
+                    "limit": { values: params["limit"] },
+                    "page": { values: params["page"] },
+                    "sortOrder": { values: params["sortOrder"] },
+                    "sortBy": { values: params["sortBy"] }
+            },
+
+            headerParameters: {
+                "opc-request-id":  params["opcRequestId"]
+            },
+
+
+            parseResponseBody: true,
+
+            operationName: "listQcWorkOrders",
             httpMethod: "GET"
         });
     }

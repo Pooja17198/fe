@@ -52,6 +52,12 @@ const routeArray: Array<any> = [
     detail: {
       label: "Cabling"
     },
+  },
+  {
+    path: "qc",
+    detail: {
+      label: "Quality Control"
+    }
   }
 ]
 
@@ -252,8 +258,10 @@ export const App = registerCustomElement("app-root", (props: Props) => {
           onPageChanged={pageChangeHandler}
           onVendorChanged={vendorChangedHandler}
           onUserTypeChanged={userTypeChangedHandler}
+          vendorName={selectedVendor}
           region={selectedRegion}
-          routes={routeArray}/>
+          routes={routeArray}
+        />
         <Footer />
       </div>
     );
