@@ -579,6 +579,21 @@ export function useRackValidation(props: RackProps, options?: UseRackValidationO
       try {
         if (!props.rack_serial || !props.region) return false;
 
+        if (props.isGpuRack) {
+            try {
+                await refreshRackHostReadiness(pageAbortRef.current?.signal as AbortSignal | undefined);
+            } catch (readinessError: any) {
+                if (readinessError?.name === "AbortError") {
+                    return false;
+                }
+                console.warn("[RackValidation] rackHostCableValidationReadiness refresh failed before cablingValidation", {
+                    message: readinessError?.message || String(readinessError),
+                    rackSerial: props.rack_serial,
+                    region: props.region,
+                });
+            }
+        }
+
         const localStubPayload = getLocalRackStubValidationPayload({
           region: props.region,
           building: props.building,
@@ -649,9 +664,11 @@ export function useRackValidation(props: RackProps, options?: UseRackValidationO
         props.rack_serial,
         props.rack,
         props.building,
+        props.isGpuRack,
         filterOutPeriodicValidationDevices,
         prefetchPatchPanelRowsForCurrentRack,
         applyPatchPanelRowsForValidationFailures,
+        refreshRackHostReadiness,
     ]);
 
     const refreshValidationServiceResults = useCallback(async (

@@ -720,6 +720,12 @@
     color: #1d4ed8;
 }
 
+.rack-status-chip.not-ready-for-lvv {
+    background: #fff1f2;
+    border-color: #fecdd3;
+    color: #be123c;
+}
+
 .rack-status-text {
     display: inline-flex;
     align-items: center;
@@ -1395,6 +1401,7 @@
 /* Host Transceiver = green/rose */
 .device-accordion-error-chip.chip-host-opt { background: #ecfdf5; color: #047857; border-color: #a7f3d0; }
 .device-accordion-error-chip.chip-host-fec { background: #fff1f2; color: #be123c; border-color: #fecdd3; }
+.device-accordion-error-chip.chip-not-ready-for-lvv { background: #fff1f2; color: #be123c; border-color: #fecdd3; }
 
 .device-accordion-psu-chip {
     display: inline-flex;

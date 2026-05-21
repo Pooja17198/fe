@@ -25,7 +25,13 @@ import {
   RAW_BER_COLUMN_SETTINGS,
   RX_POWER_COLUMN_SETTINGS,
 } from "./columns";
-import { VALIDATION_TABLE_ACCESSIBILITY } from "./constants";
+import {
+  VALIDATION_TABLE_ACCESSIBILITY,
+} from "./constants";
+import {
+  NOT_READY_FOR_LVV_LABEL,
+  READINESS_STATES_WITH_REAL_ERRORS,
+} from "./readinessDisplayConfig";
 import { orderValidationSectionKeys, VALIDATION_COLUMN_ORDER_BY_SECTION } from "./columnOrder";
 import {
   booleanStatusTemplate,
@@ -2124,9 +2130,29 @@ const DeviceAccordion = (props: Props) => {
   }, [filteredFailuresByDevice, props.isGpuRack]);
 
   const renderErrorCount = (
+      device: DeviceStatus,
       deviceFailures: DeviceValidationFailures
   ) => {
     const isGpuCompute = isGpuComputeDevice(deviceFailures.deviceName, props.isGpuRack);
+    if (isGpuCompute) {
+      const readinessStatus = String(device.hostReadinessStatus || "").trim().toUpperCase();
+      if (
+        readinessStatus !== "" &&
+        !READINESS_STATES_WITH_REAL_ERRORS.has(readinessStatus)
+      ) {
+        return (
+          <span className="device-accordion-error-breakdown">
+            <span
+              className="device-accordion-error-chip chip-not-ready-for-lvv"
+              title={`${NOT_READY_FOR_LVV_LABEL}:1`}
+            >
+              {NOT_READY_FOR_LVV_LABEL}:1
+            </span>
+          </span>
+        );
+      }
+    }
+
     const t0ToHostChips = deviceFailures.sectionOrder
         .map((sectionKey) => {
           const section = deviceFailures.sections[sectionKey];
@@ -2593,7 +2619,7 @@ const DeviceAccordion = (props: Props) => {
                       </span>
 
                             <span className="device-col errors">
-                              {renderErrorCount(deviceFailures)}
+                              {renderErrorCount(device, deviceFailures)}
                             </span>
 
                             {showReachabilityColumn ? (

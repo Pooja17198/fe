@@ -29,6 +29,10 @@ import {
 } from "../../localRackStub";
 import type { DeviceStatus, ValidationMode } from "../rack/types";
 import { isGpuComputeDevice } from "../rack/utils";
+import {
+    NOT_READY_FOR_LVV_LABEL,
+    READINESS_STATES_WITH_REAL_ERRORS,
+} from "../rack/readinessDisplayConfig";
 
 const BASE_RACK_COLUMNS = [
     { headerText: "Rack Location", field: "rackLocation", id: "rackLocation", resizable: "enabled" as const, sortable: 'enabled' as const },
@@ -107,6 +111,8 @@ type RackHostCountSummary = {
 type RackHostReadinessSummaries = {
     readySummary: RackValidationReadySummary;
     hostCountSummary: RackHostCountSummary;
+    notReadyForLvvCount: number;
+    notReadyForLvvDeviceNames: string[];
 };
 
 const EMPTY_VALIDATION_READY_SUMMARY: RackValidationReadySummary = {
@@ -440,14 +446,32 @@ function buildRackStatusTokens(summary: RackValidationSummary, region?: string):
     return tokens;
 }
 
-function renderRackStatus(summary: RackValidationSummary | undefined, region?: string) {
+function renderRackStatusWithReadinessCount(
+    summary: RackValidationSummary | undefined,
+    region: string | undefined,
+    notReadyForLvvCount: number | undefined
+) {
     if (!summary) {
         return <span class="rack-status-text muted">Loading...</span>;
     }
 
+    const hasNotReadyForLvv = (notReadyForLvvCount ?? 0) > 0;
+    const statusTokens = buildRackStatusTokens(summary, region);
+    const tokens = hasNotReadyForLvv
+        ? statusTokens.filter((token) => token.label !== "CLEAN")
+        : [...statusTokens];
+
+    if (hasNotReadyForLvv) {
+        tokens.push({
+            className: "rack-status-chip not-ready-for-lvv",
+            label: `${NOT_READY_FOR_LVV_LABEL}:${notReadyForLvvCount}`,
+            title: `${notReadyForLvvCount} host${notReadyForLvvCount === 1 ? "" : "s"} not ready for LVV`,
+        });
+    }
+
     return (
         <span class="rack-status-cell">
-            {buildRackStatusTokens(summary, region).map((token) => (
+            {tokens.map((token) => (
                 <span key={token.label} class={token.className} title={token.title}>
                     {token.label}
                 </span>
@@ -459,10 +483,36 @@ function renderRackStatus(summary: RackValidationSummary | undefined, region?: s
 async function fetchRackValidationSummary(
     row: ProjectRackRow,
     region: string,
-    signal: AbortSignal
+    signal: AbortSignal,
+    excludeDeviceNames?: Iterable<string>
 ): Promise<RackValidationSummary> {
     if (!row.rackSerialNumber || !region) {
         return NOT_VALIDATED_SUMMARY;
+    }
+
+    const validationInputs = await fetchRackValidationSummaryInputs(row, region, signal);
+    return summarizeRackValidationSummaryInputs(validationInputs, excludeDeviceNames);
+}
+
+type RackValidationSummaryInputs = {
+    cablingFailuresByDevice: ReturnType<typeof normalizeValidationFailuresPayload>;
+    streamingFailuresByDevice: ReturnType<typeof normalizeValidationFailuresPayload>;
+    onDemandDeviceNames: string[] | null;
+    streamingDeviceNames: string[];
+};
+
+async function fetchRackValidationSummaryInputs(
+    row: ProjectRackRow,
+    region: string,
+    signal: AbortSignal
+): Promise<RackValidationSummaryInputs> {
+    if (!row.rackSerialNumber || !region) {
+        return {
+            cablingFailuresByDevice: {},
+            streamingFailuresByDevice: {},
+            onDemandDeviceNames: [],
+            streamingDeviceNames: [],
+        };
     }
 
     const [deviceStatuses, cablingPayload] = await Promise.all([
@@ -474,7 +524,12 @@ async function fetchRackValidationSummary(
         : {};
 
     if (!deviceStatuses || deviceStatuses.length === 0) {
-        return summarizeValidationFailuresByDevice(cablingFailuresByDevice);
+        return {
+            cablingFailuresByDevice,
+            streamingFailuresByDevice: {},
+            onDemandDeviceNames: null,
+            streamingDeviceNames: [],
+        };
     }
 
     const hasBackendValidationModes = deviceStatuses.some((device) => {
@@ -516,11 +571,31 @@ async function fetchRackValidationSummary(
         ? normalizeValidationFailuresPayload(streamingPayload, row.rackSerialNumber)
         : {};
 
-    const onDemandSummary = summarizeValidationFailuresByDevice(cablingFailuresByDevice, {
-        includeDeviceNames: onDemandDeviceNames,
+    return {
+        cablingFailuresByDevice,
+        streamingFailuresByDevice,
+        onDemandDeviceNames,
+        streamingDeviceNames,
+    };
+}
+
+function summarizeRackValidationSummaryInputs(
+    validationInputs: RackValidationSummaryInputs,
+    excludeDeviceNames?: Iterable<string>
+): RackValidationSummary {
+    if (validationInputs.onDemandDeviceNames === null) {
+        return summarizeValidationFailuresByDevice(validationInputs.cablingFailuresByDevice, {
+            excludeDeviceNames,
+        });
+    }
+
+    const onDemandSummary = summarizeValidationFailuresByDevice(validationInputs.cablingFailuresByDevice, {
+        includeDeviceNames: validationInputs.onDemandDeviceNames,
+        excludeDeviceNames,
     });
-    const streamingSummary = summarizeValidationFailuresByDevice(streamingFailuresByDevice, {
-        includeDeviceNames: streamingDeviceNames,
+    const streamingSummary = summarizeValidationFailuresByDevice(validationInputs.streamingFailuresByDevice, {
+        includeDeviceNames: validationInputs.streamingDeviceNames,
+        excludeDeviceNames,
     });
 
     return mergeRackValidationSummaries(onDemandSummary, streamingSummary);
@@ -568,6 +643,36 @@ function summarizeHostCountPayload(payload: unknown | null): RackHostCountSummar
     });
 }
 
+function summarizeNotReadyForLvvCountPayload(payload: unknown | null): number {
+    return getHostReadinessItems(payload).reduce<number>((count, item) => {
+        const status = String(item["status"] ?? "").trim().toUpperCase();
+        if (status === "") {
+            return count;
+        }
+        return READINESS_STATES_WITH_REAL_ERRORS.has(status) ? count : count + 1;
+    }, 0);
+}
+
+function summarizeNotReadyForLvvDeviceNames(payload: unknown | null): string[] {
+    const names = new Set<string>();
+
+    getHostReadinessItems(payload).forEach((item) => {
+        const status = String(item["status"] ?? "").trim().toUpperCase();
+        if (status === "" || READINESS_STATES_WITH_REAL_ERRORS.has(status)) {
+            return;
+        }
+
+        const deviceName = String(
+            item["deviceName"] ?? item["hostName"] ?? item["host"] ?? ""
+        ).trim();
+        if (deviceName) {
+            names.add(deviceName);
+        }
+    });
+
+    return Array.from(names);
+}
+
 async function fetchRackHostReadinessSummaries(
     row: ProjectRackRow,
     region: string,
@@ -577,6 +682,8 @@ async function fetchRackHostReadinessSummaries(
     return {
         readySummary: payload ? summarizeHostReadinessPayload(payload) : EMPTY_VALIDATION_READY_SUMMARY,
         hostCountSummary: payload ? summarizeHostCountPayload(payload) : EMPTY_HOST_COUNT_SUMMARY,
+        notReadyForLvvCount: payload ? summarizeNotReadyForLvvCountPayload(payload) : 0,
+        notReadyForLvvDeviceNames: payload ? summarizeNotReadyForLvvDeviceNames(payload) : [],
     };
 }
 
@@ -588,6 +695,7 @@ const ProjectDetailsContainer = (props: Props) => {
     const [rackStatusByKey, setRackStatusByKey] = useState<Record<string, RackValidationSummary | undefined>>({});
     const [rackValidationReadyByKey, setRackValidationReadyByKey] = useState<Record<string, RackValidationReadySummary | undefined>>({});
     const [rackHostCountByKey, setRackHostCountByKey] = useState<Record<string, RackHostCountSummary | undefined>>({});
+    const [rackNotReadyForLvvCountByKey, setRackNotReadyForLvvCountByKey] = useState<Record<string, number | undefined>>({});
     const [isRefreshingHostReadiness, setIsRefreshingHostReadiness] = useState(false);
 
     const [activeBlocks, setActiveBlocks] = useState<string[]>([]);
@@ -895,6 +1003,7 @@ const ProjectDetailsContainer = (props: Props) => {
             setRackStatusByKey((prev) => (isEmptyObject(prev) ? prev : {}));
             setRackValidationReadyByKey((prev) => (isEmptyObject(prev) ? prev : {}));
             setRackHostCountByKey((prev) => (isEmptyObject(prev) ? prev : {}));
+            setRackNotReadyForLvvCountByKey((prev) => (isEmptyObject(prev) ? prev : {}));
             setIsRefreshingHostReadiness(false);
             return () => ac.abort();
         }
@@ -902,14 +1011,19 @@ const ProjectDetailsContainer = (props: Props) => {
         const nextStatuses: Record<string, RackValidationSummary | undefined> = {};
         const nextReadyByKey: Record<string, RackValidationReadySummary | undefined> = {};
         const nextHostCountByKey: Record<string, RackHostCountSummary | undefined> = {};
+        const nextNotReadyForLvvCountByKey: Record<string, number | undefined> = {};
         visibleRows.forEach((row) => {
             nextStatuses[row._key] = row.rackSerialNumber ? undefined : NOT_VALIDATED_SUMMARY;
+            if (row.isGpuRack) {
+                nextNotReadyForLvvCountByKey[row._key] = row.rackSerialNumber ? undefined : 0;
+            }
             if (showOnlyGpuRacks && row.isGpuRack) {
                 nextReadyByKey[row._key] = row.rackSerialNumber ? undefined : EMPTY_VALIDATION_READY_SUMMARY;
                 nextHostCountByKey[row._key] = row.rackSerialNumber ? undefined : EMPTY_HOST_COUNT_SUMMARY;
             }
         });
         setRackStatusByKey(nextStatuses);
+        setRackNotReadyForLvvCountByKey(nextNotReadyForLvvCountByKey);
         if (showOnlyGpuRacks) {
             setRackValidationReadyByKey(nextReadyByKey);
             setRackHostCountByKey(nextHostCountByKey);
@@ -925,9 +1039,7 @@ const ProjectDetailsContainer = (props: Props) => {
         const rowsToFetch = visibleRows.filter(
             (row) => row.rackSerialNumber && row.rackSerialNumber.trim() !== ""
         );
-        const hostReadinessRowsToFetch = showOnlyGpuRacks
-            ? rowsToFetch.filter((row) => row.isGpuRack)
-            : [];
+        const hostReadinessRowsToFetch = rowsToFetch.filter((row) => row.isGpuRack);
 
         if (rowsToFetch.length === 0) {
             if (ac.signal.aborted || requestId !== statusRequestSeqRef.current) {
@@ -958,11 +1070,79 @@ const ProjectDetailsContainer = (props: Props) => {
 
         rowsToFetch.forEach((row) => {
             void (async () => {
+                const validationSummaryInputsPromise = fetchRackValidationSummaryInputs(
+                    row,
+                    props.region,
+                    ac.signal
+                );
+                let notReadyForLvvDeviceNames: string[] = [];
+                let shouldStop = false;
+
+                if (row.isGpuRack) {
+                    try {
+                        const {
+                            readySummary,
+                            hostCountSummary,
+                            notReadyForLvvCount,
+                            notReadyForLvvDeviceNames: fetchedNotReadyDeviceNames,
+                        } = await fetchRackHostReadinessSummaries(row, props.region, ac.signal);
+                        if (ac.signal.aborted || requestId !== statusRequestSeqRef.current) {
+                            shouldStop = true;
+                        } else {
+                            notReadyForLvvDeviceNames = fetchedNotReadyDeviceNames;
+
+                            setRackNotReadyForLvvCountByKey((prev) => ({
+                                ...prev,
+                                [row._key]: notReadyForLvvCount,
+                            }));
+
+                            if (showOnlyGpuRacks) {
+                                setRackValidationReadyByKey((prev) => ({
+                                    ...prev,
+                                    [row._key]: readySummary,
+                                }));
+                                setRackHostCountByKey((prev) => ({
+                                    ...prev,
+                                    [row._key]: hostCountSummary,
+                                }));
+                            }
+                        }
+                    } catch (e) {
+                        if ((e as any)?.name === 'AbortError') {
+                            shouldStop = true;
+                        } else if (ac.signal.aborted || requestId !== statusRequestSeqRef.current) {
+                            shouldStop = true;
+                        } else {
+                            setRackNotReadyForLvvCountByKey((prev) => ({
+                                ...prev,
+                                [row._key]: 0,
+                            }));
+                            if (showOnlyGpuRacks) {
+                                setRackValidationReadyByKey((prev) => ({
+                                    ...prev,
+                                    [row._key]: EMPTY_VALIDATION_READY_SUMMARY,
+                                }));
+                                setRackHostCountByKey((prev) => ({
+                                    ...prev,
+                                    [row._key]: EMPTY_HOST_COUNT_SUMMARY,
+                                }));
+                            }
+                        }
+                    } finally {
+                        finishHostReadinessRow();
+                    }
+                }
+
                 try {
-                    const statusSummary = await fetchRackValidationSummary(row, props.region, ac.signal);
-                    if (ac.signal.aborted || requestId !== statusRequestSeqRef.current) {
+                    const validationSummaryInputs = await validationSummaryInputsPromise;
+                    if (shouldStop || ac.signal.aborted || requestId !== statusRequestSeqRef.current) {
                         return;
                     }
+
+                    const statusSummary = summarizeRackValidationSummaryInputs(
+                        validationSummaryInputs,
+                        notReadyForLvvDeviceNames
+                    );
 
                     setRackStatusByKey((prev) => ({
                         ...prev,
@@ -984,47 +1164,6 @@ const ProjectDetailsContainer = (props: Props) => {
             })();
         });
 
-        hostReadinessRowsToFetch.forEach((row) => {
-            void (async () => {
-                try {
-                    const { readySummary, hostCountSummary } =
-                        await fetchRackHostReadinessSummaries(row, props.region, ac.signal);
-                    if (ac.signal.aborted || requestId !== statusRequestSeqRef.current) {
-                        return;
-                    }
-
-                    setRackValidationReadyByKey((prev) => ({
-                        ...prev,
-                        [row._key]: readySummary,
-                    }));
-                    setRackHostCountByKey((prev) => ({
-                        ...prev,
-                        [row._key]: hostCountSummary,
-                    }));
-                } catch (e) {
-                    if ((e as any)?.name === 'AbortError') {
-                        return;
-                    }
-                    if (ac.signal.aborted || requestId !== statusRequestSeqRef.current) {
-                        return;
-                    }
-
-                    if (row.isGpuRack) {
-                        setRackValidationReadyByKey((prev) => ({
-                            ...prev,
-                            [row._key]: EMPTY_VALIDATION_READY_SUMMARY,
-                        }));
-                        setRackHostCountByKey((prev) => ({
-                            ...prev,
-                            [row._key]: EMPTY_HOST_COUNT_SUMMARY,
-                        }));
-                    }
-                } finally {
-                    finishHostReadinessRow();
-                }
-            })();
-        });
-
         return () => {
             ac.abort();
             setIsRefreshingHostReadiness(false);
@@ -1036,6 +1175,7 @@ const ProjectDetailsContainer = (props: Props) => {
             if (!signal?.aborted) {
                 setRackValidationReadyByKey((prev) => (isEmptyObject(prev) ? prev : {}));
                 setRackHostCountByKey((prev) => (isEmptyObject(prev) ? prev : {}));
+                setRackNotReadyForLvvCountByKey((prev) => (isEmptyObject(prev) ? prev : {}));
                 setIsRefreshingHostReadiness(false);
             }
             return;
@@ -1049,6 +1189,7 @@ const ProjectDetailsContainer = (props: Props) => {
             if (!signal?.aborted) {
                 setRackValidationReadyByKey((prev) => (isEmptyObject(prev) ? prev : {}));
                 setRackHostCountByKey((prev) => (isEmptyObject(prev) ? prev : {}));
+                setRackNotReadyForLvvCountByKey((prev) => (isEmptyObject(prev) ? prev : {}));
                 setIsRefreshingHostReadiness(false);
             }
             return;
@@ -1060,13 +1201,16 @@ const ProjectDetailsContainer = (props: Props) => {
 
         const nextLoadingReadyByKey: Record<string, RackValidationReadySummary | undefined> = {};
         const nextLoadingHostCountByKey: Record<string, RackHostCountSummary | undefined> = {};
+        const nextLoadingNotReadyForLvvByKey: Record<string, number | undefined> = {};
         rowsToFetch.forEach((row) => {
             nextLoadingReadyByKey[row._key] = undefined;
             nextLoadingHostCountByKey[row._key] = undefined;
+            nextLoadingNotReadyForLvvByKey[row._key] = undefined;
         });
 
         setRackValidationReadyByKey(nextLoadingReadyByKey);
         setRackHostCountByKey(nextLoadingHostCountByKey);
+        setRackNotReadyForLvvCountByKey(nextLoadingNotReadyForLvvByKey);
 
         setIsRefreshingHostReadiness(true);
         const localController = signal ? null : new AbortController();
@@ -1075,13 +1219,17 @@ const ProjectDetailsContainer = (props: Props) => {
         try {
             await Promise.all(
                 rowsToFetch.map(async (row) => {
-                    const { readySummary, hostCountSummary } =
+                    const { readySummary, hostCountSummary, notReadyForLvvCount } =
                         await fetchRackHostReadinessSummaries(row, props.region, requestSignal);
 
                     if (requestSignal.aborted) {
                         return;
                     }
 
+                    setRackNotReadyForLvvCountByKey((prev) => ({
+                        ...prev,
+                        [row._key]: notReadyForLvvCount,
+                    }));
                     setRackValidationReadyByKey((prev) => ({
                         ...prev,
                         [row._key]: readySummary,
@@ -1123,7 +1271,11 @@ const ProjectDetailsContainer = (props: Props) => {
 
     const validationStatusTemplate = (context: any) => {
         const row = (context?.item && context.item.data) || {};
-        return renderRackStatus(rackStatusByKey[row._key], props.region);
+        return renderRackStatusWithReadinessCount(
+            rackStatusByKey[row._key],
+            props.region,
+            rackNotReadyForLvvCountByKey[row._key]
+        );
     };
 
     const validationReadyTemplate = (context: any) => {
