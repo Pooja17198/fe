@@ -30,6 +30,7 @@ import {
 } from "./constants";
 import {
   NOT_READY_FOR_LVV_LABEL,
+  NOT_READY_FOR_LVV_TOOLTIP,
   READINESS_STATES_WITH_REAL_ERRORS,
 } from "./readinessDisplayConfig";
 import { orderValidationSectionKeys, VALIDATION_COLUMN_ORDER_BY_SECTION } from "./columnOrder";
@@ -178,6 +179,7 @@ type Props = {
   loading: boolean;
   isValidating: boolean;
   hideUnsupported: boolean;
+  hideNotReadyDeviceErrors?: boolean;
   rackValidationAllowed: boolean;
   rackValidationTooltip: string;
   periodicValidationEnabled: boolean;
@@ -2144,7 +2146,8 @@ const DeviceAccordion = (props: Props) => {
           <span className="device-accordion-error-breakdown">
             <span
               className="device-accordion-error-chip chip-not-ready-for-lvv"
-              title={`${NOT_READY_FOR_LVV_LABEL}:1`}
+              title={NOT_READY_FOR_LVV_TOOLTIP}
+              aria-label={NOT_READY_FOR_LVV_TOOLTIP}
             >
               {NOT_READY_FOR_LVV_LABEL}:1
             </span>
@@ -2519,6 +2522,13 @@ const DeviceAccordion = (props: Props) => {
                       .map((sectionKey) => deviceFailures.sections[sectionKey])
                       .filter((section): section is ValidationSection => Boolean(section && section.rows.length > 0));
                   const isGpuCompute = isGpuComputeDevice(device.deviceName, props.isGpuRack);
+                  const readinessStatusUpper = String(device.hostReadinessStatus || "").trim().toUpperCase();
+                  const isNotReadyForLvvDevice =
+                      isGpuCompute &&
+                      readinessStatusUpper !== "" &&
+                      !READINESS_STATES_WITH_REAL_ERRORS.has(readinessStatusUpper);
+                  const hideValidationSectionsForNotReadyDevice =
+                      isNotReadyForLvvDevice && Boolean(props.hideNotReadyDeviceErrors);
                   const validationSectionGroups = isGpuCompute
                       ? applyStableHostTransceiverTimestamps(
                           device.deviceName,
@@ -2532,7 +2542,9 @@ const DeviceAccordion = (props: Props) => {
                   const hasValidationSections = isGpuCompute
                       ? validationSectionGroups.length > 0
                       : visibleSections.length > 0;
-                  const hasExpandableContent = hasValidationSections || hasDeviceInformation;
+                  const hasVisibleValidationSections =
+                      hideValidationSectionsForNotReadyDevice ? false : hasValidationSections;
+                  const hasExpandableContent = hasVisibleValidationSections || hasDeviceInformation;
                   const psuStatus = isGpuCompute
                       ? "-"
                       : getPsuStatusLabel(device.jobStatus, deviceFailures.hasPsuFailure);
@@ -2675,22 +2687,23 @@ const DeviceAccordion = (props: Props) => {
                                     VALIDATION_TABLE_ACCESSIBILITY,
                                     props.region
                                   )}
-                                {isGpuCompute
-                                  ? validationSectionGroups.map((group) =>
-                                    renderValidationSectionGroup(device, idx, group)
-                                  )
-                                  : visibleSections.map((section) => {
-                                    return (
-                                        <MemoizedValidationSectionTable
-                                            key={`${device.deviceName}-${section.key}`}
-                                            deviceIndex={idx}
-                                            deviceName={device.deviceName}
-                                            isGpuRack={props.isGpuRack}
-                                            hideLastExecuted={hideLastExecutedColumn}
-                                            section={section}
-                                        />
-                                    );
-                                  })}
+                                {!hideValidationSectionsForNotReadyDevice &&
+                                  (isGpuCompute
+                                    ? validationSectionGroups.map((group) =>
+                                      renderValidationSectionGroup(device, idx, group)
+                                    )
+                                    : visibleSections.map((section) => {
+                                      return (
+                                          <MemoizedValidationSectionTable
+                                              key={`${device.deviceName}-${section.key}`}
+                                              deviceIndex={idx}
+                                              deviceName={device.deviceName}
+                                              isGpuRack={props.isGpuRack}
+                                              hideLastExecuted={hideLastExecutedColumn}
+                                              section={section}
+                                          />
+                                      );
+                                    }))}
                               </oj-accordion>
                             </div>
                         ) : null}

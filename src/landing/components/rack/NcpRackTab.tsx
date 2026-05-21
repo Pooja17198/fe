@@ -6,6 +6,7 @@ import { RackProps } from "./types";
 
 const NcpRackTab = (props: RackProps) => {
   const [hideUnsupported, setHideUnsupported] = useState(true);
+  const [hideNotReadyDeviceErrors, setHideNotReadyDeviceErrors] = useState(true);
   const [externalExpandedKeys, setExternalExpandedKeys] = useState<Set<string>>(new Set());
   const [externalExpandedKeysNonce, setExternalExpandedKeysNonce] = useState(0);
   const [toastMsg, setToastMsg] = useState<string>("");
@@ -177,6 +178,19 @@ const NcpRackTab = (props: RackProps) => {
           Hide Unsupported LLDP errors
         </label>
 
+        {props.isGpuRack && (
+          <label>
+            <input
+              type="checkbox"
+              checked={hideNotReadyDeviceErrors}
+              onChange={(e) =>
+                setHideNotReadyDeviceErrors((e.target as HTMLInputElement).checked)
+              }
+            />
+            Hide Not Ready Device Errors
+          </label>
+        )}
+
         <oj-c-button chroming="outlined" label="✚" tooltip="Expand All" onojAction={handleExpandAll} size="sm" class="action-btn"></oj-c-button>
         <oj-c-button chroming="outlined" label="－" tooltip="Collapse All" onojAction={handleCollapseAll} size="sm" class="action-btn"></oj-c-button>
       </div>
@@ -204,6 +218,7 @@ const NcpRackTab = (props: RackProps) => {
         loading={devicesLoading}
         isValidating={isValidating}
         hideUnsupported={hideUnsupported}
+        hideNotReadyDeviceErrors={hideNotReadyDeviceErrors}
         rackValidationAllowed={rackValidationAllowed}
         rackValidationTooltip={rackValidationTooltip}
         periodicValidationEnabled={periodicValidationEnabled}
