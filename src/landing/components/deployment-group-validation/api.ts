@@ -76,6 +76,14 @@ function asRecord(value: unknown): Record<string, unknown> | null {
     : null;
 }
 
+function rackNumberLookupFailureMessage(hostSerial: string): string {
+  return `Failed to get rack number from Cerebro using this host serial: ${hostSerial}.`;
+}
+
+function buildAvailabilityDomainCandidates(region: string): string[] {
+  return [1, 2, 3].map((index) => `${region}-ad-${index}`);
+}
+
 function normalizeRackMetadataPayload(payload: unknown): RackMetadata[] {
   const record = asRecord(payload);
   const rawRows = Array.isArray(payload)
@@ -130,6 +138,49 @@ export async function fetchDeploymentGroupRackMetadata(params: {
   }
 
   return normalizeRackMetadataPayload(await readJsonOrEmpty(response));
+}
+
+export async function fetchRackNumberByHostSerial(params: {
+  region: string;
+  hostSerial: string;
+  signal?: AbortSignal;
+}): Promise<string> {
+  const hostSerial = params.hostSerial.trim();
+  if (!hostSerial) {
+    throw new Error("Host serial is required.");
+  }
+
+  for (const availabilityDomain of buildAvailabilityDomainCandidates(params.region)) {
+    const url = new URL(lvvApi("/rackNumber"));
+    url.searchParams.set("regionName", params.region);
+    url.searchParams.set("availabilityDomain", availabilityDomain);
+    url.searchParams.set("hostSerial", hostSerial);
+
+    let response: Response;
+    try {
+      response = await fetchWithRetry(url.href, {
+        method: "GET",
+        signal: params.signal,
+      });
+    } catch (error: any) {
+      if (error?.name === "AbortError") {
+        throw error;
+      }
+      continue;
+    }
+
+    if (!response.ok) {
+      continue;
+    }
+
+    const payload = asRecord(await readJsonOrEmpty(response));
+    const rackNumber = text(payload?.rackNumber);
+    if (rackNumber) {
+      return rackNumber;
+    }
+  }
+
+  throw new Error(rackNumberLookupFailureMessage(hostSerial));
 }
 
 export async function fetchDeploymentGroupJobMetadata(params: {

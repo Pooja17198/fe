@@ -9,6 +9,37 @@ export interface EmitUiMetricRequest {
         [key: string]: string;
     };
 }
+export interface CreateQcTaskAttachmentDetails {
+    "fileName": string;
+    "contentType": string;
+    "contentSize": number;
+    "createdBy": string;
+    "emailAddress"?: string;
+    "timeCreated": string;
+    "content": string;
+    "notes"?: string;
+}
+export interface CreateQcTaskCommentDetails {
+    "comment": string;
+    "createdBy": string;
+    "emailAddress"?: string;
+    "timeCreated": string;
+}
+export interface CreateQcWorkOrderDetails {
+    "workOrderDefinitionId": string;
+    "displayName": string;
+    "regionId": string;
+    "buildingId": string;
+    "roomId": string;
+    "rackLocationId": string;
+    "vendorName"?: string;
+    "createdBy": string;
+}
+export interface EvaluateQcTaskDetails {
+    "result": QcTaskEvaluationResult;
+    "evaluatedBy": string;
+    "timeEvaluated": string;
+}
 export interface FileMetadata {
     "name": string;
     "sizeBytes": number;
@@ -109,7 +140,7 @@ export interface PhysicalConnectionCollection {
 }
 export interface PhysicalConnectionImageResponse {
     "image": string;
-    "materials"?: MaterialSummary[];
+    "materials"?: Array<MaterialSummary>;
 }
 export interface PhysicalConnectionSummary {
     "id"?: string;
@@ -158,6 +189,90 @@ export interface PortErrorSummary {
     "otherErrors"?: Array<string>;
     "lastValidated"?: string;
 }
+export interface QcTaskAttachmentCollection {
+    "items": Array<QcTaskAttachmentSummary>;
+}
+export interface QcTaskAttachmentSummary {
+    "attachmentId": string;
+    "taskId": string;
+    "createdBy"?: string;
+    "fileName": string;
+    "contentType": string;
+    "contentSize"?: number;
+    "content"?: string;
+    "timeCreated": string;
+}
+export interface QcTaskCollection {
+    "items": Array<QcTaskSummary>;
+}
+export interface QcTaskCommentCollection {
+    "items": Array<QcTaskCommentSummary>;
+}
+export interface QcTaskCommentSummary {
+    "commentId": string;
+    "taskId": string;
+    "createdBy"?: string;
+    "comment": string;
+    "timeCreated": string;
+}
+export type QcTaskEvaluationResult = "PASS";
+export declare enum QcTaskEvaluationResultValues {
+    PASS = "PASS"
+}
+export type QcTaskLifecycleState = "IN_PROGRESS" | "COMPLETED" | "FAILED";
+export declare enum QcTaskLifecycleStateValues {
+    IN_PROGRESS = "IN_PROGRESS",
+    COMPLETED = "COMPLETED",
+    FAILED = "FAILED"
+}
+export interface QcTaskSummary {
+    "id": string;
+    "workOrderId": string;
+    "taskKey"?: string;
+    "vendorName"?: string;
+    "lifecycleState"?: QcTaskLifecycleState;
+    "timeCreated"?: string;
+    "timeUpdated"?: string;
+    "timeStarted"?: string;
+    "timeCompleted"?: string;
+}
+export interface QcWorkOrder {
+    "id": string;
+    "workOrderDefinitionId"?: string;
+    "displayName"?: string;
+    "timeCreated": string;
+    "timeUpdated"?: string;
+    "regionId"?: string;
+    "buildingId"?: string;
+    "roomId"?: string;
+    "rackLocationId"?: string;
+    "vendorName"?: string;
+    "createdBy"?: string;
+    "lifecycleState": QcWorkOrderLifecycleState;
+}
+export interface QcWorkOrderCollection {
+    "items": Array<QcWorkOrderSummary>;
+}
+export type QcWorkOrderLifecycleState = "IN_PROGRESS" | "FAILED" | "SUCCEEDED";
+export declare enum QcWorkOrderLifecycleStateValues {
+    IN_PROGRESS = "IN_PROGRESS",
+    FAILED = "FAILED",
+    SUCCEEDED = "SUCCEEDED"
+}
+export interface QcWorkOrderSummary {
+    "id": string;
+    "workOrderDefinitionId"?: string;
+    "displayName"?: string;
+    "timeCreated": string;
+    "timeUpdated"?: string;
+    "regionId"?: string;
+    "buildingId"?: string;
+    "roomId"?: string;
+    "rackLocationId"?: string;
+    "vendorName"?: string;
+    "createdBy"?: string;
+    "lifecycleState": QcWorkOrderLifecycleState;
+}
 export interface RackDeviceSummary {
     "deviceName"?: string;
     "elevation"?: number;
@@ -171,10 +286,10 @@ export interface RoomLayout {
     "layout"?: any;
 }
 export interface RoomMetadata {
-    "regionDisplayName": string;
-    "availabilityDomainCanonicalShortCode": string;
-    "buildingCanonicalName": string;
-    "roomCanonicalName": string;
+    "regionDisplayName"?: string;
+    "availabilityDomainCanonicalShortCode"?: string;
+    "buildingCanonicalName"?: string;
+    "roomCanonicalName"?: string;
 }
 export interface RoomMetadataCollection {
     "items"?: Array<RoomMetadata>;
@@ -219,7 +334,7 @@ export declare class BuildArtifactsApi extends base.BaseAPI {
     }>;
 }
 export interface MaterialApiListMaterialsArgs {
-    "roomName": string;
+    "roomName"?: string;
     "bomId"?: number;
     "limit"?: number;
     "page"?: string;
@@ -234,7 +349,7 @@ export type MaterialApiListMaterialsReturnType = {
 export declare class MaterialApi extends base.BaseAPI {
     static createFromEndpointTemplate(fetch: base.Fetch, region: string, secondLevelDomain: string, config?: base.BaseApiConfig): MaterialApi;
     listMaterials(params: {
-        "roomName": string;
+        "roomName"?: string;
         "bomId"?: number;
         "limit"?: number;
         "page"?: string;
@@ -343,9 +458,9 @@ export declare class NamespaceMappingApi extends base.BaseAPI {
     }>;
 }
 export interface PhysicalConnectionApiGetPhysicalConnectionImageArgs {
-    "roomName": string;
     "sourceRackNumber": string;
     "destinationRackNumber": string;
+    "roomName"?: string;
     "opcRequestId"?: string;
 }
 export type PhysicalConnectionApiGetPhysicalConnectionImageReturnType = {
@@ -353,7 +468,7 @@ export type PhysicalConnectionApiGetPhysicalConnectionImageReturnType = {
     data: PhysicalConnectionImageResponse;
 };
 export interface PhysicalConnectionApiListPhysicalConnectionsArgs {
-    "roomName": string;
+    "roomName"?: string;
     "blockName"?: string;
     "bomId"?: number;
     "limit"?: number;
@@ -369,16 +484,16 @@ export type PhysicalConnectionApiListPhysicalConnectionsReturnType = {
 export declare class PhysicalConnectionApi extends base.BaseAPI {
     static createFromEndpointTemplate(fetch: base.Fetch, region: string, secondLevelDomain: string, config?: base.BaseApiConfig): PhysicalConnectionApi;
     getPhysicalConnectionImage(params: {
-        "roomName": string;
         "sourceRackNumber": string;
         "destinationRackNumber": string;
+        "roomName"?: string;
         "opcRequestId"?: string;
     }, options?: any): Promise<{
         response: Response;
         data: PhysicalConnectionImageResponse;
     }>;
     listPhysicalConnections(params: {
-        "roomName": string;
+        "roomName"?: string;
         "blockName"?: string;
         "bomId"?: number;
         "limit"?: number;
@@ -440,6 +555,192 @@ export declare class PhysicalCutsheetApi extends base.BaseAPI {
     }, options?: any): Promise<{
         response: Response;
         data: PhysicalCutsheetCollection;
+    }>;
+}
+export interface QcApiCreateQcTaskAttachmentArgs {
+    "taskId": string;
+    "createQcTaskAttachmentDetails": CreateQcTaskAttachmentDetails;
+    "opcRequestId"?: string;
+}
+export type QcApiCreateQcTaskAttachmentReturnType = {
+    response: Response;
+    data: QcTaskAttachmentSummary;
+};
+export interface QcApiCreateQcTaskCommentArgs {
+    "taskId": string;
+    "createQcTaskCommentDetails": CreateQcTaskCommentDetails;
+    "opcRequestId"?: string;
+}
+export type QcApiCreateQcTaskCommentReturnType = {
+    response: Response;
+    data: QcTaskCommentSummary;
+};
+export interface QcApiCreateQcWorkOrderArgs {
+    "createQcWorkOrderDetails": CreateQcWorkOrderDetails;
+    "opcRequestId"?: string;
+}
+export type QcApiCreateQcWorkOrderReturnType = {
+    response: Response;
+    data: QcWorkOrder;
+};
+export interface QcApiEvaluateQcTaskArgs {
+    "taskId": string;
+    "evaluateQcTaskDetails": EvaluateQcTaskDetails;
+    "opcRequestId"?: string;
+}
+export type QcApiEvaluateQcTaskReturnType = {
+    response: Response;
+    data: QcTaskSummary;
+};
+export interface QcApiGetQcWorkOrderArgs {
+    "workOrderId": string;
+    "opcRequestId"?: string;
+}
+export type QcApiGetQcWorkOrderReturnType = {
+    response: Response;
+    data: QcWorkOrder;
+};
+export interface QcApiListQcTaskAttachmentsArgs {
+    "taskId": string;
+    "limit"?: number;
+    "page"?: string;
+    "sortOrder"?: string;
+    "sortBy"?: string;
+    "opcRequestId"?: string;
+}
+export type QcApiListQcTaskAttachmentsReturnType = {
+    response: Response;
+    data: QcTaskAttachmentCollection;
+};
+export interface QcApiListQcTaskCommentsArgs {
+    "taskId": string;
+    "limit"?: number;
+    "page"?: string;
+    "sortOrder"?: string;
+    "sortBy"?: string;
+    "opcRequestId"?: string;
+}
+export type QcApiListQcTaskCommentsReturnType = {
+    response: Response;
+    data: QcTaskCommentCollection;
+};
+export interface QcApiListQcWorkOrderTasksArgs {
+    "workOrderId": string;
+    "limit"?: number;
+    "page"?: string;
+    "sortOrder"?: string;
+    "sortBy"?: string;
+    "opcRequestId"?: string;
+}
+export type QcApiListQcWorkOrderTasksReturnType = {
+    response: Response;
+    data: QcTaskCollection;
+};
+export interface QcApiListQcWorkOrdersArgs {
+    "lifecycleState"?: string;
+    "createdBy"?: string;
+    "regionId"?: string;
+    "buildingId"?: string;
+    "roomId"?: string;
+    "rackLocationId"?: string;
+    "limit"?: number;
+    "page"?: string;
+    "sortOrder"?: string;
+    "sortBy"?: string;
+    "opcRequestId"?: string;
+}
+export type QcApiListQcWorkOrdersReturnType = {
+    response: Response;
+    data: QcWorkOrderCollection;
+};
+export declare class QcApi extends base.BaseAPI {
+    static createFromEndpointTemplate(fetch: base.Fetch, region: string, secondLevelDomain: string, config?: base.BaseApiConfig): QcApi;
+    createQcTaskAttachment(params: {
+        "taskId": string;
+        "createQcTaskAttachmentDetails": CreateQcTaskAttachmentDetails;
+        "opcRequestId"?: string;
+    }, options?: any): Promise<{
+        response: Response;
+        data: QcTaskAttachmentSummary;
+    }>;
+    createQcTaskComment(params: {
+        "taskId": string;
+        "createQcTaskCommentDetails": CreateQcTaskCommentDetails;
+        "opcRequestId"?: string;
+    }, options?: any): Promise<{
+        response: Response;
+        data: QcTaskCommentSummary;
+    }>;
+    createQcWorkOrder(params: {
+        "createQcWorkOrderDetails": CreateQcWorkOrderDetails;
+        "opcRequestId"?: string;
+    }, options?: any): Promise<{
+        response: Response;
+        data: QcWorkOrder;
+    }>;
+    evaluateQcTask(params: {
+        "taskId": string;
+        "evaluateQcTaskDetails": EvaluateQcTaskDetails;
+        "opcRequestId"?: string;
+    }, options?: any): Promise<{
+        response: Response;
+        data: QcTaskSummary;
+    }>;
+    getQcWorkOrder(params: {
+        "workOrderId": string;
+        "opcRequestId"?: string;
+    }, options?: any): Promise<{
+        response: Response;
+        data: QcWorkOrder;
+    }>;
+    listQcTaskAttachments(params: {
+        "taskId": string;
+        "limit"?: number;
+        "page"?: string;
+        "sortOrder"?: string;
+        "sortBy"?: string;
+        "opcRequestId"?: string;
+    }, options?: any): Promise<{
+        response: Response;
+        data: QcTaskAttachmentCollection;
+    }>;
+    listQcTaskComments(params: {
+        "taskId": string;
+        "limit"?: number;
+        "page"?: string;
+        "sortOrder"?: string;
+        "sortBy"?: string;
+        "opcRequestId"?: string;
+    }, options?: any): Promise<{
+        response: Response;
+        data: QcTaskCommentCollection;
+    }>;
+    listQcWorkOrderTasks(params: {
+        "workOrderId": string;
+        "limit"?: number;
+        "page"?: string;
+        "sortOrder"?: string;
+        "sortBy"?: string;
+        "opcRequestId"?: string;
+    }, options?: any): Promise<{
+        response: Response;
+        data: QcTaskCollection;
+    }>;
+    listQcWorkOrders(params: {
+        "lifecycleState"?: string;
+        "createdBy"?: string;
+        "regionId"?: string;
+        "buildingId"?: string;
+        "roomId"?: string;
+        "rackLocationId"?: string;
+        "limit"?: number;
+        "page"?: string;
+        "sortOrder"?: string;
+        "sortBy"?: string;
+        "opcRequestId"?: string;
+    }, options?: any): Promise<{
+        response: Response;
+        data: QcWorkOrderCollection;
     }>;
 }
 export interface RackViewApiGetRackViewArgs {

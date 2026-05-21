@@ -1,4 +1,4 @@
-import { useCallback, useState } from "preact/hooks";
+import { useCallback, useEffect, useRef, useState } from "preact/hooks";
 import "oj-c/button";
 import DeviceAccordion from "./DeviceAccordion";
 import { useRackValidation } from "./hooks/useRackValidation";
@@ -10,6 +10,9 @@ const ValidationServiceRackTab = (props: RackProps) => {
   const [externalExpandedKeys, setExternalExpandedKeys] = useState<Set<string>>(new Set());
   const [externalExpandedKeysNonce, setExternalExpandedKeysNonce] = useState(0);
   const [isMergedDownloadInProgress, setIsMergedDownloadInProgress] = useState(false);
+  const [toastMsg, setToastMsg] = useState<string>("");
+  const [toastVisible, setToastVisible] = useState<boolean>(false);
+  const toastTimerRef = useRef<number | null>(null);
 
   const {
     deviceStatuses,
@@ -31,9 +34,43 @@ const ValidationServiceRackTab = (props: RackProps) => {
     rackValidationTooltip,
     periodicValidationEnabled,
     periodicValidationDeviceNames,
+    resolveAllowed,
+    resolveTooltip,
     validate,
+    resolve,
     refreshPeriodicValidationResults,
   } = useRackValidation(props, { viewMode: "validationService" });
+
+  const showToast = useCallback((msg: string) => {
+    setToastMsg(msg);
+    setToastVisible(true);
+    if (toastTimerRef.current) {
+      window.clearTimeout(toastTimerRef.current);
+      toastTimerRef.current = null;
+    }
+    toastTimerRef.current = window.setTimeout(() => {
+      setToastVisible(false);
+      toastTimerRef.current = null;
+    }, 4000);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) {
+        window.clearTimeout(toastTimerRef.current);
+      }
+    };
+  }, []);
+
+  const handleResolve = useCallback(async () => {
+    const result = await resolve();
+    if (!(result as any)?.ok) {
+      const msg = (result as any)?.message;
+      if (msg && msg !== "Cancelled") {
+        showToast(String(msg));
+      }
+    }
+  }, [resolve, showToast]);
 
   const handleExpandAll = useCallback(() => {
     const deviceNamesWithFailures = new Set(
@@ -122,6 +159,14 @@ const ValidationServiceRackTab = (props: RackProps) => {
         <oj-c-button
           chroming="callToAction"
           size="sm"
+          label="Resolve"
+          onojAction={handleResolve}
+          disabled={isValidating || !resolveAllowed}
+          title={isValidating ? "" : resolveTooltip}
+        ></oj-c-button>
+        <oj-c-button
+          chroming="callToAction"
+          size="sm"
           label={isMergedDownloadInProgress ? "Preparing Excel..." : "Download Excel"}
           onojAction={handleStreamingTabDownload}
           style="margin-left: 8px;"
@@ -172,6 +217,31 @@ const ValidationServiceRackTab = (props: RackProps) => {
         externalExpandedKeys={externalExpandedKeys}
         externalExpandedKeysNonce={externalExpandedKeysNonce}
       />
+
+      {toastVisible && (
+        <div
+          role="status"
+          aria-live="polite"
+          onClick={() => setToastVisible(false)}
+          style={{
+            position: "fixed",
+            right: "16px",
+            bottom: "16px",
+            background: "#1f2937",
+            color: "#fff",
+            padding: "10px 12px",
+            borderRadius: "6px",
+            boxShadow: "0 2px 8px rgba(0,0,0,0.2)",
+            cursor: "pointer",
+            zIndex: 9999,
+            maxWidth: "480px",
+            whiteSpace: "pre-wrap",
+          }}
+          title="Click to dismiss"
+        >
+          {toastMsg}
+        </div>
+      )}
     </div>
   );
 };

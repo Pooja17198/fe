@@ -416,7 +416,10 @@ function mapLldpSheetRow(row: ValidationTableRow): Record<string, string> {
       row.remoteDevicePort,
       row["Remote Device Port"]
     ),
-    "Device B Rack": firstTextValue(
+    "Device B Rack": getLldpLocationCellValue(
+      row.currentBLocation,
+      row["Current B Location"],
+      row["Current Device B Location"],
       row.currentDeviceBRack,
       row["Current Device B Rack"],
       row["Device B Rack"]
@@ -425,8 +428,16 @@ function mapLldpSheetRow(row: ValidationTableRow): Record<string, string> {
       row.expectedDeviceBName,
       row["Expected Device B Name"]
     ),
-    "Device A Rack": firstTextValue(row.deviceARack, row["Device A Rack"]),
-    "Expected Device B Rack": firstTextValue(
+    "Device A Rack": getLldpLocationCellValue(
+      row.deviceALocation,
+      row["Device A Location"],
+      row.deviceARack,
+      row["Device A Rack"]
+    ),
+    "Expected Device B Rack": getLldpLocationCellValue(
+      row.expectedBLocation,
+      row["Expected B Location"],
+      row["Expected Device B Location"],
       row.expectedDeviceBRack,
       row["Expected Device B Rack"]
     ),
@@ -1642,6 +1653,17 @@ function formatLocationValueForDisplay(rawLocation: unknown): string {
       normalizeMissingValue(parsed?.rackElevation ?? parsed?.elevation),
     ].join(":");
   }
+}
+
+function getLldpLocationCellValue(...values: unknown[]): string {
+  for (const value of values) {
+    const formattedValue = formatLocationValueForDisplay(value);
+    if (normalizeMissingValue(formattedValue) !== "missing") {
+      return formattedValue;
+    }
+  }
+
+  return "";
 }
 
 function mapGpuComputePortToNicLabel(rawPort: string): string | null {

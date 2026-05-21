@@ -1,5 +1,5 @@
 import { h } from "preact";
-import { useCallback, useMemo, useState } from "preact/hooks";
+import { useCallback, useEffect, useMemo, useRef, useState } from "preact/hooks";
 import "ojs/ojbutton";
 import "ojs/ojprogress-circle";
 import "ojs/ojselectsingle";
@@ -51,6 +51,9 @@ function readSelectionFromUrl(fallbackRegion: string) {
     region: params.get("region") || fallbackRegion,
     building: params.get("building") || "",
     deploymentGroup: params.get("deploymentGroup") || params.get("deploymentgroup") || "",
+    autoValidateFromDeviceSearch:
+      (params.get("autoValidate") === "true" || params.get("autoValidate") === "1")
+      && params.get("autoValidateSource") === "deviceSearch",
   };
 }
 
@@ -91,6 +94,7 @@ function compareRackRows(left: DeploymentGroupRackRow, right: DeploymentGroupRac
 
 const DeploymentGroupValidationPage = ({ region, onPageChanged }: Props) => {
   const selection = readSelectionFromUrl(region);
+  const autoValidateTriggeredRef = useRef(false);
   const [searchText, setSearchText] = useState("");
   const [filter, setFilter] = useState<DeploymentGroupRackFilter>("all");
   const [failedFirst, setFailedFirst] = useState(true);
@@ -111,6 +115,33 @@ const DeploymentGroupValidationPage = ({ region, onPageChanged }: Props) => {
     summary,
     validateDeploymentGroup,
   } = useDeploymentGroupValidation(selection);
+
+  useEffect(() => {
+    if (!selection.autoValidateFromDeviceSearch || autoValidateTriggeredRef.current) {
+      return;
+    }
+    if (!hasRequiredSelection || loading || isValidating || rows.length === 0) {
+      return;
+    }
+
+    autoValidateTriggeredRef.current = true;
+    try {
+      const nextUrl = new URL(window.location.href);
+      nextUrl.searchParams.delete("autoValidate");
+      nextUrl.searchParams.delete("autoValidateSource");
+      window.history.replaceState({}, "", nextUrl.toString());
+    } catch (error) {
+      console.error(error);
+    }
+    void validateDeploymentGroup();
+  }, [
+    hasRequiredSelection,
+    isValidating,
+    loading,
+    rows.length,
+    selection.autoValidateFromDeviceSearch,
+    validateDeploymentGroup,
+  ]);
 
   const filterDataProvider = useMemo(
     () => new ArrayDataProvider<FilterOption["value"], FilterOption>(

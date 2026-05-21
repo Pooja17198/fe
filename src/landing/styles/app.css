@@ -775,11 +775,44 @@
     font-weight: 700;
 }
 
+.deployment-group-tab-row {
+    margin-bottom: 16px;
+}
+
+.deployment-group-tab-bar {
+    width: 100%;
+}
+
 .deployment-group-selector-grid {
     display: grid;
     grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr) auto;
     align-items: end;
     gap: 12px;
+}
+
+.deployment-group-search-grid {
+    display: grid;
+    grid-template-columns: minmax(220px, 280px) minmax(280px, 1fr);
+    align-items: end;
+    gap: 12px;
+}
+
+.deployment-group-search-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 0.84rem;
+    font-weight: 700;
+    color: #374151;
+}
+
+.deployment-group-search-field input[type="text"] {
+    height: 34px;
+    min-width: 0;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    padding: 0 9px;
+    box-sizing: border-box;
 }
 
 .deployment-group-rack-count {
@@ -971,6 +1004,14 @@
     gap: 10px;
     color: #4b5563;
     font-weight: 700;
+}
+
+@media (max-width: 900px) {
+    .deployment-group-selector-grid,
+    .deployment-group-search-grid,
+    .deployment-group-filter-row {
+        grid-template-columns: 1fr;
+    }
 }
 
 .rack-status-text.muted {
