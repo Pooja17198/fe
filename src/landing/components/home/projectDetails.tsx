@@ -15,6 +15,7 @@ import type { RackValidationSummary } from "../rack/validationShared";
 import {
     asArray,
     asRecord,
+    getHostTransceiverMetricDisplayDeviceNames,
     mergeRackValidationSummaries,
     normalizeDeviceStatusesPayload,
     normalizeValidationFailuresPayload,
@@ -113,6 +114,7 @@ type RackHostReadinessSummaries = {
     hostCountSummary: RackHostCountSummary;
     notReadyForLvvCount: number;
     notReadyForLvvDeviceNames: string[];
+    hostTransceiverMetricDeviceNames: string[];
 };
 
 const EMPTY_VALIDATION_READY_SUMMARY: RackValidationReadySummary = {
@@ -484,14 +486,19 @@ async function fetchRackValidationSummary(
     row: ProjectRackRow,
     region: string,
     signal: AbortSignal,
-    excludeDeviceNames?: Iterable<string>
+    excludeDeviceNames?: Iterable<string>,
+    hostTransceiverMetricDeviceNames?: Iterable<string>
 ): Promise<RackValidationSummary> {
     if (!row.rackSerialNumber || !region) {
         return NOT_VALIDATED_SUMMARY;
     }
 
     const validationInputs = await fetchRackValidationSummaryInputs(row, region, signal);
-    return summarizeRackValidationSummaryInputs(validationInputs, excludeDeviceNames);
+    return summarizeRackValidationSummaryInputs(
+        validationInputs,
+        excludeDeviceNames,
+        hostTransceiverMetricDeviceNames
+    );
 }
 
 type RackValidationSummaryInputs = {
@@ -581,21 +588,25 @@ async function fetchRackValidationSummaryInputs(
 
 function summarizeRackValidationSummaryInputs(
     validationInputs: RackValidationSummaryInputs,
-    excludeDeviceNames?: Iterable<string>
+    excludeDeviceNames?: Iterable<string>,
+    hostTransceiverMetricDeviceNames?: Iterable<string>
 ): RackValidationSummary {
     if (validationInputs.onDemandDeviceNames === null) {
         return summarizeValidationFailuresByDevice(validationInputs.cablingFailuresByDevice, {
             excludeDeviceNames,
+            hostTransceiverDisplayDeviceNames: hostTransceiverMetricDeviceNames,
         });
     }
 
     const onDemandSummary = summarizeValidationFailuresByDevice(validationInputs.cablingFailuresByDevice, {
         includeDeviceNames: validationInputs.onDemandDeviceNames,
         excludeDeviceNames,
+        hostTransceiverDisplayDeviceNames: hostTransceiverMetricDeviceNames,
     });
     const streamingSummary = summarizeValidationFailuresByDevice(validationInputs.streamingFailuresByDevice, {
         includeDeviceNames: validationInputs.streamingDeviceNames,
         excludeDeviceNames,
+        hostTransceiverDisplayDeviceNames: hostTransceiverMetricDeviceNames,
     });
 
     return mergeRackValidationSummaries(onDemandSummary, streamingSummary);
@@ -684,6 +695,9 @@ async function fetchRackHostReadinessSummaries(
         hostCountSummary: payload ? summarizeHostCountPayload(payload) : EMPTY_HOST_COUNT_SUMMARY,
         notReadyForLvvCount: payload ? summarizeNotReadyForLvvCountPayload(payload) : 0,
         notReadyForLvvDeviceNames: payload ? summarizeNotReadyForLvvDeviceNames(payload) : [],
+        hostTransceiverMetricDeviceNames: payload
+            ? getHostTransceiverMetricDisplayDeviceNames(getHostReadinessItems(payload))
+            : [],
     };
 }
 
@@ -1076,6 +1090,7 @@ const ProjectDetailsContainer = (props: Props) => {
                     ac.signal
                 );
                 let notReadyForLvvDeviceNames: string[] = [];
+                let hostTransceiverMetricDeviceNames: string[] | undefined = row.isGpuRack ? [] : undefined;
                 let shouldStop = false;
 
                 if (row.isGpuRack) {
@@ -1085,11 +1100,13 @@ const ProjectDetailsContainer = (props: Props) => {
                             hostCountSummary,
                             notReadyForLvvCount,
                             notReadyForLvvDeviceNames: fetchedNotReadyDeviceNames,
+                            hostTransceiverMetricDeviceNames: fetchedHostTransceiverMetricDeviceNames,
                         } = await fetchRackHostReadinessSummaries(row, props.region, ac.signal);
                         if (ac.signal.aborted || requestId !== statusRequestSeqRef.current) {
                             shouldStop = true;
                         } else {
                             notReadyForLvvDeviceNames = fetchedNotReadyDeviceNames;
+                            hostTransceiverMetricDeviceNames = fetchedHostTransceiverMetricDeviceNames;
 
                             setRackNotReadyForLvvCountByKey((prev) => ({
                                 ...prev,
@@ -1141,7 +1158,8 @@ const ProjectDetailsContainer = (props: Props) => {
 
                     const statusSummary = summarizeRackValidationSummaryInputs(
                         validationSummaryInputs,
-                        notReadyForLvvDeviceNames
+                        notReadyForLvvDeviceNames,
+                        hostTransceiverMetricDeviceNames
                     );
 
                     setRackStatusByKey((prev) => ({

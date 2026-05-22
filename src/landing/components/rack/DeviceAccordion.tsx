@@ -32,6 +32,7 @@ import {
   NOT_READY_FOR_LVV_LABEL,
   NOT_READY_FOR_LVV_TOOLTIP,
   READINESS_STATES_WITH_REAL_ERRORS,
+  shouldDisplayHostTransceiverMetrics,
 } from "./readinessDisplayConfig";
 import { orderValidationSectionKeys, VALIDATION_COLUMN_ORDER_BY_SECTION } from "./columnOrder";
 import {
@@ -751,11 +752,14 @@ function orderT0ToHostSections(sections: ValidationSection[]): ValidationSection
 }
 
 function buildValidationSectionGroups(
-  visibleSections: ValidationSection[]
+  visibleSections: ValidationSection[],
+  showHostTransceiverMetrics: boolean = true
 ): ValidationSectionGroup[] {
-  const hostTransceiverSections = visibleSections
-    .filter((section) => isHostTransceiverSection(section.title))
-    .flatMap(splitHostTransceiverSections);
+  const hostTransceiverSections = showHostTransceiverMetrics
+    ? visibleSections
+      .filter((section) => isHostTransceiverSection(section.title))
+      .flatMap(splitHostTransceiverSections)
+    : [];
   const t0ToHostSections = orderT0ToHostSections(
     visibleSections.filter((section) => !isHostTransceiverSection(section.title))
   );
@@ -788,11 +792,18 @@ type ErrorCountChip = {
   label: string;
   count: number;
   typeClass: string;
+  title?: string;
+  ariaLabel?: string;
 };
 
 function getHostTransceiverErrorChips(
-  deviceFailures: DeviceValidationFailures
+  deviceFailures: DeviceValidationFailures,
+  showHostTransceiverMetrics: boolean = true
 ): ErrorCountChip[] {
+  if (!showHostTransceiverMetrics) {
+    return [];
+  }
+
   return deviceFailures.sectionOrder
     .flatMap((sectionKey) => {
       const section = deviceFailures.sections[sectionKey];
@@ -820,7 +831,8 @@ function renderErrorChipRow(chips: ErrorCountChip[]) {
         <span
           key={chip.label}
           className={`device-accordion-error-chip ${chip.typeClass}`}
-          title={`${chip.label}: ${chip.count}`}
+          title={chip.title || `${chip.label}: ${chip.count}`}
+          aria-label={chip.ariaLabel}
         >
           {chip.label}:{chip.count}
         </span>
@@ -864,11 +876,19 @@ function getHostTransceiverRowSummaryStatus(row: ValidationTableRow): "pass" | "
 }
 
 function summarizeHostTransceiverRows(
-  failuresByDevice: ValidationFailuresByDevice
+  failuresByDevice: ValidationFailuresByDevice,
+  hostTransceiverMetricDeviceNames?: Iterable<string>
 ): HostTransceiverSummaryCounts {
   const counts: HostTransceiverSummaryCounts = { pass: 0, fail: 0, stale: 0, total: 0 };
+  const displayNames = hostTransceiverMetricDeviceNames
+    ? new Set(Array.from(hostTransceiverMetricDeviceNames).map((deviceName) => normalizeDeviceName(deviceName)))
+    : null;
 
-  Object.values(failuresByDevice).forEach((deviceFailures) => {
+  Object.entries(failuresByDevice).forEach(([deviceName, deviceFailures]) => {
+    if (displayNames && !displayNames.has(normalizeDeviceName(deviceName))) {
+      return;
+    }
+
     deviceFailures.sectionOrder.forEach((sectionKey) => {
       const section = deviceFailures.sections[sectionKey];
       if (!section || !isHostTransceiverSection(section.title)) {
@@ -2118,6 +2138,19 @@ const DeviceAccordion = (props: Props) => {
     });
   };
 
+  const hostTransceiverMetricDeviceNames = useMemo(
+    () =>
+      new Set(
+        props.devices
+          .filter((device) =>
+            isGpuComputeDevice(device.deviceName, props.isGpuRack) &&
+            shouldDisplayHostTransceiverMetrics(device.hostReadinessStatus)
+          )
+          .map((device) => device.deviceName)
+      ),
+    [props.devices, props.isGpuRack]
+  );
+
   const summaryCounts = useMemo(() => {
     const values = Object.values(filteredFailuresByDevice);
     const linkFailures = values.reduce((sum, item) => sum + countT0ToHostRows(item), 0);
@@ -2127,33 +2160,41 @@ const DeviceAccordion = (props: Props) => {
     return {
       linkFailures,
       powerFailures,
-      hostTransceiver: summarizeHostTransceiverRows(filteredFailuresByDevice),
+      hostTransceiver: summarizeHostTransceiverRows(
+        filteredFailuresByDevice,
+        props.isGpuRack ? hostTransceiverMetricDeviceNames : undefined
+      ),
     };
-  }, [filteredFailuresByDevice, props.isGpuRack]);
+  }, [filteredFailuresByDevice, hostTransceiverMetricDeviceNames, props.isGpuRack]);
 
   const renderErrorCount = (
       device: DeviceStatus,
       deviceFailures: DeviceValidationFailures
   ) => {
     const isGpuCompute = isGpuComputeDevice(deviceFailures.deviceName, props.isGpuRack);
-    if (isGpuCompute) {
-      const readinessStatus = String(device.hostReadinessStatus || "").trim().toUpperCase();
-      if (
-        readinessStatus !== "" &&
-        !READINESS_STATES_WITH_REAL_ERRORS.has(readinessStatus)
-      ) {
-        return (
-          <span className="device-accordion-error-breakdown">
-            <span
-              className="device-accordion-error-chip chip-not-ready-for-lvv"
-              title={NOT_READY_FOR_LVV_TOOLTIP}
-              aria-label={NOT_READY_FOR_LVV_TOOLTIP}
-            >
-              {NOT_READY_FOR_LVV_LABEL}:1
-            </span>
-          </span>
-        );
-      }
+    const readinessStatus = String(device.hostReadinessStatus || "").trim().toUpperCase();
+    const showNotReadyForLvvChip =
+      isGpuCompute &&
+      readinessStatus !== "" &&
+      !READINESS_STATES_WITH_REAL_ERRORS.has(readinessStatus);
+    const showHostTransceiverMetrics =
+      isGpuCompute && shouldDisplayHostTransceiverMetrics(readinessStatus);
+    const notReadyForLvvChip = showNotReadyForLvvChip
+      ? [{
+        label: NOT_READY_FOR_LVV_LABEL,
+        count: 1,
+        typeClass: "chip-not-ready-for-lvv",
+        title: NOT_READY_FOR_LVV_TOOLTIP,
+        ariaLabel: NOT_READY_FOR_LVV_TOOLTIP,
+      }]
+      : [];
+
+    if (showNotReadyForLvvChip) {
+      return (
+        <span className="device-accordion-error-breakdown">
+          {renderErrorChipRow(notReadyForLvvChip)}
+        </span>
+      );
     }
 
     const t0ToHostChips = deviceFailures.sectionOrder
@@ -2170,9 +2211,16 @@ const DeviceAccordion = (props: Props) => {
         .filter((entry): entry is { label: string; count: number; typeClass: string } =>
             Boolean(entry && entry.count > 0)
         );
-    const hostTransceiverChips = getHostTransceiverErrorChips(deviceFailures);
+    const hostTransceiverChips = getHostTransceiverErrorChips(
+      deviceFailures,
+      showHostTransceiverMetrics
+    );
 
-    if (t0ToHostChips.length === 0 && hostTransceiverChips.length === 0) {
+    if (
+      notReadyForLvvChip.length === 0 &&
+      t0ToHostChips.length === 0 &&
+      hostTransceiverChips.length === 0
+    ) {
       const zeroClass = `device-accordion-failure-count ${
           !isGpuCompute && deviceFailures.hasPsuFailure
               ? "danger"
@@ -2183,6 +2231,7 @@ const DeviceAccordion = (props: Props) => {
 
     return (
         <span className="device-accordion-error-breakdown">
+          {renderErrorChipRow(notReadyForLvvChip)}
           {renderErrorChipRow(t0ToHostChips)}
           {renderErrorChipRow(hostTransceiverChips)}
       </span>
@@ -2523,6 +2572,8 @@ const DeviceAccordion = (props: Props) => {
                       .filter((section): section is ValidationSection => Boolean(section && section.rows.length > 0));
                   const isGpuCompute = isGpuComputeDevice(device.deviceName, props.isGpuRack);
                   const readinessStatusUpper = String(device.hostReadinessStatus || "").trim().toUpperCase();
+                  const showHostTransceiverMetrics =
+                      isGpuCompute && shouldDisplayHostTransceiverMetrics(readinessStatusUpper);
                   const isNotReadyForLvvDevice =
                       isGpuCompute &&
                       readinessStatusUpper !== "" &&
@@ -2532,18 +2583,21 @@ const DeviceAccordion = (props: Props) => {
                   const validationSectionGroups = isGpuCompute
                       ? applyStableHostTransceiverTimestamps(
                           device.deviceName,
-                          buildValidationSectionGroups(visibleSections),
+                          buildValidationSectionGroups(visibleSections, showHostTransceiverMetrics),
                           stableHostTransceiverTimestampRef.current,
                           validationReferenceTimeMs
                       )
                       : [];
+                  const visibleValidationSectionGroups =
+                      hideValidationSectionsForNotReadyDevice
+                          ? []
+                          : validationSectionGroups;
                   const isPeriodicValidation = isPeriodicValidationDevice(device.deviceName);
                   const hasDeviceInformation = Boolean(isGpuCompute && device.hostReadinessStatus && device.hostSerial);
                   const hasValidationSections = isGpuCompute
-                      ? validationSectionGroups.length > 0
+                      ? visibleValidationSectionGroups.length > 0
                       : visibleSections.length > 0;
-                  const hasVisibleValidationSections =
-                      hideValidationSectionsForNotReadyDevice ? false : hasValidationSections;
+                  const hasVisibleValidationSections = hasValidationSections;
                   const hasExpandableContent = hasVisibleValidationSections || hasDeviceInformation;
                   const psuStatus = isGpuCompute
                       ? "-"
@@ -2687,9 +2741,9 @@ const DeviceAccordion = (props: Props) => {
                                     VALIDATION_TABLE_ACCESSIBILITY,
                                     props.region
                                   )}
-                                {!hideValidationSectionsForNotReadyDevice &&
+                                {hasVisibleValidationSections &&
                                   (isGpuCompute
-                                    ? validationSectionGroups.map((group) =>
+                                    ? visibleValidationSectionGroups.map((group) =>
                                       renderValidationSectionGroup(device, idx, group)
                                     )
                                     : visibleSections.map((section) => {

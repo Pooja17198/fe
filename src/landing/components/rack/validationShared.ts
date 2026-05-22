@@ -11,6 +11,7 @@ import {
   isPeriodicValidationRefreshEnabledForAllDevices,
   isPeriodicValidationRefreshEnabledForDeviceType,
 } from "../../config/configUtils";
+import { shouldDisplayHostTransceiverMetrics } from "./readinessDisplayConfig";
 
 export type RowRecord = Record<string, unknown>;
 
@@ -254,10 +255,12 @@ export function summarizeValidationFailuresByDevice(
   options: {
     includeDeviceNames?: Iterable<string>;
     excludeDeviceNames?: Iterable<string>;
+    hostTransceiverDisplayDeviceNames?: Iterable<string>;
   } = {}
 ): RackValidationSummary {
   const includeNames = toNormalizedNameSet(options.includeDeviceNames);
   const excludeNames = toNormalizedNameSet(options.excludeDeviceNames);
+  const hostTransceiverDisplayNames = toNormalizedNameSet(options.hostTransceiverDisplayDeviceNames);
 
   let includedDeviceCount = 0;
   let cableFailures = 0;
@@ -274,14 +277,28 @@ export function summarizeValidationFailuresByDevice(
 
   Object.entries(failuresByDevice).forEach(([deviceName, failures]) => {
     const normalizedName = normalizeDeviceName(deviceName);
-    if (includeNames && !includeNames.has(normalizedName)) {
-      return;
-    }
-    if (excludeNames?.has(normalizedName)) {
+    const isIncludedByMode = !includeNames || includeNames.has(normalizedName);
+    const shouldCountBaseFailures = isIncludedByMode && !excludeNames?.has(normalizedName);
+    const shouldCountHostTransceiverFailures = shouldCountBaseFailures &&
+      (hostTransceiverDisplayNames ? hostTransceiverDisplayNames.has(normalizedName) : true);
+
+    if (!shouldCountBaseFailures && !shouldCountHostTransceiverFailures) {
       return;
     }
 
     includedDeviceCount += 1;
+
+    if (shouldCountHostTransceiverFailures) {
+      const hostTransceiverCounts = getHostTransceiverActionableCounts(failures);
+      hostOpticsFailures += hostTransceiverCounts.total;
+      hostOptFailures += hostTransceiverCounts.optics;
+      hostFecBerFailures += hostTransceiverCounts.fecBer;
+    }
+
+    if (!shouldCountBaseFailures) {
+      return;
+    }
+
     const lldpCount = getSectionCount(failures, "LLDP Errors");
     const interfaceCount = getSectionCount(failures, "Interface Errors");
     const opticCount = getSectionCount(failures, "Optic Errors");
@@ -295,10 +312,6 @@ export function summarizeValidationFailuresByDevice(
     rawBerFailures += rawBerCount;
     cableFailures += lldpCount + interfaceCount;
     opticsFailures += opticCount + fecBerCount;
-    const hostTransceiverCounts = getHostTransceiverActionableCounts(failures);
-    hostOpticsFailures += hostTransceiverCounts.total;
-    hostOptFailures += hostTransceiverCounts.optics;
-    hostFecBerFailures += hostTransceiverCounts.fecBer;
     deviceFailures += failures.counts.power;
     deviceFailures += getSectionCount(failures, "Fan Errors");
   });
@@ -889,4 +902,26 @@ function toNormalizedNameSet(
     .filter((deviceName) => deviceName !== "");
 
   return new Set(names);
+}
+
+export function getHostTransceiverMetricDisplayDeviceNames(
+  hostReadinessItems: Iterable<Record<string, unknown>>
+): string[] {
+  const names = new Set<string>();
+
+  Array.from(hostReadinessItems).forEach((item) => {
+    const status = String(item["status"] ?? "").trim();
+    if (!shouldDisplayHostTransceiverMetrics(status)) {
+      return;
+    }
+
+    const deviceName = String(
+      item["deviceName"] ?? item["hostName"] ?? item["host"] ?? ""
+    ).trim();
+    if (deviceName) {
+      names.add(deviceName);
+    }
+  });
+
+  return Array.from(names);
 }
