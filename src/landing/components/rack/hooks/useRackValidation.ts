@@ -32,11 +32,13 @@ import {
 import {
     asArray,
     asRecord,
+    chunkArray,
     finalizeCounts,
     getPeriodicRefreshDeviceNames,
     normalizeDeviceStatusesPayload,
     normalizeSectionKey,
     normalizeValidationFailuresPayload,
+    VALIDATION_SERVICE_DEVICE_BATCH_SIZE,
 } from "../validationShared";
 
 const VALIDATION_SERVICE_REFRESH_INTERVAL_MS = 10_000;
@@ -733,32 +735,41 @@ export function useRackValidation(props: RackProps, options?: UseRackValidationO
             const url = new URL(`${LVV_API}/getResultsFromValidationService`);
             const headers = createCsrfHeaders();
             headers.append("Content-Type", "application/json");
-            const payload: ValidationServiceResultsRequestPayload = {
-                regionName: props.region,
-                buildingName: props.building,
-                rackSerialNumber: props.rack_serial,
-                rackNumber: props.rack,
-                devices: requestedDeviceNames.map((deviceName) => ({
-                    deviceName,
-                    isGpuDevice: isGpuComputeDevice(deviceName, props.isGpuRack),
-                })),
-            };
+            const batchResults = await Promise.all(
+                chunkArray(
+                    requestedDeviceNames,
+                    VALIDATION_SERVICE_DEVICE_BATCH_SIZE
+                ).map(async (deviceNameBatch) => {
+                    const payload: ValidationServiceResultsRequestPayload = {
+                        regionName: props.region,
+                        buildingName: props.building,
+                        rackSerialNumber: props.rack_serial,
+                        rackNumber: props.rack,
+                        devices: deviceNameBatch.map((deviceName) => ({
+                            deviceName,
+                            isGpuDevice: isGpuComputeDevice(deviceName, props.isGpuRack),
+                        })),
+                    };
 
-            const resp = await fetchWithRetry(url.href, {
-                method: "POST",
-                headers,
-                body: JSON.stringify(payload),
-                signal: pageAbortRef.current?.signal as AbortSignal | undefined,
-            });
-            if (!resp.ok) {
-                return {
-                    ok: false,
-                    message: `Periodic refresh failed with status ${resp.status} ${resp.statusText}`,
-                };
-            }
+                    const resp = await fetchWithRetry(url.href, {
+                        method: "POST",
+                        headers,
+                        body: JSON.stringify(payload),
+                        signal: pageAbortRef.current?.signal as AbortSignal | undefined,
+                    });
+                    if (!resp.ok) {
+                        throw new Error(
+                            `Periodic refresh failed with status ${resp.status} ${resp.statusText}`
+                        );
+                    }
 
-            const data: unknown = await resp.json();
-            const normalized = normalizeValidationFailuresPayload(data, props.rack_serial);
+                    const data: unknown = await resp.json();
+                    return normalizeValidationFailuresPayload(data, props.rack_serial);
+                })
+            );
+
+            const normalized: ValidationFailuresByDevice = Object.assign({}, ...batchResults);
+
             if (Object.keys(normalized).length === 0) {
                 return {
                     ok: false,

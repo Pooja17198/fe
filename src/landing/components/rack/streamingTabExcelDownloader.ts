@@ -13,8 +13,10 @@ import { LVV_API } from "./constants";
 import { downloadWorkbook, sheetFromRows } from "./excelDownloadUtil";
 import {
   asRecord,
+  chunkArray,
   normalizeDeviceStatusesPayload,
   normalizeValidationFailuresPayload,
+  VALIDATION_SERVICE_DEVICE_BATCH_SIZE,
 } from "./validationShared";
 import { isGpuComputeDevice } from "./utils";
 import {
@@ -684,31 +686,39 @@ async function fetchStreamingValidationFailures(
   const url = new URL(`${LVV_API}/getResultsFromValidationService`);
   const headers = createCsrfHeaders();
   headers.append("Content-Type", "application/json");
+  const batchResults = await Promise.all(
+    chunkArray(
+      deviceNames,
+      VALIDATION_SERVICE_DEVICE_BATCH_SIZE
+    ).map(async (deviceNameBatch) => {
+      const payload = {
+        regionName: props.region,
+        buildingName: props.building,
+        rackSerialNumber: props.rack_serial,
+        rackNumber: props.rack,
+        devices: deviceNameBatch.map((deviceName) => ({
+          deviceName,
+          isGpuDevice: isGpuComputeDevice(deviceName, props.isGpuRack),
+        })),
+      };
 
-  const payload = {
-    regionName: props.region,
-    buildingName: props.building,
-    rackSerialNumber: props.rack_serial,
-    rackNumber: props.rack,
-    devices: deviceNames.map((deviceName) => ({
-      deviceName,
-      isGpuDevice: isGpuComputeDevice(deviceName, props.isGpuRack),
-    })),
-  };
+      const response = await fetchWithRetry(url.href, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(payload),
+      });
+      if (!response.ok) {
+        throw new Error(
+          `getResultsFromValidationService query failed (${response.status} ${response.statusText})`
+        );
+      }
 
-  const response = await fetchWithRetry(url.href, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(payload),
-  });
-  if (!response.ok) {
-    throw new Error(
-      `getResultsFromValidationService query failed (${response.status} ${response.statusText})`
-    );
-  }
+      const resultPayload: unknown = await response.json();
+      return normalizeValidationFailuresPayload(resultPayload, props.rack_serial);
+    })
+  );
 
-  const resultPayload: unknown = await response.json();
-  return normalizeValidationFailuresPayload(resultPayload, props.rack_serial);
+  return Object.assign({}, ...batchResults);
 }
 
 async function fetchPatchPanelByDevicePort(props: RackProps): Promise<PatchPanelByDevicePort> {

@@ -45,6 +45,8 @@ export const NOT_VALIDATED_SUMMARY: RackValidationSummary = {
   deviceFailures: 0,
 };
 
+export const VALIDATION_SERVICE_DEVICE_BATCH_SIZE = 2;
+
 const LAST_VALIDATED_SECTION_TITLE = "Last Validated";
 const POWER_SECTION_TITLE = "Power Errors";
 const DEVICE_REACHABILITY_SECTION_TITLE = "Device Reachability";
@@ -58,6 +60,18 @@ export function asRecord(value: unknown): RowRecord | null {
 
 export function asArray(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [];
+}
+
+export function chunkArray<T>(items: T[], chunkSize: number): T[][] {
+  if (chunkSize <= 0) {
+    return [items];
+  }
+
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += chunkSize) {
+    chunks.push(items.slice(i, i + chunkSize));
+  }
+  return chunks;
 }
 
 export function normalizeSectionKey(title: string): string {

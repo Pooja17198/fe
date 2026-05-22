@@ -15,12 +15,14 @@ import type { RackValidationSummary } from "../rack/validationShared";
 import {
     asArray,
     asRecord,
+    chunkArray,
     getHostTransceiverMetricDisplayDeviceNames,
     mergeRackValidationSummaries,
     normalizeDeviceStatusesPayload,
     normalizeValidationFailuresPayload,
     NOT_VALIDATED_SUMMARY,
     summarizeValidationFailuresByDevice,
+    VALIDATION_SERVICE_DEVICE_BATCH_SIZE,
 } from "../rack/validationShared";
 import {
     getLocalRackStubDeviceStatuses,
@@ -223,37 +225,77 @@ async function fetchRackStreamingValidationPayload(
     const headers = createCsrfHeaders();
     headers.append("Content-Type", "application/json");
     const url = new URL(`${API_URL}/getResultsFromValidationService`);
-    const payload = {
-        regionName: region,
-        buildingName: row.building,
-        rackSerialNumber: row.rackSerialNumber,
-        rackNumber: row.rackLocation,
-        devices: deviceNames.map((deviceName) => ({
-            deviceName,
-            isGpuDevice: isGpuComputeDevice(deviceName, row.isGpuRack),
-        })),
-    };
+    const batchPayloads = await Promise.all(
+        chunkArray(
+            deviceNames,
+            VALIDATION_SERVICE_DEVICE_BATCH_SIZE
+        ).map(async (deviceNameBatch) => {
+            const payload = {
+                regionName: region,
+                buildingName: row.building,
+                rackSerialNumber: row.rackSerialNumber,
+                rackNumber: row.rackLocation,
+                devices: deviceNameBatch.map((deviceName) => ({
+                    deviceName,
+                    isGpuDevice: isGpuComputeDevice(deviceName, row.isGpuRack),
+                })),
+            };
 
-    const response = await fetchWithRetry(url.href, {
-        method: "POST",
-        headers,
-        body: JSON.stringify(payload),
-        signal,
+            const response = await fetchWithRetry(url.href, {
+                method: "POST",
+                headers,
+                body: JSON.stringify(payload),
+                signal,
+            });
+            if (!response.ok) {
+                return null;
+            }
+
+            const body = await response.text();
+            if (!body.trim()) {
+                return null;
+            }
+
+            try {
+                return JSON.parse(body) as unknown;
+            } catch {
+                return null;
+            }
+        })
+    );
+
+    if (batchPayloads.some((payload) => payload === null)) {
+        return null;
+    }
+
+    const mergedRackResults: Record<string, unknown> = {};
+    batchPayloads.forEach((payload) => {
+        const payloadRecord = asRecord(payload);
+        if (!payloadRecord) {
+            return;
+        }
+
+        let rackNode: unknown = payloadRecord[row.rackSerialNumber];
+        if (!rackNode) {
+            const keys = Object.keys(payloadRecord);
+            if (keys.length === 1) {
+                rackNode = payloadRecord[keys[0]];
+            }
+        }
+
+        const rackRecord = asRecord(rackNode);
+        if (!rackRecord) {
+            return;
+        }
+
+        const existingRackRecord = asRecord(mergedRackResults[row.rackSerialNumber]) || {};
+        mergedRackResults[row.rackSerialNumber] = {
+            ...existingRackRecord,
+            ...rackRecord,
+        };
     });
-    if (!response.ok) {
-        return null;
-    }
 
-    const body = await response.text();
-    if (!body.trim()) {
-        return null;
-    }
-
-    try {
-        return JSON.parse(body) as unknown;
-    } catch {
-        return null;
-    }
+    return Object.keys(mergedRackResults).length === 0 ? null : mergedRackResults;
 }
 
 function normalizeValidationMode(value: ValidationMode | string | undefined): ValidationMode | undefined {
