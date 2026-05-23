@@ -63,7 +63,6 @@ const Content = (props: Props) => {
   const [selectedUserType, setSelectedUserType] = useState<"master" | "vendor">(() =>
     getInitialLvvUserType(isLocalhost())
   );
-  const [deploymentGroupAccessLoading, setDeploymentGroupAccessLoading] = useState(false);
   const [selectedRackRegion, setSelectedRackRegion] = useState(INIT_DEFAULT);
   const [selectedResolveEnabled, setSelectedResolveEnabled] = useState<boolean>(false);
   const [selectedResolveDisabledReason, setSelectedResolveDisabledReason] = useState<string>("");
@@ -89,33 +88,6 @@ const Content = (props: Props) => {
   const isDeploymentGroupSelectionRoute = props.page === "deployment-group-validation";
   const isDeploymentGroupValidationRoute = props.page === "deployment-group-validation-page";
   const isDeploymentGroupRoute = isDeploymentGroupSelectionRoute || isDeploymentGroupValidationRoute;
-
-  useEffect(() => {
-    if (!isDeploymentGroupRoute) {
-      setDeploymentGroupAccessLoading(false);
-      return;
-    }
-    if (selectedUserType === "master") {
-      setDeploymentGroupAccessLoading(false);
-      return;
-    }
-
-    const ac = new AbortController();
-    setDeploymentGroupAccessLoading(true);
-    void resolveCurrentUserType(props.region, ac.signal)
-      .then((userType) => {
-        if (ac.signal.aborted) return;
-        setSelectedUserType(userType);
-        setDeploymentGroupAccessLoading(false);
-      })
-      .catch((error) => {
-        if ((error as any)?.name === "AbortError") return;
-        setSelectedUserType("vendor");
-        setDeploymentGroupAccessLoading(false);
-      });
-
-    return () => ac.abort();
-  }, [isDeploymentGroupRoute, selectedUserType, props.region]);
 
   // Hydrate rack context from URL when user refreshes or opens /rack/{id} directly.
   useEffect(() => {
@@ -252,27 +224,14 @@ const Content = (props: Props) => {
 
   const isRack = Boolean(props.page?.includes("rack"));
   const isCabling = Boolean(props.page?.includes("cabling"));
-  const isDeploymentGroupSelection = Boolean(
-    isDeploymentGroupSelectionRoute && selectedUserType === "master"
-  );
-  const isDeploymentGroupValidationPage = Boolean(
-    isDeploymentGroupValidationRoute && selectedUserType === "master"
-  );
+  const isDeploymentGroupSelection = Boolean(isDeploymentGroupSelectionRoute);
+  const isDeploymentGroupValidationPage = Boolean(isDeploymentGroupValidationRoute);
   const isHome = !isRack && !isCabling && !isDeploymentGroupRoute;
   const isQc = Boolean(props.page?.includes("qc"));
   return (
     <div class="oj-web-applayout-max-width oj-web-applayout-content lvv-route-content">
       {isCabling ? (
         <Cabling onSelectedSiteNameChanged={setSelectedCablingSiteName} />
-      ) : isDeploymentGroupRoute && deploymentGroupAccessLoading ? (
-        <div class="deployment-group-loading" role="status" aria-live="polite">
-          <oj-progress-circle size="md" value={-1}></oj-progress-circle>
-          <div>Checking access...</div>
-        </div>
-      ) : isDeploymentGroupRoute && selectedUserType !== "master" ? (
-        <div class="deployment-group-access-denied" role="alert">
-          Deployment Group Validation is available only to master users.
-        </div>
       ) : isDeploymentGroupSelection ? (
         <DeploymentGroupSelectionPage
           region={props.region}

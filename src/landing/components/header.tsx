@@ -28,7 +28,7 @@ type Props = Readonly<{
   onPageChanged: (value: any) => void;
 }>;
 
-export function Header({ appName, userLogin, vendorName, userType, regionValue, page, onRegionChanged, onPageChanged }: Props) {
+export function Header({ appName, userLogin, vendorName, regionValue, page, onRegionChanged, onPageChanged }: Props) {
   const mediaQueryRef = useRef<MediaQueryList>(window.matchMedia(ResponsiveUtils.getFrameworkQuery("sm-only")!));
 
   const [isSmallWidth, setIsSmallWidth] = useState(mediaQueryRef.current.matches);
@@ -135,18 +135,17 @@ export function Header({ appName, userLogin, vendorName, userType, regionValue, 
     label: string;
   };
 
-  const isMasterUser = userType === "master";
   const tabs: Tab[] = [
     { path: "cabling", label: "Cabling and Materials" },
     { path: "qc", label: "Quality Control" },
     { path: "home", label: "Rack Validation" },
-    ...(isMasterUser ? [{ path: "deployment-group-validation", label: "Deployment Group Validation" }] : []),
+    { path: "deployment-group-validation", label: "Deployment Group Validation" },
   ];
   const isCabling = Boolean(page?.includes("cabling") || page?.includes("qc") );
   const [activeTab, setActiveTab] = useState<string>(() => {
     if (page?.includes("cabling")) return "cabling";
     if (page?.includes("qc")) return "qc";
-    if (page?.includes("deployment-group-validation") && isMasterUser) {
+    if (page?.includes("deployment-group-validation")) {
       return "deployment-group-validation";
     }
     return "home";
@@ -174,11 +173,6 @@ export function Header({ appName, userLogin, vendorName, userType, regionValue, 
       return;
     }
     if (selectedPath === "deployment-group-validation") {
-      if (!isMasterUser) {
-        onPageChanged({ path: "home" });
-        setActiveTab("home");
-        return;
-      }
       onPageChanged({ path: "deployment-group-validation" });
       setActiveTab("deployment-group-validation");
       return;
@@ -205,15 +199,11 @@ export function Header({ appName, userLogin, vendorName, userType, regionValue, 
       return;
     }
     if (page?.includes("deployment-group-validation")) {
-      if (!isMasterUser) {
-        setActiveTab("home");
-        return;
-      }
       setActiveTab("deployment-group-validation");
       return;
     }
     setActiveTab("home");
-  }, [page, isMasterUser]);
+  }, [page]);
 
   const tabbarDP = new MutableArrayDataProvider<Tab["path"], Tab>(
     tabs.slice(0),

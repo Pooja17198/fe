@@ -158,6 +158,7 @@ function isDeviceNotEligibleForValidation(
 type Props = {
   devices: DeviceStatus[];
   eligibleDeviceNames: Set<string>;
+  selectableDeviceNames?: Set<string>;
   building: string;
   block: string;
   rack: string;
@@ -1585,6 +1586,7 @@ const DeviceAccordion = (props: Props) => {
   const viewMode: RackValidationViewMode = props.viewMode || "ncp";
   const validationServiceView = viewMode === "validationService";
   const showSelection = props.showSelection !== false;
+  const selectableDeviceNames = props.selectableDeviceNames || props.eligibleDeviceNames;
 
   useEffect(() => {
     stableHostTransceiverTimestampRef.current.clear();
@@ -2103,10 +2105,10 @@ const DeviceAccordion = (props: Props) => {
       () =>
           new Set(
               sortedDevices
-                  .filter((device) => props.eligibleDeviceNames.has(device.deviceName))
+                  .filter((device) => selectableDeviceNames.has(device.deviceName))
                   .map((device) => device._key)
           ),
-      [sortedDevices, props.eligibleDeviceNames]
+      [sortedDevices, selectableDeviceNames]
   );
   const allSelected =
       eligibleDeviceKeys.size > 0 &&
@@ -2516,7 +2518,7 @@ const DeviceAccordion = (props: Props) => {
                         : !props.rackValidationAllowed
                         ? props.rackValidationTooltip
                         : eligibleDeviceKeys.size === 0
-                        ? "No monitored and deployed devices are available for validation."
+                        ? "No on-demand devices are available for validation."
                         : ""
                   }
               />
@@ -2604,19 +2606,23 @@ const DeviceAccordion = (props: Props) => {
                       : getPsuStatusLabel(device.jobStatus, deviceFailures.hasPsuFailure);
                   const isExpanded = expandedKeys.has(device._key);
                   const isValidationEligible = props.eligibleDeviceNames.has(device.deviceName);
+                  const isSelectableForValidation = selectableDeviceNames.has(device.deviceName);
                   const statusToRender = validationServiceView
                       ? (isPeriodicValidation
                           ? (isValidationEligible ? "PERIODIC_CHECK" : "NOT_ELIGIBLE")
                           : (isValidationEligible ? device.jobStatus : "NOT_ELIGIBLE"))
                       : (isValidationEligible ? device.jobStatus : "NOT_ELIGIBLE");
-                  const rowSelectionDisabled = gpuRackSelectionDisabled || !props.rackValidationAllowed || !isValidationEligible;
+                  const rowSelectionDisabled =
+                      gpuRackSelectionDisabled || !props.rackValidationAllowed || !isSelectableForValidation;
                   const disabledReason =
                       gpuRackSelectionDisabled
                           ? gpuRackSelectionDisabledReason
                           : !props.rackValidationAllowed
                           ? props.rackValidationTooltip
                           : (
-                              device.validationEligibilityReason ||
+                              (!isValidationEligible
+                                  ? device.validationEligibilityReason
+                                  : "Only on-demand devices can be selected for validation.") ||
                               "Validation is available only for monitored and deployed devices."
                           );
                   const validationStateContent = props.isGpuRack

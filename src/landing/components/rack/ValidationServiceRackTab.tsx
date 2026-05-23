@@ -29,6 +29,7 @@ const ValidationServiceRackTab = (props: RackProps) => {
     jobErrorDetails,
     isPeriodicValidationRefreshing,
     eligibleDeviceNames,
+    onDemandValidationDeviceNames,
     onDemandValidationDeviceCount,
     rackValidationAllowed,
     rackValidationTooltip,
@@ -189,6 +190,7 @@ const ValidationServiceRackTab = (props: RackProps) => {
       <DeviceAccordion
         devices={deviceStatuses}
         eligibleDeviceNames={eligibleDeviceNames}
+        selectableDeviceNames={onDemandValidationDeviceNames}
         building={props.building}
         block={props.block}
         rack={props.rack}
@@ -213,7 +215,7 @@ const ValidationServiceRackTab = (props: RackProps) => {
         rackValidationTooltip={rackValidationTooltip}
         periodicValidationEnabled={periodicValidationEnabled}
         viewMode="validationService"
-        showSelection={false}
+        showSelection={true}
         externalExpandedKeys={externalExpandedKeys}
         externalExpandedKeysNonce={externalExpandedKeysNonce}
       />
