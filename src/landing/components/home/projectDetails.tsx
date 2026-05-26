@@ -131,6 +131,11 @@ const EMPTY_HOST_COUNT_SUMMARY: RackHostCountSummary = {
     customerCount: 0,
 };
 
+const VALIDATED_CLEAN_SUMMARY: RackValidationSummary = {
+    ...NOT_VALIDATED_SUMMARY,
+    isValidated: true,
+};
+
 function isEmptyObject(value: Record<string, unknown>): boolean {
     return Object.keys(value).length === 0;
 }
@@ -652,11 +657,16 @@ function summarizeRackValidationSummaryInputs(
     excludeDeviceNames?: Iterable<string>,
     hostTransceiverMetricDeviceNames?: Iterable<string>
 ): RackValidationSummary {
+    const hasValidationResults =
+        Object.keys(validationInputs.cablingFailuresByDevice).length > 0 ||
+        Object.keys(validationInputs.streamingFailuresByDevice).length > 0;
+
     if (validationInputs.onDemandDeviceNames === null) {
-        return summarizeValidationFailuresByDevice(validationInputs.cablingFailuresByDevice, {
+        const summary = summarizeValidationFailuresByDevice(validationInputs.cablingFailuresByDevice, {
             excludeDeviceNames,
             hostTransceiverDisplayDeviceNames: hostTransceiverMetricDeviceNames,
         });
+        return !summary.isValidated && hasValidationResults ? VALIDATED_CLEAN_SUMMARY : summary;
     }
 
     const onDemandSummary = summarizeValidationFailuresByDevice(validationInputs.cablingFailuresByDevice, {
@@ -670,7 +680,8 @@ function summarizeRackValidationSummaryInputs(
         hostTransceiverDisplayDeviceNames: hostTransceiverMetricDeviceNames,
     });
 
-    return mergeRackValidationSummaries(onDemandSummary, streamingSummary);
+    const summary = mergeRackValidationSummaries(onDemandSummary, streamingSummary);
+    return !summary.isValidated && hasValidationResults ? VALIDATED_CLEAN_SUMMARY : summary;
 }
 
 function getHostReadinessItems(payload: unknown): Record<string, unknown>[] {
@@ -756,7 +767,11 @@ function summarizeNotReadyForLvvDeviceNames(
 
     (deviceStatuses || []).forEach((device) => {
         const normalizedDeviceName = normalizeDeviceName(device.deviceName);
-        if (!normalizedDeviceName || readinessByName.has(normalizedDeviceName)) {
+        if (
+            !normalizedDeviceName ||
+            readinessByName.has(normalizedDeviceName) ||
+            !isGpuComputeDevice(device.deviceName, true)
+        ) {
             return;
         }
 
