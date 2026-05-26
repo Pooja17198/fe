@@ -67,6 +67,8 @@ const router = new CoreRouter<CoreRouter.DetailedRouteConfig>(routeArray, {
 
 // ─── Session constants ────────────────────────────────────────────────────────
 const TOKEN_REFRESH_MS      = 15.1 * 60 * 1000;     // refresh IDCS token every 15 min
+const TOKEN_REFRESH_MAX_ATTEMPTS = 3;               // redirect only after 3 failed refresh attempts
+const TOKEN_REFRESH_RETRY_DELAY_MS = 1000;
 const RELAUNCH_AUTH_URL     = "/";          // force fresh login flow
 
 function isLocalhost(): boolean {
@@ -178,15 +180,28 @@ export const App = registerCustomElement("app-root", (props: Props) => {
       refreshInFlightRef.current = true;
       const refreshUrl = `/callback?refresh&_=${Date.now()}`;
       try {
-        const response = await fetch(refreshUrl, {
-          method: "GET",
-          credentials: "same-origin",
-          cache: "no-store",
-          redirect: "follow",
-        });
+        for (let attempt = 1; attempt <= TOKEN_REFRESH_MAX_ATTEMPTS; attempt += 1) {
+          try {
+            const response = await fetch(refreshUrl, {
+              method: "GET",
+              credentials: "same-origin",
+              cache: "no-store",
+              redirect: "follow",
+            });
 
-        if (!response.ok) {
-          throw new Error(`Refresh failed with status ${response.status}`);
+            if (!response.ok) {
+              throw new Error(`Refresh failed with status ${response.status}`);
+            }
+            return;
+          } catch (err) {
+            if (attempt >= TOKEN_REFRESH_MAX_ATTEMPTS) {
+              throw err;
+            }
+            console.warn(`Token refresh attempt ${attempt} failed; retrying.`, err);
+            await new Promise<void>((resolve) =>
+              window.setTimeout(resolve, TOKEN_REFRESH_RETRY_DELAY_MS)
+            );
+          }
         }
       } catch (err) {
         console.error("Token refresh failed, redirecting to login.", err);
