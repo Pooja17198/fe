@@ -18,6 +18,7 @@ import {
     chunkArray,
     getHostTransceiverMetricDisplayDeviceNames,
     mergeRackValidationSummaries,
+    normalizeDeviceName,
     normalizeDeviceStatusesPayload,
     normalizeValidationFailuresPayload,
     NOT_VALIDATED_SUMMARY,
