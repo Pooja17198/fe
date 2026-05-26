@@ -306,6 +306,20 @@ function normalizeValidationMode(value: ValidationMode | string | undefined): Va
     return undefined;
 }
 
+function getGpuExpanderParentComputeName(deviceName: string | undefined | null): string | null {
+    const normalizedDeviceName = String(deviceName || "").trim();
+    const match = normalizedDeviceName.match(/^(.*?)(?:-u\d+)?-gpu-expander(\d+)(?:-.+)?$/i);
+    if (!match) {
+        return null;
+    }
+
+    return `${match[1]}-compute${match[2]}`;
+}
+
+function isNotReadyForLvvStatus(status: string): boolean {
+    return status !== "" && !READINESS_STATES_WITH_REAL_ERRORS.has(status);
+}
+
 async function fetchRackHostReadinessPayload(
     row: ProjectRackRow,
     region: string,
@@ -546,6 +560,7 @@ async function fetchRackValidationSummary(
 type RackValidationSummaryInputs = {
     cablingFailuresByDevice: ReturnType<typeof normalizeValidationFailuresPayload>;
     streamingFailuresByDevice: ReturnType<typeof normalizeValidationFailuresPayload>;
+    deviceStatuses: DeviceStatus[] | null;
     onDemandDeviceNames: string[] | null;
     streamingDeviceNames: string[];
 };
@@ -559,6 +574,7 @@ async function fetchRackValidationSummaryInputs(
         return {
             cablingFailuresByDevice: {},
             streamingFailuresByDevice: {},
+            deviceStatuses: [],
             onDemandDeviceNames: [],
             streamingDeviceNames: [],
         };
@@ -576,6 +592,7 @@ async function fetchRackValidationSummaryInputs(
         return {
             cablingFailuresByDevice,
             streamingFailuresByDevice: {},
+            deviceStatuses: null,
             onDemandDeviceNames: null,
             streamingDeviceNames: [],
         };
@@ -623,6 +640,7 @@ async function fetchRackValidationSummaryInputs(
     return {
         cablingFailuresByDevice,
         streamingFailuresByDevice,
+        deviceStatuses,
         onDemandDeviceNames,
         streamingDeviceNames,
     };
@@ -696,30 +714,59 @@ function summarizeHostCountPayload(payload: unknown | null): RackHostCountSummar
     });
 }
 
-function summarizeNotReadyForLvvCountPayload(payload: unknown | null): number {
-    return getHostReadinessItems(payload).reduce<number>((count, item) => {
-        const status = String(item["status"] ?? "").trim().toUpperCase();
-        if (status === "") {
-            return count;
-        }
-        return READINESS_STATES_WITH_REAL_ERRORS.has(status) ? count : count + 1;
-    }, 0);
+function getHostReadinessDeviceName(item: Record<string, unknown>): string {
+    return String(
+        item["deviceName"] ?? item["hostName"] ?? item["host"] ?? ""
+    ).trim();
 }
 
-function summarizeNotReadyForLvvDeviceNames(payload: unknown | null): string[] {
+function buildHostReadinessStatusByDeviceName(payload: unknown | null): Map<string, string> {
+    const readinessByName = new Map<string, string>();
+
+    getHostReadinessItems(payload).forEach((item) => {
+        const deviceName = getHostReadinessDeviceName(item);
+        const status = String(item["status"] ?? "").trim().toUpperCase();
+        if (deviceName && status) {
+            readinessByName.set(normalizeDeviceName(deviceName), status);
+        }
+    });
+
+    return readinessByName;
+}
+
+function summarizeNotReadyForLvvDeviceNames(
+    payload: unknown | null,
+    deviceStatuses: DeviceStatus[] | null = null
+): string[] {
     const names = new Set<string>();
+    const readinessByName = buildHostReadinessStatusByDeviceName(payload);
 
     getHostReadinessItems(payload).forEach((item) => {
         const status = String(item["status"] ?? "").trim().toUpperCase();
-        if (status === "" || READINESS_STATES_WITH_REAL_ERRORS.has(status)) {
+        if (!isNotReadyForLvvStatus(status)) {
             return;
         }
 
-        const deviceName = String(
-            item["deviceName"] ?? item["hostName"] ?? item["host"] ?? ""
-        ).trim();
+        const deviceName = getHostReadinessDeviceName(item);
         if (deviceName) {
             names.add(deviceName);
+        }
+    });
+
+    (deviceStatuses || []).forEach((device) => {
+        const normalizedDeviceName = normalizeDeviceName(device.deviceName);
+        if (!normalizedDeviceName || readinessByName.has(normalizedDeviceName)) {
+            return;
+        }
+
+        const parentComputeName = getGpuExpanderParentComputeName(device.deviceName);
+        if (!parentComputeName) {
+            return;
+        }
+
+        const parentReadinessStatus = readinessByName.get(normalizeDeviceName(parentComputeName));
+        if (parentReadinessStatus && isNotReadyForLvvStatus(parentReadinessStatus)) {
+            names.add(device.deviceName);
         }
     });
 
@@ -729,14 +776,18 @@ function summarizeNotReadyForLvvDeviceNames(payload: unknown | null): string[] {
 async function fetchRackHostReadinessSummaries(
     row: ProjectRackRow,
     region: string,
-    signal: AbortSignal
+    signal: AbortSignal,
+    deviceStatuses: DeviceStatus[] | null = null
 ): Promise<RackHostReadinessSummaries> {
     const payload = await fetchRackHostReadinessPayload(row, region, signal);
+    const notReadyForLvvDeviceNames = payload
+        ? summarizeNotReadyForLvvDeviceNames(payload, deviceStatuses)
+        : [];
     return {
         readySummary: payload ? summarizeHostReadinessPayload(payload) : EMPTY_VALIDATION_READY_SUMMARY,
         hostCountSummary: payload ? summarizeHostCountPayload(payload) : EMPTY_HOST_COUNT_SUMMARY,
-        notReadyForLvvCount: payload ? summarizeNotReadyForLvvCountPayload(payload) : 0,
-        notReadyForLvvDeviceNames: payload ? summarizeNotReadyForLvvDeviceNames(payload) : [],
+        notReadyForLvvCount: notReadyForLvvDeviceNames.length,
+        notReadyForLvvDeviceNames,
         hostTransceiverMetricDeviceNames: payload
             ? getHostTransceiverMetricDisplayDeviceNames(getHostReadinessItems(payload))
             : [],
@@ -1131,6 +1182,16 @@ const ProjectDetailsContainer = (props: Props) => {
                     props.region,
                     ac.signal
                 );
+                const hostReadinessSummariesPromise = row.isGpuRack
+                    ? validationSummaryInputsPromise.then((validationSummaryInputs) =>
+                        fetchRackHostReadinessSummaries(
+                            row,
+                            props.region,
+                            ac.signal,
+                            validationSummaryInputs.deviceStatuses
+                        )
+                    )
+                    : null;
                 let notReadyForLvvDeviceNames: string[] = [];
                 let hostTransceiverMetricDeviceNames: string[] | undefined = row.isGpuRack ? [] : undefined;
                 let shouldStop = false;
@@ -1143,7 +1204,7 @@ const ProjectDetailsContainer = (props: Props) => {
                             notReadyForLvvCount,
                             notReadyForLvvDeviceNames: fetchedNotReadyDeviceNames,
                             hostTransceiverMetricDeviceNames: fetchedHostTransceiverMetricDeviceNames,
-                        } = await fetchRackHostReadinessSummaries(row, props.region, ac.signal);
+                        } = await hostReadinessSummariesPromise!;
                         if (ac.signal.aborted || requestId !== statusRequestSeqRef.current) {
                             shouldStop = true;
                         } else {
@@ -1279,8 +1340,18 @@ const ProjectDetailsContainer = (props: Props) => {
         try {
             await Promise.all(
                 rowsToFetch.map(async (row) => {
+                    const deviceStatuses = await fetchRackDeviceStatuses(
+                        row,
+                        props.region,
+                        requestSignal
+                    ).catch(() => null);
                     const { readySummary, hostCountSummary, notReadyForLvvCount } =
-                        await fetchRackHostReadinessSummaries(row, props.region, requestSignal);
+                        await fetchRackHostReadinessSummaries(
+                            row,
+                            props.region,
+                            requestSignal,
+                            deviceStatuses
+                        );
 
                     if (requestSignal.aborted) {
                         return;
