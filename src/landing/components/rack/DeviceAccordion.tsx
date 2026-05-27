@@ -1233,7 +1233,7 @@ function toAvailabilityDomain(region: string, availabilityDomain?: string): stri
 function buildComputeAdminHostUrl(hostSerial: string, region: string, availabilityDomain?: string): string {
   const computeAdminRegion = toAvailabilityDomain(region, availabilityDomain);
   if (!hostSerial || !computeAdminRegion) return "#";
-  return `https://devops.oci.oraclecorp.com/compute-admin/hosts/${encodeURIComponent(hostSerial)}?region=${encodeURIComponent(computeAdminRegion)}&region=${encodeURIComponent(computeAdminRegion)}`;
+  return `https://devops.oci.oraclecorp.com/compute-admin/hosts/${encodeURIComponent(hostSerial)}?region=${encodeURIComponent(computeAdminRegion)}`;
 }
 
 function buildComputeAdminInstanceUrl(instanceId: string, region: string, availabilityDomain?: string): string {
