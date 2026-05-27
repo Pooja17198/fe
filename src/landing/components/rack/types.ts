@@ -11,6 +11,7 @@ export type DeviceStatus = {
   hostReadinessStatus?: string;
   hostSerial?: string;
   hostInstanceId?: string | null;
+  hostAvailabilityDomain?: string;
   hostHopsState?: string;
   hostComputeState?: string;
   hostComputePool?: string;
@@ -22,6 +23,7 @@ export type HostReadinessItem = {
   hostSerial: string;
   hostName: string;
   instanceId?: string | null;
+  availabilityDomain?: string;
   hopsState?: string;
   computeState?: string;
   computePool?: string;

@@ -1218,21 +1218,28 @@ function buildDeviceFailuresFallback(deviceName: string): DeviceValidationFailur
   };
 }
 
-function toAvailabilityDomain(region: string): string {
+function toAvailabilityDomain(region: string, availabilityDomain?: string): string {
   const normalizedRegion = String(region || "").trim();
+  const normalizedAvailabilityDomain = String(availabilityDomain || "").trim();
+  if (normalizedRegion && normalizedAvailabilityDomain) {
+    const adMatch = normalizedAvailabilityDomain.match(/-ad-(\d+)$/i);
+    if (adMatch) {
+      return `${normalizedRegion}-ad-${adMatch[1]}`;
+    }
+  }
   return normalizedRegion ? `${normalizedRegion}-ad-1` : "";
 }
 
-function buildComputeAdminHostUrl(hostSerial: string, region: string): string {
-  const availabilityDomain = toAvailabilityDomain(region);
-  if (!hostSerial || !availabilityDomain) return "#";
-  return `https://devops.oci.oraclecorp.com/compute-admin/hosts/${encodeURIComponent(hostSerial)}?region=${encodeURIComponent(availabilityDomain)}&region=${encodeURIComponent(availabilityDomain)}`;
+function buildComputeAdminHostUrl(hostSerial: string, region: string, availabilityDomain?: string): string {
+  const computeAdminRegion = toAvailabilityDomain(region, availabilityDomain);
+  if (!hostSerial || !computeAdminRegion) return "#";
+  return `https://devops.oci.oraclecorp.com/compute-admin/hosts/${encodeURIComponent(hostSerial)}?region=${encodeURIComponent(computeAdminRegion)}&region=${encodeURIComponent(computeAdminRegion)}`;
 }
 
-function buildComputeAdminInstanceUrl(instanceId: string, region: string): string {
-  const availabilityDomain = toAvailabilityDomain(region);
-  if (!instanceId || !availabilityDomain) return "#";
-  return `https://devops.oci.oraclecorp.com/compute-admin/instances/${encodeURIComponent(instanceId)}?region=${encodeURIComponent(availabilityDomain)}`;
+function buildComputeAdminInstanceUrl(instanceId: string, region: string, availabilityDomain?: string): string {
+  const computeAdminRegion = toAvailabilityDomain(region, availabilityDomain);
+  if (!instanceId || !computeAdminRegion) return "#";
+  return `https://devops.oci.oraclecorp.com/compute-admin/instances/${encodeURIComponent(instanceId)}?region=${encodeURIComponent(computeAdminRegion)}`;
 }
 
 function buildCerebroHostUrl(hostSerial: string, region: string): string {
@@ -1280,6 +1287,7 @@ function renderDeviceInformationSection(
   const deviceName = String(device.deviceName || "").trim() || "-";
   const hostSerial = String(device.hostSerial || "").trim();
   const instanceId = device.hostInstanceId == null ? "-" : String(device.hostInstanceId).trim() || "-";
+  const hostAvailabilityDomain = String(device.hostAvailabilityDomain || "").trim();
   const hopsState = String(device.hostHopsState || "").trim() || "-";
   const computeState = String(device.hostComputeState || "").trim() || "-";
   const computePool = String(device.hostComputePool || "").trim() || "-";
@@ -1307,7 +1315,7 @@ function renderDeviceInformationSection(
     {
       label: "Host Serial",
       value: hostSerial ? (
-        <a href={buildComputeAdminHostUrl(hostSerial, region)} target="_blank" rel="noopener noreferrer">
+        <a href={buildComputeAdminHostUrl(hostSerial, region, hostAvailabilityDomain)} target="_blank" rel="noopener noreferrer">
           {hostSerial}
         </a>
       ) : "-",
@@ -1315,7 +1323,7 @@ function renderDeviceInformationSection(
     {
       label: "Instance ID",
       value: instanceId !== "-" ? (
-        <a href={buildComputeAdminInstanceUrl(instanceId, region)} target="_blank" rel="noopener noreferrer">
+        <a href={buildComputeAdminInstanceUrl(instanceId, region, hostAvailabilityDomain)} target="_blank" rel="noopener noreferrer">
           {instanceId}
         </a>
       ) : instanceId,
