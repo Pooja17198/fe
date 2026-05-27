@@ -1229,6 +1229,12 @@ function buildComputeAdminHostUrl(hostSerial: string, region: string): string {
   return `https://devops.oci.oraclecorp.com/compute-admin/hosts/${encodeURIComponent(hostSerial)}?region=${encodeURIComponent(availabilityDomain)}&region=${encodeURIComponent(availabilityDomain)}`;
 }
 
+function buildComputeAdminInstanceUrl(instanceId: string, region: string): string {
+  const availabilityDomain = toAvailabilityDomain(region);
+  if (!instanceId || !availabilityDomain) return "#";
+  return `https://devops.oci.oraclecorp.com/compute-admin/instances/${encodeURIComponent(instanceId)}?region=${encodeURIComponent(availabilityDomain)}`;
+}
+
 function buildCerebroHostUrl(hostSerial: string, region: string): string {
   const availabilityDomain = toAvailabilityDomain(region);
   if (!hostSerial || !availabilityDomain) return "#";
@@ -1308,8 +1314,8 @@ function renderDeviceInformationSection(
     },
     {
       label: "Instance ID",
-      value: hostSerial && instanceId !== "-" ? (
-        <a href={buildComputeAdminHostUrl(hostSerial, region)} target="_blank" rel="noopener noreferrer">
+      value: instanceId !== "-" ? (
+        <a href={buildComputeAdminInstanceUrl(instanceId, region)} target="_blank" rel="noopener noreferrer">
           {instanceId}
         </a>
       ) : instanceId,
