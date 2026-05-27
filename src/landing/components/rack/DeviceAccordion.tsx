@@ -1242,16 +1242,19 @@ function buildComputeAdminInstanceUrl(instanceId: string, region: string, availa
   return `https://devops.oci.oraclecorp.com/compute-admin/instances/${encodeURIComponent(instanceId)}?region=${encodeURIComponent(computeAdminRegion)}`;
 }
 
-function buildCerebroHostUrl(hostSerial: string, region: string): string {
-  const availabilityDomain = toAvailabilityDomain(region);
-  if (!hostSerial || !availabilityDomain) return "#";
-  return `https://devops.oci.oraclecorp.com/cerebro-ui/HostDetails/${encodeURIComponent(hostSerial)}?region=${encodeURIComponent(availabilityDomain)}`;
+function buildCerebroHostUrl(hostSerial: string, region: string, availabilityDomain?: string): string {
+  const cerebroRegion = toAvailabilityDomain(region, availabilityDomain);
+  if (!hostSerial || !cerebroRegion) return "#";
+  return `https://devops.oci.oraclecorp.com/cerebro-ui/HostDetails/${encodeURIComponent(hostSerial)}?region=${encodeURIComponent(cerebroRegion)}`;
 }
 
-function buildHopsDeviceUrl(hostSerial: string, region: string): string {
+function buildHopsDeviceUrl(hostSerial: string, region: string, availabilityDomain?: string): string {
   const normalizedRegion = String(region || "").trim();
+  const normalizedAvailabilityDomain = String(availabilityDomain || "").trim();
+  const adMatch = normalizedAvailabilityDomain.match(/-ad-(\d+)$/i);
+  const adName = adMatch ? `ad${adMatch[1]}` : "ad1";
   if (!hostSerial || !normalizedRegion) return "#";
-  return `https://hops.svc.ad1.${normalizedRegion}/ui/deviceview?serial=${encodeURIComponent(hostSerial)}`;
+  return `https://hops.svc.${adName}.${normalizedRegion}/ui/deviceview?serial=${encodeURIComponent(hostSerial)}`;
 }
 
 function buildTicketUrl(ticketId: string): string {
@@ -1307,7 +1310,7 @@ function renderDeviceInformationSection(
     {
       label: "Device Name",
       value: hostSerial ? (
-        <a href={buildCerebroHostUrl(hostSerial, region)} target="_blank" rel="noopener noreferrer">
+        <a href={buildCerebroHostUrl(hostSerial, region, hostAvailabilityDomain)} target="_blank" rel="noopener noreferrer">
           {deviceName}
         </a>
       ) : deviceName,
@@ -1331,7 +1334,7 @@ function renderDeviceInformationSection(
     {
       label: "Hops State",
       value: hostSerial && hopsState !== "-" ? (
-        <a href={buildHopsDeviceUrl(hostSerial, region)} target="_blank" rel="noopener noreferrer">
+        <a href={buildHopsDeviceUrl(hostSerial, region, hostAvailabilityDomain)} target="_blank" rel="noopener noreferrer">
           {hopsState}
         </a>
       ) : hopsState,
