@@ -1244,7 +1244,7 @@ function buildHopsDeviceUrl(hostSerial: string, region: string): string {
 function buildTicketUrl(ticketId: string): string {
   const normalizedTicketId = String(ticketId || "").trim();
   if (!normalizedTicketId) return "#";
-  return `https://jira-sd.mc1.oracleiaas.com/projects/LVV/queues/custom/31341/${encodeURIComponent(normalizedTicketId)}`;
+  return `https://jira-sd.mc1.oracleiaas.com/browse/${encodeURIComponent(normalizedTicketId)}`;
 }
 
 const VALIDATION_STATE_LEGEND_ITEMS = [
