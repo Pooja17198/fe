@@ -15,6 +15,7 @@ import { Header } from "./header";
 import Content from "./content/index";
 import UrlPathParamAdapter = require("ojs/ojurlpathparamadapter");
 import { getInitialLvvUserType } from "./home/userType";
+import { authenticateDuploUser, refreshDuploToken } from "../auth/duploAuth";
 
 type Props = {
   appName?: string;
@@ -182,6 +183,11 @@ export const App = registerCustomElement("app-root", (props: Props) => {
       try {
         for (let attempt = 1; attempt <= TOKEN_REFRESH_MAX_ATTEMPTS; attempt += 1) {
           try {
+            const duploRefreshHandled = await refreshDuploToken(true, selectedRegion);
+            if (duploRefreshHandled) {
+              return;
+            }
+
             const response = await fetch(refreshUrl, {
               method: "GET",
               credentials: "same-origin",
@@ -248,7 +254,12 @@ export const App = registerCustomElement("app-root", (props: Props) => {
           console.error(error);
         }
       });
-      startTokenRefresh();
+      void authenticateDuploUser()
+        .then(() => startTokenRefresh())
+        .catch((error) => {
+          console.error("Duplo authentication failed, redirecting to login.", error);
+          redirectToLogin();
+        });
 
       return () => {
         stopTokenRefresh();
