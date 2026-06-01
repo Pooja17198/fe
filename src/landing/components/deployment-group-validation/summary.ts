@@ -19,6 +19,22 @@ const VALIDATED_CLEAN_SUMMARY: RackValidationSummary = {
   isValidated: true,
 };
 
+const ALLOWED_DEPLOYMENT_GROUP_RACK_STATES = new Set([
+  "DELIVERED",
+  "RECEIVED",
+  "AVAILABLE",
+  "IN-SERVICE",
+]);
+
+function isAllowedDeploymentGroupRackState(rackState: string | null | undefined): boolean {
+  const normalizedState = String(rackState || "").trim().toUpperCase();
+  if (!normalizedState) {
+    // Preserve current behavior until /rackLocationDetails is deployed with rackState.
+    return true;
+  }
+  return ALLOWED_DEPLOYMENT_GROUP_RACK_STATES.has(normalizedState);
+}
+
 const IGNORED_DEPLOYMENT_GROUP_DEVICE_NAMES = new Set(["unknown"]);
 
 function toValidatedSummary(summary: RackValidationSummary): RackValidationSummary {
@@ -111,8 +127,11 @@ export function buildDeploymentGroupRackRows(params: {
   region: string;
   building: string;
 }): DeploymentGroupRackRow[] {
-  return params.rackNumbers.map((rackNumber) => {
+  return params.rackNumbers.flatMap((rackNumber) => {
     const metadata = params.metadataByRackNumber[rackNumber];
+    if (!metadata || !isAllowedDeploymentGroupRackState(metadata.rackState)) {
+      return [];
+    }
     const rackSerialNumber = metadata?.rackSerialNumber || "";
     const hasResult = hasDeploymentGroupRackResult(params.results, rackSerialNumber);
     const failuresByDevice = getDeploymentGroupRackValidationFailures({
@@ -123,7 +142,7 @@ export function buildDeploymentGroupRackRows(params: {
       ? toValidatedSummary(summarizeValidationFailuresByDevice(failuresByDevice))
       : NOT_VALIDATED_SUMMARY;
 
-    return {
+    return [{
       _key: rackNumber,
       rackLocation: rackNumber,
       rackSerialNumber,
@@ -141,7 +160,7 @@ export function buildDeploymentGroupRackRows(params: {
             rackSerialNumber,
           })
         : undefined,
-    };
+    }];
   });
 }
 

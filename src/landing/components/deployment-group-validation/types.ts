@@ -31,6 +31,7 @@ export type RackMetadata = {
   rackSerialNumber: string;
   block: string;
   platformName: string;
+  rackState: string;
 };
 
 export type DeploymentGroupValidationResults = Record<string, unknown>;
