@@ -1,29 +1,94 @@
-From 5f89a48abab3631c266ea28d0fe25aa0523a1f10 Mon Sep 17 00:00:00 2001
+From ec83ebe5b96818a20276b1f6371dbf064cdedc87 Mon Sep 17 00:00:00 2001
 From: Cursor Agent <cursoragent@cursor.com>
 Date: Mon, 1 Jun 2026 17:08:41 +0000
 Subject: [PATCH] Return rack state in rack location details
 
 ---
- .../service/dependencies/storekeeper/StoreKeeperHelper.java   | 2 +-
- .../pic/networking/lvv/service/service/RacksService.java      | 1 +
- .../dependencies/storekeeper/StoreKeeperHelperTest.java       | 2 ++
- .../pic/networking/lvv/service/service/RacksServiceTest.java  | 4 ++++
- lvv-service-spec/src/specs/api.cond.yaml                      | 1 +
- 5 files changed, 9 insertions(+), 1 deletion(-)
+ .../storekeeper/StoreKeeperHelper.java        | 60 +++++++++++++++++++
+ .../lvv/service/service/RacksService.java     |  1 +
+ .../storekeeper/StoreKeeperHelperTest.java    |  9 +++
+ .../lvv/service/service/RacksServiceTest.java |  4 ++
+ lvv-service-spec/src/specs/api.cond.yaml      |  1 +
+ 5 files changed, 75 insertions(+)
 
 diff --git a/lvv-service-api/src/main/java/com/oracle/pic/networking/lvv/service/dependencies/storekeeper/StoreKeeperHelper.java b/lvv-service-api/src/main/java/com/oracle/pic/networking/lvv/service/dependencies/storekeeper/StoreKeeperHelper.java
-index 27b2e93..e812039 100644
+index 27b2e93..288d70a 100644
 --- a/lvv-service-api/src/main/java/com/oracle/pic/networking/lvv/service/dependencies/storekeeper/StoreKeeperHelper.java
 +++ b/lvv-service-api/src/main/java/com/oracle/pic/networking/lvv/service/dependencies/storekeeper/StoreKeeperHelper.java
-@@ -382,7 +382,7 @@ public class StoreKeeperHelper {
-                 .block(rackLocation.getBlock() == null ? null : rackLocation.getBlock().getName())
-                 .rackLocation(rackLocation.getRackNumber())
-                 .rackSerial(rackLocation.getRackSerial())
--                .rackState(null)
-+                .rackState(normalizedRackState(rackLocation.getRackState()))
-                 .platformName(rackLocation.getPlatformName())
-                 .isGpuRack(isGpuRack(rackLocation.getPlatformName()))
-                 .build();
+@@ -274,6 +274,7 @@ public class StoreKeeperHelper {
+             executor.shutdownNow();
+         }
+ 
++        addRackStatesFromLocationMap(rackByNumber, requestedRackNumbers, buildingName);
+         return rackByNumber;
+     }
+ 
+@@ -358,6 +359,65 @@ public class StoreKeeperHelper {
+         return null;
+     }
+ 
++    private void addRackStatesFromLocationMap(
++            Map<String, Rack> rackByNumber, Set<String> requestedRackNumbers, String buildingName) {
++        if (rackByNumber.isEmpty()) {
++            return;
++        }
++
++        String pageToken = null;
++        try {
++            do {
++                ListRackLocationsMapRequest request =
++                        ListRackLocationsMapRequest.builder()
++                                .buildingName(buildingName)
++                                .numResults(RACK_LIST_SIZE)
++                                .pageToken(pageToken)
++                                .build();
++
++                ListRackLocationsMapResponse response =
++                        this.storeKeeperClient.listRackLocationsMap(request);
++                if (response == null
++                        || response.getListRackLocationsMap() == null
++                        || response.getListRackLocationsMap().getRackLocations() == null) {
++                    log.warn(
++                            "Empty response from Storekeeper rack location map for buildingName={}; returning rack details without rack state",
++                            buildingName);
++                    return;
++                }
++
++                for (RackLocationMap rackLocationMap :
++                        response.getListRackLocationsMap().getRackLocations()) {
++                    if (rackLocationMap == null || rackLocationMap.getRackNumber() == null) {
++                        continue;
++                    }
++
++                    String returnedRackNumber = trimRackNumber(rackLocationMap.getRackNumber());
++                    if (!requestedRackNumbers.contains(returnedRackNumber)) {
++                        continue;
++                    }
++
++                    Rack rack = rackByNumber.get(returnedRackNumber);
++                    if (rack != null) {
++                        rack.setRackState(normalizedRackState(rackLocationMap.getRackState()));
++                    }
++                }
++
++                if (rackByNumber.values().stream().allMatch(rack -> rack.getRackState() != null)) {
++                    return;
++                }
++
++                pageToken = response.getListRackLocationsMap().getNextPageToken();
++            } while (pageToken != null);
++        } catch (Exception e) {
++            log.warn(
++                    "Failed fetching rack location map states for rackNumbers={} buildingName={}; returning rack details without rack state",
++                    requestedRackNumbers,
++                    buildingName,
++                    e);
++        }
++    }
++
+     private static final class RackLookupResult {
+         private final String rackNumber;
+         private final Rack rack;
 diff --git a/lvv-service-api/src/main/java/com/oracle/pic/networking/lvv/service/service/RacksService.java b/lvv-service-api/src/main/java/com/oracle/pic/networking/lvv/service/service/RacksService.java
 index ccf27f1..d298d61 100644
 --- a/lvv-service-api/src/main/java/com/oracle/pic/networking/lvv/service/service/RacksService.java
@@ -37,18 +102,24 @@ index ccf27f1..d298d61 100644
          }
  
 diff --git a/lvv-service-api/src/test/java/com/oracle/pic/networking/lvv/service/dependencies/storekeeper/StoreKeeperHelperTest.java b/lvv-service-api/src/test/java/com/oracle/pic/networking/lvv/service/dependencies/storekeeper/StoreKeeperHelperTest.java
-index 6ab0301..7531919 100644
+index 6ab0301..c3245b2 100644
 --- a/lvv-service-api/src/test/java/com/oracle/pic/networking/lvv/service/dependencies/storekeeper/StoreKeeperHelperTest.java
 +++ b/lvv-service-api/src/test/java/com/oracle/pic/networking/lvv/service/dependencies/storekeeper/StoreKeeperHelperTest.java
-@@ -79,6 +79,7 @@ class StoreKeeperHelperTest {
-         when(rackLocation.getRackNumber()).thenReturn(rackNumber);
-         when(rackLocation.getRackSerial()).thenReturn(rackSerial);
-         when(rackLocation.getPlatformName()).thenReturn("GPU-platform");
-+        when(rackLocation.getRackState()).thenReturn("AVAILABLE");
-         if (blockName != null) {
-             Block block = mock(Block.class);
-             when(block.getName()).thenReturn(blockName);
-@@ -363,6 +364,7 @@ class StoreKeeperHelperTest {
+@@ -354,6 +354,13 @@ class StoreKeeperHelperTest {
+                                 default -> rackDetailsResponse(List.of(), null);
+                             };
+                         });
++        when(storeKeeper.listRackLocationsMap(any(ListRackLocationsMapRequest.class)))
++                .thenReturn(
++                        pageResponse(
++                                List.of(
++                                        mockRack("1001", "AVAILABLE", "SL01", null, "GPU-platform"),
++                                        mockRack("1002", "DELIVERED", "SL02", null, "GPU-platform")),
++                                null));
+ 
+         List<Rack> result =
+                 helper.listRackLocationDetails(
+@@ -363,9 +370,11 @@ class StoreKeeperHelperTest {
          assertEquals("1001", result.get(0).getRackLocation());
          assertEquals("SL01", result.get(0).getRackSerial());
          assertEquals("1", result.get(0).getBlock());
@@ -56,6 +127,10 @@ index 6ab0301..7531919 100644
          assertEquals("1002", result.get(1).getRackLocation());
          assertEquals("SL02", result.get(1).getRackSerial());
          assertEquals("2", result.get(1).getBlock());
++        assertEquals("DELIVERED", result.get(1).getRackState());
+ 
+         ArgumentCaptor<ListRackLocationsRequest> requestCaptor =
+                 ArgumentCaptor.forClass(ListRackLocationsRequest.class);
 diff --git a/lvv-service-api/src/test/java/com/oracle/pic/networking/lvv/service/service/RacksServiceTest.java b/lvv-service-api/src/test/java/com/oracle/pic/networking/lvv/service/service/RacksServiceTest.java
 index 26130f2..fca9ff3 100644
 --- a/lvv-service-api/src/test/java/com/oracle/pic/networking/lvv/service/service/RacksServiceTest.java
