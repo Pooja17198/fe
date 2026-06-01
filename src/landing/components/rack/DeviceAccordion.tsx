@@ -398,6 +398,24 @@ function normalizeDeviceName(value: string | undefined | null): string {
   return String(value || "").trim().toLowerCase();
 }
 
+function getGpuExpanderParentComputeName(deviceName: string | undefined | null): string | null {
+  const normalizedDeviceName = String(deviceName || "").trim();
+  const match = normalizedDeviceName.match(/^(.*?)(?:-u\d+)?-gpu-expander(\d+)(?:-.+)?$/i);
+  if (!match) {
+    return null;
+  }
+
+  return `${match[1]}-compute${match[2]}`;
+}
+
+function getDeviceHostReadinessStatus(device: DeviceStatus | undefined | null): string {
+  return String(device?.hostReadinessStatus || "").trim().toUpperCase();
+}
+
+function isNotReadyForLvvStatus(readinessStatus: string): boolean {
+  return readinessStatus !== "" && !READINESS_STATES_WITH_REAL_ERRORS.has(readinessStatus);
+}
+
 function isUsableLookupValue(value: string | undefined | null): boolean {
   const normalized = normalizeDeviceName(value);
   return !["", "unknown", "n/a", "na", "-", "null"].includes(normalized);
@@ -1200,33 +1218,49 @@ function buildDeviceFailuresFallback(deviceName: string): DeviceValidationFailur
   };
 }
 
-function toAvailabilityDomain(region: string): string {
+function toAvailabilityDomain(region: string, availabilityDomain?: string): string {
   const normalizedRegion = String(region || "").trim();
+  const normalizedAvailabilityDomain = String(availabilityDomain || "").trim();
+  if (normalizedRegion && normalizedAvailabilityDomain) {
+    const adMatch = normalizedAvailabilityDomain.match(/-ad-(\d+)$/i);
+    if (adMatch) {
+      return `${normalizedRegion}-ad-${adMatch[1]}`;
+    }
+  }
   return normalizedRegion ? `${normalizedRegion}-ad-1` : "";
 }
 
-function buildComputeAdminHostUrl(hostSerial: string, region: string): string {
-  const availabilityDomain = toAvailabilityDomain(region);
-  if (!hostSerial || !availabilityDomain) return "#";
-  return `https://devops.oci.oraclecorp.com/compute-admin/hosts/${encodeURIComponent(hostSerial)}?region=${encodeURIComponent(availabilityDomain)}&region=${encodeURIComponent(availabilityDomain)}`;
+function buildComputeAdminHostUrl(hostSerial: string, region: string, availabilityDomain?: string): string {
+  const computeAdminRegion = toAvailabilityDomain(region, availabilityDomain);
+  if (!hostSerial || !computeAdminRegion) return "#";
+  return `https://devops.oci.oraclecorp.com/compute-admin/hosts/${encodeURIComponent(hostSerial)}?region=${encodeURIComponent(computeAdminRegion)}`;
 }
 
-function buildCerebroHostUrl(hostSerial: string, region: string): string {
-  const availabilityDomain = toAvailabilityDomain(region);
-  if (!hostSerial || !availabilityDomain) return "#";
-  return `https://devops.oci.oraclecorp.com/cerebro-ui/HostDetails/${encodeURIComponent(hostSerial)}?region=${encodeURIComponent(availabilityDomain)}`;
+function buildComputeAdminInstanceUrl(instanceId: string, region: string, availabilityDomain?: string): string {
+  const computeAdminRegion = toAvailabilityDomain(region, availabilityDomain);
+  if (!instanceId || !computeAdminRegion) return "#";
+  return `https://devops.oci.oraclecorp.com/compute-admin/instances/${encodeURIComponent(instanceId)}?region=${encodeURIComponent(computeAdminRegion)}`;
 }
 
-function buildHopsDeviceUrl(hostSerial: string, region: string): string {
+function buildCerebroHostUrl(hostSerial: string, region: string, availabilityDomain?: string): string {
+  const cerebroRegion = toAvailabilityDomain(region, availabilityDomain);
+  if (!hostSerial || !cerebroRegion) return "#";
+  return `https://devops.oci.oraclecorp.com/cerebro-ui/HostDetails/${encodeURIComponent(hostSerial)}?region=${encodeURIComponent(cerebroRegion)}`;
+}
+
+function buildHopsDeviceUrl(hostSerial: string, region: string, availabilityDomain?: string): string {
   const normalizedRegion = String(region || "").trim();
+  const normalizedAvailabilityDomain = String(availabilityDomain || "").trim();
+  const adMatch = normalizedAvailabilityDomain.match(/-ad-(\d+)$/i);
+  const adName = adMatch ? `ad${adMatch[1]}` : "ad1";
   if (!hostSerial || !normalizedRegion) return "#";
-  return `https://hops.svc.ad1.${normalizedRegion}/ui/deviceview?serial=${encodeURIComponent(hostSerial)}`;
+  return `https://hops.svc.${adName}.${normalizedRegion}/ui/deviceview?serial=${encodeURIComponent(hostSerial)}`;
 }
 
 function buildTicketUrl(ticketId: string): string {
   const normalizedTicketId = String(ticketId || "").trim();
   if (!normalizedTicketId) return "#";
-  return `https://jira-sd.mc1.oracleiaas.com/projects/LVV/queues/custom/31341/${encodeURIComponent(normalizedTicketId)}`;
+  return `https://jira-sd.mc1.oracleiaas.com/browse/${encodeURIComponent(normalizedTicketId)}`;
 }
 
 const VALIDATION_STATE_LEGEND_ITEMS = [
@@ -1256,6 +1290,7 @@ function renderDeviceInformationSection(
   const deviceName = String(device.deviceName || "").trim() || "-";
   const hostSerial = String(device.hostSerial || "").trim();
   const instanceId = device.hostInstanceId == null ? "-" : String(device.hostInstanceId).trim() || "-";
+  const hostAvailabilityDomain = String(device.hostAvailabilityDomain || "").trim();
   const hopsState = String(device.hostHopsState || "").trim() || "-";
   const computeState = String(device.hostComputeState || "").trim() || "-";
   const computePool = String(device.hostComputePool || "").trim() || "-";
@@ -1275,7 +1310,7 @@ function renderDeviceInformationSection(
     {
       label: "Device Name",
       value: hostSerial ? (
-        <a href={buildCerebroHostUrl(hostSerial, region)} target="_blank" rel="noopener noreferrer">
+        <a href={buildCerebroHostUrl(hostSerial, region, hostAvailabilityDomain)} target="_blank" rel="noopener noreferrer">
           {deviceName}
         </a>
       ) : deviceName,
@@ -1283,15 +1318,15 @@ function renderDeviceInformationSection(
     {
       label: "Host Serial",
       value: hostSerial ? (
-        <a href={buildComputeAdminHostUrl(hostSerial, region)} target="_blank" rel="noopener noreferrer">
+        <a href={buildComputeAdminHostUrl(hostSerial, region, hostAvailabilityDomain)} target="_blank" rel="noopener noreferrer">
           {hostSerial}
         </a>
       ) : "-",
     },
     {
       label: "Instance ID",
-      value: hostSerial && instanceId !== "-" ? (
-        <a href={buildComputeAdminHostUrl(hostSerial, region)} target="_blank" rel="noopener noreferrer">
+      value: instanceId !== "-" ? (
+        <a href={buildComputeAdminInstanceUrl(instanceId, region, hostAvailabilityDomain)} target="_blank" rel="noopener noreferrer">
           {instanceId}
         </a>
       ) : instanceId,
@@ -1299,7 +1334,7 @@ function renderDeviceInformationSection(
     {
       label: "Hops State",
       value: hostSerial && hopsState !== "-" ? (
-        <a href={buildHopsDeviceUrl(hostSerial, region)} target="_blank" rel="noopener noreferrer">
+        <a href={buildHopsDeviceUrl(hostSerial, region, hostAvailabilityDomain)} target="_blank" rel="noopener noreferrer">
           {hopsState}
         </a>
       ) : hopsState,
@@ -2010,6 +2045,64 @@ const DeviceAccordion = (props: Props) => {
     return [...props.devices].sort((a, b) => (b.elevation ?? -Infinity) - (a.elevation ?? -Infinity));
   }, [props.devices]);
 
+  const deviceByName = useMemo(() => {
+    return new Map(props.devices.map((device) => [normalizeDeviceName(device.deviceName), device]));
+  }, [props.devices]);
+
+  const effectiveReadinessStatusByDeviceName = useMemo(() => {
+    const readinessByName = new Map<string, string>();
+
+    props.devices.forEach((device) => {
+      const readinessStatus = getDeviceHostReadinessStatus(device);
+      if (readinessStatus) {
+        readinessByName.set(normalizeDeviceName(device.deviceName), readinessStatus);
+      }
+    });
+
+    props.devices.forEach((device) => {
+      const deviceKey = normalizeDeviceName(device.deviceName);
+      if (readinessByName.has(deviceKey)) {
+        return;
+      }
+
+      const parentComputeName = getGpuExpanderParentComputeName(device.deviceName);
+      if (!parentComputeName) {
+        return;
+      }
+
+      const parentReadinessStatus = readinessByName.get(normalizeDeviceName(parentComputeName));
+      if (parentReadinessStatus) {
+        readinessByName.set(deviceKey, parentReadinessStatus);
+      }
+    });
+
+    return readinessByName;
+  }, [props.devices]);
+
+  const getEffectiveReadinessStatus = useCallback(
+    (device: DeviceStatus): string =>
+      effectiveReadinessStatusByDeviceName.get(normalizeDeviceName(device.deviceName)) ||
+      getDeviceHostReadinessStatus(device),
+    [effectiveReadinessStatusByDeviceName]
+  );
+
+  const shouldShowNotReadyForLvvChip = useCallback(
+    (device: DeviceStatus, deviceName: string): boolean =>
+      isGpuComputeDevice(deviceName, props.isGpuRack) &&
+      isNotReadyForLvvStatus(getEffectiveReadinessStatus(device)),
+    [getEffectiveReadinessStatus, props.isGpuRack]
+  );
+
+  const shouldHideValidationErrorsForDevice = useCallback(
+    (device: DeviceStatus | undefined, deviceName: string): boolean =>
+      Boolean(
+        props.hideNotReadyDeviceErrors &&
+        device &&
+        shouldShowNotReadyForLvvChip(device, deviceName)
+      ),
+    [props.hideNotReadyDeviceErrors, shouldShowNotReadyForLvvChip]
+  );
+
   useEffect(() => {
     setValidationReferenceTimeMs(Date.now());
   }, [props.validationFailuresByDevice]);
@@ -2155,7 +2248,13 @@ const DeviceAccordion = (props: Props) => {
 
   const summaryCounts = useMemo(() => {
     const values = Object.values(filteredFailuresByDevice);
-    const linkFailures = values.reduce((sum, item) => sum + countT0ToHostRows(item), 0);
+    const linkFailures = values.reduce((sum, item) => {
+      const device = deviceByName.get(normalizeDeviceName(item.deviceName));
+      if (shouldHideValidationErrorsForDevice(device, item.deviceName)) {
+        return sum;
+      }
+      return sum + countT0ToHostRows(item);
+    }, 0);
     const powerFailures = values.filter(
         (item) => !isGpuComputeDevice(item.deviceName, props.isGpuRack) && item.hasPsuFailure
     ).length;
@@ -2167,18 +2266,21 @@ const DeviceAccordion = (props: Props) => {
         props.isGpuRack ? hostTransceiverMetricDeviceNames : undefined
       ),
     };
-  }, [filteredFailuresByDevice, hostTransceiverMetricDeviceNames, props.isGpuRack]);
+  }, [
+    filteredFailuresByDevice,
+    deviceByName,
+    hostTransceiverMetricDeviceNames,
+    props.isGpuRack,
+    shouldHideValidationErrorsForDevice,
+  ]);
 
   const renderErrorCount = (
       device: DeviceStatus,
       deviceFailures: DeviceValidationFailures
   ) => {
     const isGpuCompute = isGpuComputeDevice(deviceFailures.deviceName, props.isGpuRack);
-    const readinessStatus = String(device.hostReadinessStatus || "").trim().toUpperCase();
-    const showNotReadyForLvvChip =
-      isGpuCompute &&
-      readinessStatus !== "" &&
-      !READINESS_STATES_WITH_REAL_ERRORS.has(readinessStatus);
+    const readinessStatus = getDeviceHostReadinessStatus(device);
+    const showNotReadyForLvvChip = shouldShowNotReadyForLvvChip(device, deviceFailures.deviceName);
     const showHostTransceiverMetrics =
       isGpuCompute && shouldDisplayHostTransceiverMetrics(readinessStatus);
     const notReadyForLvvChip = showNotReadyForLvvChip
@@ -2576,12 +2678,8 @@ const DeviceAccordion = (props: Props) => {
                   const readinessStatusUpper = String(device.hostReadinessStatus || "").trim().toUpperCase();
                   const showHostTransceiverMetrics =
                       isGpuCompute && shouldDisplayHostTransceiverMetrics(readinessStatusUpper);
-                  const isNotReadyForLvvDevice =
-                      isGpuCompute &&
-                      readinessStatusUpper !== "" &&
-                      !READINESS_STATES_WITH_REAL_ERRORS.has(readinessStatusUpper);
                   const hideValidationSectionsForNotReadyDevice =
-                      isNotReadyForLvvDevice && Boolean(props.hideNotReadyDeviceErrors);
+                      shouldHideValidationErrorsForDevice(device, device.deviceName);
                   const validationSectionGroups = isGpuCompute
                       ? applyStableHostTransceiverTimestamps(
                           device.deviceName,

@@ -104,6 +104,7 @@ function normalizeRackMetadataPayload(payload: unknown): RackMetadata[] {
       rackSerialNumber: text(row.rackSerialNumber ?? row.rackSerial ?? row.serialNumber),
       block: text(row.block ?? row.blockName ?? row.cfabBlock),
       platformName: text(row.platformName ?? row.platform ?? row.rackSku),
+      rackState: text(row.rackState ?? row.state ?? row.lifecycleState),
     }))
     .filter((row) => row.rackNumber !== "");
 }
