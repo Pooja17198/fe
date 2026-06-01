@@ -1,5 +1,4 @@
 import { getLvvApiBase } from "../../config/api";
-import { getAuthenticatedFetch } from "../../auth/duploAuth";
 
 /**
  * Generic fetch with retry helper.
@@ -18,7 +17,7 @@ export async function fetchWithRetry(
       if (options?.signal?.aborted) {
         throw new DOMException("Aborted", "AbortError");
       }
-      const response = await getAuthenticatedFetch()(url, options);
+      const response = await fetch(url, options);
       if (!response.ok && response.status >= 500) {
         throw new Error(`Server error: ${response.status}`);
       }
